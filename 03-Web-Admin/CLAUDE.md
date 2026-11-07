@@ -80,6 +80,9 @@ The user has asked for this standing rule: after completing a **significant** ch
 
 ## Repo notes
 
+- **Location:** this app lives in the team monorepo https://github.com/Maianh-26/Coffeshop (public) under `03-Web-Admin/`, next to `01-Backend-Blazor/` and `02-Flutter-Tablet/`. Local clone: `C:\dev\Coffeshop` — open `C:\dev\Coffeshop\03-Web-Admin\CoffeeShop.Admin.sln` in Visual Studio and run Claude Code from `C:\dev\Coffeshop\03-Web-Admin`. The old copy in OneDrive (`...\projectTT\CoffeeShop.Admin`) is an archive only — never edit it.
+- **Git workflow:** never push straight to `main`; work on a branch (`web-admin` or `feature/...`), push, open a Pull Request for the team lead. Only touch files under `03-Web-Admin/` — other folders belong to the other teams. Run `git pull` before starting work. Commit/push only when the user asks.
+- The repo is public: never commit secrets, real credentials or private screenshots.
 - `.playwright-mcp/` holds Playwright screenshots/logs — scratch output, don't commit it.
 
 - `server.out`/`_check-server.*` are stale logs.
