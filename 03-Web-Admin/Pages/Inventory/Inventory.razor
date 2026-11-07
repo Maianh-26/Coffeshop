@@ -1,0 +1,649 @@
+@page "/inventory"
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Kho nguyên liệu - Coffee Shop</PageTitle>
+
+<div class="inventory-page">
+
+    <section class="panel filters-panel">
+
+        <div class="tabs">
+
+            <button class="tab @(!transactionTab ? "active" : "")"
+                    @onclick="() => SwitchTab(false)">
+
+                <Icon Name="box" />
+                Nguyên liệu
+
+            </button>
+
+            <button class="tab @(transactionTab ? "active" : "")"
+                    @onclick="() => SwitchTab(true)">
+
+                <Icon Name="orders" />
+                Giao dịch kho
+
+            </button>
+
+        </div>
+
+        <div class="filter-row">
+
+            <div class="search-field">
+
+                <Icon Name="search" />
+
+                <input @bind="search"
+                       @bind:event="oninput"
+                       placeholder="@(transactionTab
+                           ? "Tìm mã giao dịch"
+                           : "Tìm mã hoặc tên nguyên liệu")" />
+
+            </div>
+
+            <button class="btn primary"
+                    @onclick="Filter">
+
+                <Icon Name="filter" />
+                Lọc
+
+            </button>
+
+            <button class="btn outline"
+                    @onclick="Reset">
+
+                <Icon Name="reset" />
+                Đặt lại
+
+            </button>
+
+        </div>
+
+    </section>
+
+    <section class="panel action-bar">
+
+        <button class="btn primary"
+                @onclick="Add">
+
+            <Icon Name="plus" />
+
+            @(transactionTab ? "Tạo phiếu nhập/xuất" : "Thêm nguyên liệu")
+
+        </button>
+
+        @if (!transactionTab)
+        {
+            <button class="btn outline"
+                    @onclick="Edit">
+
+                <Icon Name="edit" />
+                Sửa
+
+            </button>
+
+            <button class="btn danger-outline"
+                    @onclick="AskDelete">
+
+                <Icon Name="trash" />
+                Xóa
+
+            </button>
+        }
+
+    </section>
+
+    @if (message is not null)
+    {
+        <p class="alert success" role="status">
+            @message
+        </p>
+    }
+
+    <section class="panel list-panel">
+
+        <div class="table-wrap">
+
+            <table>
+
+                <thead>
+
+                    @if (transactionTab)
+                    {
+                        <tr>
+                            <th>Mã GD</th>
+                            <th>Nguyên liệu</th>
+                            <th>Loại</th>
+                            <th>Số lượng</th>
+                            <th>Đơn vị</th>
+                            <th>Đơn giá</th>
+                            <th>Ngày tạo</th>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <th>Mã NL</th>
+                            <th>Tên nguyên liệu</th>
+                            <th>Đơn vị</th>
+                        </tr>
+                    }
+
+                </thead>
+
+                <tbody>
+
+                    @if (transactionTab)
+                    {
+                        @foreach (var item in VisibleTransactions)
+                        {
+                            <tr>
+                                <td>@item.Code</td>
+                                <td>@item.IngredientName</td>
+
+                                <td>
+                                    <span class="badge @(item.Type == "Nhập mua" ? "green" : "yellow")">
+                                        @item.Type
+                                    </span>
+                                </td>
+
+                                <td>@item.Quantity</td>
+                                <td>@item.Unit</td>
+
+                                <td>
+                                    @(item.UnitCost.HasValue
+                                        ? Money(item.UnitCost.Value)
+                                        : "—")
+                                </td>
+
+                                <td>@item.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        @foreach (var item in VisibleIngredients)
+                        {
+                            <tr class="selectable @(selected == item.Code ? "selected" : "")"
+                                tabindex="0"
+                                @onclick="() => selected = item.Code"
+                                @onclick:stopPropagation="true">
+
+                                <td>@item.Code</td>
+                                <td>@item.Name</td>
+                                <td>@item.Unit</td>
+
+                            </tr>
+                        }
+                    }
+
+                    @if (ItemCount == 0)
+                    {
+                        <tr>
+
+                            <td class="empty-cell"
+                                colspan="@(transactionTab ? 7 : 3)">
+
+                                <Icon Name="box" Size="32" />
+
+                                <p>
+                                    Chưa có dữ liệu.
+                                </p>
+
+                            </td>
+
+                        </tr>
+                    }
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        <div class="list-footer">
+
+            <span>
+                @ItemCount @(transactionTab ? "giao dịch" : "nguyên liệu")
+                · Trang @(page)/@Pages
+            </span>
+
+            <div class="pagination">
+
+                <button class="page-button"
+                        aria-label="Trang trước"
+                        @onclick="() => Move(-1)">
+                    <Icon Name="left" Size="16" />
+                </button>
+
+                <span class="page-number">@(page)</span>
+
+                <button class="page-button"
+                        aria-label="Trang sau"
+                        @onclick="() => Move(1)">
+                    <Icon Name="right" Size="16" />
+                </button>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</div>
+
+@if (dialog != "")
+{
+    <Modal Title="@DialogTitle"
+           OnClose="Close"
+           Busy="@saving">
+
+        @if (dialog == "ingredient")
+        {
+            <EditForm Model="ingredientModel"
+                      OnValidSubmit="SaveIngredient">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-stack">
+
+                    <div class="field">
+                        <label>Mã nguyên liệu</label>
+                        <input value="@ingredientModel.Code"
+                               placeholder="Tự động tạo khi lưu"
+                               readonly />
+                    </div>
+
+                    <div class="field">
+                        <label for="i-name">Tên nguyên liệu *</label>
+                        <InputText id="i-name"
+                                   @bind-Value="ingredientModel.Name"
+                                   placeholder="Nhập tên nguyên liệu" />
+                        <ValidationMessage For="@(() => ingredientModel.Name)" />
+                    </div>
+
+                    <div class="field">
+                        <label for="i-unit">Đơn vị *</label>
+                        <InputText id="i-unit"
+                                   @bind-Value="ingredientModel.Unit"
+                                   placeholder="g, ml, quả, gói..." />
+                        <ValidationMessage For="@(() => ingredientModel.Unit)" />
+                    </div>
+
+                </div>
+
+                @if (error is not null)
+                {
+                    <p class="alert error" role="alert">@error</p>
+                }
+
+                <div class="modal-footer">
+
+                    <button type="button" class="btn outline"
+                            @onclick="Close">
+                        Hủy
+                    </button>
+
+                    <button type="submit" class="btn primary">
+                        @(saving ? "Đang lưu…"
+                            : editingIngredient ? "Lưu thay đổi"
+                            : "Thêm nguyên liệu")
+                    </button>
+
+                </div>
+
+            </EditForm>
+        }
+
+        @if (dialog == "transaction")
+        {
+            <EditForm Model="transactionModel"
+                      OnValidSubmit="SaveTransaction">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-stack">
+
+                    <div class="field">
+                        <label for="t-type">Loại giao dịch *</label>
+                        <InputSelect id="t-type"
+                                     @bind-Value="transactionModel.Type">
+                            <option>Nhập mua</option>
+                            <option>Xuất dùng</option>
+                            <option>Kiểm kê</option>
+                        </InputSelect>
+                    </div>
+
+                    <div class="field">
+                        <label for="t-ingredient">Nguyên liệu *</label>
+                        <InputSelect id="t-ingredient"
+                                     @bind-Value="transactionModel.IngredientId">
+                            <option value="">Chọn nguyên liệu</option>
+                            @foreach (var item in ingredients)
+                            {
+                                <option value="@item.Code">@item.Name (@item.Unit)</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => transactionModel.IngredientId)" />
+                    </div>
+
+                    <div class="field">
+                        <label for="t-qty">Số lượng *</label>
+                        <InputNumber id="t-qty"
+                                     @bind-Value="transactionModel.Quantity"
+                                     step="0.001" />
+                        <ValidationMessage For="@(() => transactionModel.Quantity)" />
+                    </div>
+
+                    @if (transactionModel.Type == "Nhập mua")
+                    {
+                        <div class="field">
+                            <label for="t-cost">Đơn giá (đ)</label>
+                            <InputNumber id="t-cost"
+                                         @bind-Value="transactionModel.UnitCost"
+                                         step="1" />
+                        </div>
+                    }
+
+                    <div class="field">
+                        <label for="t-note">Ghi chú</label>
+                        <InputTextArea id="t-note"
+                                       @bind-Value="transactionModel.Note"
+                                       placeholder="Không bắt buộc"
+                                       rows="2" />
+                    </div>
+
+                </div>
+
+                @if (error is not null)
+                {
+                    <p class="alert error" role="alert">@error</p>
+                }
+
+                <div class="modal-footer">
+
+                    <button type="button" class="btn outline"
+                            @onclick="Close">
+                        Hủy
+                    </button>
+
+                    <button type="submit" class="btn primary">
+                        @(saving ? "Đang lưu…" : "Tạo phiếu")
+                    </button>
+
+                </div>
+
+            </EditForm>
+        }
+
+        @if (dialog == "delete")
+        {
+            <p>
+                Xóa nguyên liệu <strong>@selected</strong>?
+                Chỉ xóa nguyên liệu chưa có giao dịch
+                và chưa dùng trong công thức.
+            </p>
+
+            @if (error is not null)
+            {
+                <p class="alert error" role="alert">@error</p>
+            }
+
+            <div class="modal-footer">
+
+                <button class="btn outline" @onclick="Close">Hủy</button>
+
+                <button class="btn danger" @onclick="Delete">
+                    @(saving ? "Đang xóa…" : "Xóa nguyên liệu")
+                </button>
+
+            </div>
+        }
+
+    </Modal>
+}
+
+@code {
+    private List<Ingredient> ingredients = [];
+    private List<InventoryTransaction> transactions = [];
+
+    private bool transactionTab;
+    private string search = "";
+    private string? selected;
+    private int page = 1;
+    private const int PageSize = 10;
+
+    private string dialog = "";
+    private bool editingIngredient;
+    private bool saving;
+    private string? error;
+    private string? message;
+
+    private Ingredient ingredientModel = new();
+    private InventoryTransaction transactionModel = new();
+
+    private static readonly System.Globalization.CultureInfo Vi = new("vi-VN");
+
+    private static string Money(decimal value)
+    {
+        return value.ToString("N0", Vi) + " đ";
+    }
+
+    private string DialogTitle => dialog switch
+    {
+        "ingredient" => editingIngredient ? "Sửa nguyên liệu" : "Thêm nguyên liệu",
+        "transaction" => "Tạo phiếu nhập/xuất",
+        "delete" => "Xóa nguyên liệu",
+        _ => ""
+    };
+
+    private IEnumerable<Ingredient> FilteredIngredients =>
+        ingredients.Where(i =>
+            search == ""
+            || i.Code.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || i.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+        );
+
+    private IEnumerable<InventoryTransaction> FilteredTransactions =>
+        transactions.Where(t =>
+            search == ""
+            || t.Code.Contains(search, StringComparison.OrdinalIgnoreCase)
+        );
+
+    private List<Ingredient> VisibleIngredients =>
+        FilteredIngredients
+            .Skip((page - 1) * PageSize)
+            .Take(PageSize)
+            .ToList();
+
+    private List<InventoryTransaction> VisibleTransactions =>
+        FilteredTransactions
+            .OrderByDescending(t => t.CreatedAt)
+            .Skip((page - 1) * PageSize)
+            .Take(PageSize)
+            .ToList();
+
+    private int ItemCount => transactionTab
+        ? FilteredTransactions.Count()
+        : FilteredIngredients.Count();
+
+    private int Pages => Math.Max(1,
+        (int)Math.Ceiling(ItemCount / (double)PageSize));
+
+    private void SwitchTab(bool isTransaction)
+    {
+        transactionTab = isTransaction;
+        search = "";
+        page = 1;
+        selected = null;
+    }
+
+    private void Filter() { page = 1; }
+
+    private void Reset()
+    {
+        search = "";
+        page = 1;
+    }
+
+    private void Move(int direction)
+    {
+        int next = page + direction;
+        if (next >= 1 && next <= Pages) page = next;
+    }
+
+    private void Add()
+    {
+        error = null;
+
+        if (transactionTab)
+        {
+            transactionModel = new InventoryTransaction();
+            dialog = "transaction";
+        }
+        else
+        {
+            editingIngredient = false;
+            ingredientModel = new Ingredient();
+            dialog = "ingredient";
+        }
+    }
+
+    private void Edit()
+    {
+        if (selected is null) return;
+
+        error = null;
+        editingIngredient = true;
+
+        var source = ingredients.FirstOrDefault(
+            i => i.Code == selected
+        );
+
+        ingredientModel = source is not null
+            ? new Ingredient
+              {
+                  Code = source.Code,
+                  Name = source.Name,
+                  Unit = source.Unit
+              }
+            : new Ingredient();
+
+        dialog = "ingredient";
+    }
+
+    private void AskDelete()
+    {
+        if (selected is null) return;
+        error = null;
+        dialog = "delete";
+    }
+
+    private void Close()
+    {
+        dialog = "";
+        error = null;
+    }
+
+    private async Task SaveIngredient()
+    {
+        if (saving) return;
+
+        try
+        {
+            saving = true;
+            error = null;
+
+            if (editingIngredient)
+            {
+                var existing = ingredients.FirstOrDefault(
+                    i => i.Code == selected
+                );
+
+                if (existing is not null)
+                {
+                    existing.Name = ingredientModel.Name;
+                    existing.Unit = ingredientModel.Unit;
+                }
+
+                message = $"Đã cập nhật nguyên liệu {ingredientModel.Name}.";
+            }
+            else
+            {
+                ingredientModel.Code = $"NL{ingredients.Count + 1:D4}";
+                ingredients.Add(new Ingredient
+                {
+                    Code = ingredientModel.Code,
+                    Name = ingredientModel.Name,
+                    Unit = ingredientModel.Unit
+                });
+
+                message = $"Đã thêm nguyên liệu {ingredientModel.Name}.";
+            }
+
+            dialog = "";
+            await Task.CompletedTask;
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { saving = false; }
+    }
+
+    private async Task SaveTransaction()
+    {
+        if (saving) return;
+
+        try
+        {
+            saving = true;
+            error = null;
+
+            var ingredient = ingredients.FirstOrDefault(
+                i => i.Code == transactionModel.IngredientId
+            );
+
+            transactionModel.Code = $"GD{transactions.Count + 1:D4}";
+            transactionModel.IngredientName = ingredient?.Name ?? "";
+            transactionModel.Unit = ingredient?.Unit ?? "";
+            transactionModel.CreatedAt = DateTime.Now;
+
+            transactions.Add(new InventoryTransaction
+            {
+                Code = transactionModel.Code,
+                IngredientId = transactionModel.IngredientId,
+                IngredientName = transactionModel.IngredientName,
+                Type = transactionModel.Type,
+                Quantity = transactionModel.Quantity,
+                Unit = transactionModel.Unit,
+                UnitCost = transactionModel.UnitCost,
+                CreatedAt = transactionModel.CreatedAt,
+                Note = transactionModel.Note
+            });
+
+            message = $"Đã tạo phiếu {transactionModel.Code}.";
+            dialog = "";
+            await Task.CompletedTask;
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { saving = false; }
+    }
+
+    private async Task Delete()
+    {
+        if (saving || selected is null) return;
+
+        try
+        {
+            saving = true;
+            error = null;
+
+            ingredients.RemoveAll(i => i.Code == selected);
+            message = "Đã xóa nguyên liệu.";
+            selected = null;
+            dialog = "";
+            await Task.CompletedTask;
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { saving = false; }
+    }
+}
+

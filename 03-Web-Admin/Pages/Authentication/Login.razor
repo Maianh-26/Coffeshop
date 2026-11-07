@@ -1,0 +1,85 @@
+@page "/login"
+@layout AuthLayout
+@attribute [AllowAnonymous]
+
+<PageTitle>Đăng nhập - Coffee Shop</PageTitle>
+
+<div class="auth-card">
+
+    <h1>Đăng nhập</h1>
+
+    <p class="preview-note">
+        Hệ thống quản lý nội bộ dành cho nhân viên và quản lý quán cà phê.
+    </p>
+
+    @if (error is not null)
+    {
+        <p class="alert error" role="alert">
+            @error
+        </p>
+    }
+
+    <EditForm Model="model" OnValidSubmit="HandleLogin" novalidate>
+
+        <DataAnnotationsValidator />
+
+        <div class="form-stack">
+
+            <div class="field">
+
+                <label for="username">Tên đăng nhập</label>
+
+                <InputTextLive id="username"
+                           @bind-Value="model.Username"
+                           placeholder="Nhập tên đăng nhập"
+                           autocomplete="username" />
+
+                <ValidationMessage For="@(() => model.Username)" />
+
+            </div>
+
+            <div class="field">
+
+                <label for="password">Mật khẩu</label>
+
+                <div class="password-field">
+
+                    <InputTextLive id="password"
+                               type="@(showPassword ? "text" : "password")"
+                               @bind-Value="model.Password"
+                               placeholder="Nhập mật khẩu"
+                               autocomplete="current-password" />
+
+                    <button type="button"
+                            class="icon-button"
+                            aria-label="@(showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu")"
+                            @onclick="() => showPassword = !showPassword">
+
+                        <Icon Name="@(showPassword ? "eye-off" : "eye")" Size="18" />
+
+                    </button>
+
+                </div>
+
+                <ValidationMessage For="@(() => model.Password)" />
+
+            </div>
+
+        </div>
+
+        <button type="submit"
+                class="btn primary auth-submit"
+                disabled="@loading">
+
+            @(loading ? "Đang đăng nhập…" : "Đăng nhập")
+
+        </button>
+
+        <p class="auth-link">
+            <a href="forgot-password">Quên mật khẩu?</a>
+        </p>
+
+    </EditForm>
+
+</div>
+

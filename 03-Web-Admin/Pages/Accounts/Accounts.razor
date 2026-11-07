@@ -1,0 +1,463 @@
+@page "/accounts"
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Tài khoản - Coffee Shop</PageTitle>
+
+<div class="accounts-page">
+
+    <section class="panel filters-panel">
+
+        <div class="filter-row">
+
+            <div class="search-field">
+
+                <Icon Name="search" />
+
+                <input @bind="search"
+                       @bind:event="oninput"
+                       placeholder="Tìm mã, tên hoặc email" />
+
+            </div>
+
+            <select aria-label="Lọc vai trò"
+                    @bind="roleFilter">
+
+                <option value="">Tất cả vai trò</option>
+                <option value="Admin">Quản lý</option>
+                <option>Nhân viên</option>
+
+            </select>
+
+            <button class="btn primary"
+                    @onclick="Filter">
+
+                <Icon Name="filter" />
+                Lọc
+
+            </button>
+
+            <button class="btn outline"
+                    @onclick="Reset">
+
+                <Icon Name="reset" />
+                Đặt lại
+
+            </button>
+
+        </div>
+
+    </section>
+
+    <section class="panel action-bar">
+
+        <button class="btn primary"
+                @onclick="Add">
+
+            <Icon Name="plus" />
+            Thêm tài khoản
+
+        </button>
+
+        <button class="btn outline"
+                @onclick="Edit">
+
+            <Icon Name="edit" />
+            Sửa
+
+        </button>
+
+        <button class="btn danger-outline"
+                @onclick="AskDelete">
+
+            <Icon Name="trash" />
+            Xóa
+
+        </button>
+
+    </section>
+
+    @if (message is not null)
+    {
+        <p class="alert success" role="status">
+            @message
+        </p>
+    }
+
+    <section class="panel list-panel">
+
+        <div class="table-wrap">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+                        <th>Mã TK</th>
+                        <th>Họ và tên</th>
+                        <th>Tên đăng nhập</th>
+                        <th>Email</th>
+                        <th>Vai trò</th>
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    @foreach (var item in VisibleAccounts)
+                    {
+                        <tr class="selectable @(selected == item.Code ? "selected" : "")"
+                            tabindex="0"
+                            @onclick="() => selected = item.Code"
+                            @onclick:stopPropagation="true">
+
+                            <td>@item.Code</td>
+                            <td>@item.FullName</td>
+                            <td>@item.Username</td>
+                            <td>@item.Email</td>
+
+                            <td>
+                                <span class="badge @(item.Role == "Admin" ? "yellow" : "green")">
+                                    @Roles.Label(item.Role)
+                                </span>
+                            </td>
+
+                        </tr>
+                    }
+
+                    @if (VisibleAccounts.Count == 0)
+                    {
+                        <tr>
+
+                            <td class="empty-cell" colspan="5">
+
+                                <Icon Name="user" Size="32" />
+
+                                <p>
+                                    Chưa có tài khoản nào.
+                                </p>
+
+                            </td>
+
+                        </tr>
+                    }
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        <div class="list-footer">
+
+            <span>
+                @FilteredAccounts.Count() tài khoản
+                · Trang @(page)/@Pages
+            </span>
+
+            <div class="pagination">
+
+                <button class="page-button"
+                        aria-label="Trang trước"
+                        @onclick="() => Move(-1)">
+                    <Icon Name="left" Size="16" />
+                </button>
+
+                <span class="page-number">@(page)</span>
+
+                <button class="page-button"
+                        aria-label="Trang sau"
+                        @onclick="() => Move(1)">
+                    <Icon Name="right" Size="16" />
+                </button>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</div>
+
+@if (dialog != "")
+{
+    <Modal Title="@DialogTitle"
+           OnClose="Close"
+           Busy="@saving">
+
+        @if (dialog == "form")
+        {
+            <EditForm Model="model"
+                      OnValidSubmit="Save">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-stack">
+
+                    <div class="field">
+                        <label>Mã tài khoản</label>
+                        <input value="@model.Code"
+                               placeholder="@(editing
+                                   ? "Chưa chọn"
+                                   : "Tự động tạo khi lưu")"
+                               readonly />
+                    </div>
+
+                    <div class="field">
+                        <label for="a-name">Họ và tên *</label>
+                        <InputText id="a-name"
+                                   @bind-Value="model.FullName"
+                                   placeholder="Nhập họ và tên" />
+                        <ValidationMessage For="@(() => model.FullName)" />
+                    </div>
+
+                    <div class="field">
+                        <label for="a-username">Tên đăng nhập *</label>
+                        <InputText id="a-username"
+                                   @bind-Value="model.Username"
+                                   placeholder="Nhập tên đăng nhập" />
+                        <ValidationMessage For="@(() => model.Username)" />
+                    </div>
+
+                    <div class="field">
+                        <label for="a-email">Email *</label>
+                        <InputText id="a-email"
+                                   @bind-Value="model.Email"
+                                   placeholder="Nhập email"
+                                   type="email" />
+                        <ValidationMessage For="@(() => model.Email)" />
+                    </div>
+
+                    <div class="field">
+                        <label for="a-role">Vai trò</label>
+                        <InputSelect id="a-role"
+                                     @bind-Value="model.Role">
+                            <option>Nhân viên</option>
+                            <option value="Admin">Quản lý</option>
+                        </InputSelect>
+                    </div>
+
+                </div>
+
+                @if (error is not null)
+                {
+                    <p class="alert error" role="alert">@error</p>
+                }
+
+                <div class="modal-footer">
+
+                    <button type="button" class="btn outline"
+                            @onclick="Close">
+                        Hủy
+                    </button>
+
+                    <button type="submit" class="btn primary">
+                        @(saving ? "Đang lưu…"
+                            : editing ? "Lưu thay đổi"
+                            : "Thêm tài khoản")
+                    </button>
+
+                </div>
+
+            </EditForm>
+        }
+
+        @if (dialog == "delete")
+        {
+            <p>Xóa tài khoản <strong>@selected</strong>?</p>
+
+            @if (error is not null)
+            {
+                <p class="alert error" role="alert">@error</p>
+            }
+
+            <div class="modal-footer">
+
+                <button class="btn outline" @onclick="Close">
+                    Hủy
+                </button>
+
+                <button class="btn danger" @onclick="Delete">
+                    @(saving ? "Đang xóa…" : "Xóa tài khoản")
+                </button>
+
+            </div>
+        }
+
+    </Modal>
+}
+
+@code {
+    private List<Account> accounts = [];
+
+    private string search = "";
+    private string roleFilter = "";
+    private string? selected;
+    private int page = 1;
+    private const int PageSize = 10;
+
+    private string dialog = "";
+    private bool editing;
+    private bool saving;
+    private string? error;
+    private string? message;
+
+    private Account model = new();
+
+    private string DialogTitle => dialog switch
+    {
+        "form" => editing ? "Sửa tài khoản" : "Thêm tài khoản",
+        "delete" => "Xóa tài khoản",
+        _ => ""
+    };
+
+    private IEnumerable<Account> FilteredAccounts =>
+        accounts.Where(a =>
+            (roleFilter == "" || a.Role == roleFilter)
+            && (search == ""
+                || a.Code.Contains(
+                    search, StringComparison.OrdinalIgnoreCase)
+                || a.FullName.Contains(
+                    search, StringComparison.OrdinalIgnoreCase)
+                || a.Email.Contains(
+                    search, StringComparison.OrdinalIgnoreCase))
+        );
+
+    private List<Account> VisibleAccounts =>
+        FilteredAccounts
+            .Skip((page - 1) * PageSize)
+            .Take(PageSize)
+            .ToList();
+
+    private int Pages => Math.Max(1,
+        (int)Math.Ceiling(
+            FilteredAccounts.Count() / (double)PageSize
+        ));
+
+    private void Filter() { page = 1; }
+
+    private void Reset()
+    {
+        search = "";
+        roleFilter = "";
+        page = 1;
+    }
+
+    private void Move(int direction)
+    {
+        int next = page + direction;
+        if (next >= 1 && next <= Pages) page = next;
+    }
+
+    private void Add()
+    {
+        editing = false;
+        error = null;
+        model = new Account { Role = "Nhân viên" };
+        dialog = "form";
+    }
+
+    private void Edit()
+    {
+        if (selected is null) return;
+
+        editing = true;
+        error = null;
+
+        var source = accounts.FirstOrDefault(
+            a => a.Code == selected
+        );
+
+        model = source is not null
+            ? new Account
+              {
+                  Code = source.Code,
+                  FullName = source.FullName,
+                  Username = source.Username,
+                  Email = source.Email,
+                  Role = source.Role
+              }
+            : new Account();
+
+        dialog = "form";
+    }
+
+    private void AskDelete()
+    {
+        if (selected is null) return;
+        error = null;
+        dialog = "delete";
+    }
+
+    private void Close()
+    {
+        dialog = "";
+        error = null;
+    }
+
+    private async Task Save()
+    {
+        if (saving) return;
+
+        try
+        {
+            saving = true;
+            error = null;
+
+            if (editing)
+            {
+                var existing = accounts.FirstOrDefault(
+                    a => a.Code == selected
+                );
+
+                if (existing is not null)
+                {
+                    existing.FullName = model.FullName;
+                    existing.Username = model.Username;
+                    existing.Email = model.Email;
+                    existing.Role = model.Role;
+                }
+
+                message = $"Đã cập nhật tài khoản {model.FullName}.";
+            }
+            else
+            {
+                model.Code = $"TK{accounts.Count + 1:D4}";
+                accounts.Add(new Account
+                {
+                    Code = model.Code,
+                    FullName = model.FullName,
+                    Username = model.Username,
+                    Email = model.Email,
+                    Role = model.Role
+                });
+
+                message = $"Đã thêm tài khoản {model.FullName}.";
+            }
+
+            dialog = "";
+            await Task.CompletedTask;
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { saving = false; }
+    }
+
+    private async Task Delete()
+    {
+        if (saving || selected is null) return;
+
+        try
+        {
+            saving = true;
+            error = null;
+
+            accounts.RemoveAll(a => a.Code == selected);
+            message = "Đã xóa tài khoản.";
+            selected = null;
+            dialog = "";
+            await Task.CompletedTask;
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { saving = false; }
+    }
+}
+
