@@ -1,0 +1,73 @@
+﻿<div class="brand @(Large ? "large" : "")">
+
+    <svg class="brand-mark"
+         viewBox="0 0 100 100"
+         role="img"
+         aria-label="Logo Coffee Shop">
+
+        <circle cx="50"
+                cy="50"
+                r="48"
+                fill="#fffaf1"
+                stroke="#b88f6b" />
+
+        <defs>
+            <path id="@arc"
+                  d="M17 40 A35 35 0 0 1 83 40" />
+        </defs>
+
+        <text fill="#74472d"
+              font-size="10"
+              font-weight="700"
+              letter-spacing="2">
+
+            <textPath href="@("#" + arc)"
+                      startOffset="50%"
+                      text-anchor="middle">
+                COFFEE SHOP
+            </textPath>
+
+        </text>
+
+        <g fill="none"
+           stroke="#74472d"
+           stroke-width="1.6"
+           stroke-linecap="round">
+
+            <path d="M30 43h35v12a17 17 0 0 1-35 0ZM65 45h5a7 7 0 0 1 0 14h-6M25 73h47M45 20c-8 9 11 12 2 20M54 25c-6 6 7 9 1 13" />
+
+            <ellipse cx="48"
+                     cy="78"
+                     rx="25"
+                     ry="4" />
+
+        </g>
+
+        <text x="50"
+              y="91"
+              text-anchor="middle"
+              fill="#74472d"
+              font-size="4"
+              letter-spacing="1">
+            QUẢN LÝ QUÁN
+        </text>
+
+    </svg>
+
+    <span class="brand-name">
+        <strong>Coffee Shop</strong>
+
+        <small>
+            @(Large ? "Quản lý quán cà phê" : "QUẢN LÝ QUÁN")
+        </small>
+    </span>
+
+</div>
+
+@code {
+    [Parameter]
+    public bool Large { get; set; }
+
+    private readonly string arc =
+        "brand-" + Guid.NewGuid().ToString("N");
+}

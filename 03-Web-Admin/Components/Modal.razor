@@ -1,0 +1,94 @@
+﻿<div class="coffee-modal-overlay"
+     @onclick="CloseFromBackdrop">
+
+    <section class="coffee-modal-window"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="@titleId"
+             tabindex="-1"
+             @ref="windowRef"
+             @onclick:stopPropagation="true"
+             @onkeydown="HandleKeyDown">
+
+        <header class="coffee-modal-header">
+
+            <h2 id="@titleId">
+                @Title
+            </h2>
+
+            <button type="button"
+                    class="coffee-modal-close"
+                    aria-label="Đóng cửa sổ"
+                    @onclick="RequestClose">
+                ×
+            </button>
+
+        </header>
+
+        <div class="coffee-modal-body">
+            @ChildContent
+        </div>
+
+    </section>
+
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "";
+
+    [Parameter]
+    public string Size { get; set; } = "";
+
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private readonly string titleId =
+        "modal-title-" + Guid.NewGuid().ToString("N");
+
+    private ElementReference windowRef;
+
+    /// <summary>
+    /// Đưa focus vào cửa sổ ngay khi mở: phím Escape đóng được ngay,
+    /// và trình đọc màn hình đọc tiêu đề hộp thoại.
+    /// </summary>
+    /// <summary>
+    /// true (mặc định): đưa focus vào khung hộp thoại khi mở.
+    /// false: trang tự đưa focus vào ô nhập đầu tiên (Escape vẫn đóng được vì sự kiện nổi lên khung).
+    /// </summary>
+    [Parameter]
+    public bool FocusWindow { get; set; } = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && FocusWindow)
+        {
+            await windowRef.FocusAsync();
+        }
+    }
+
+    private Task RequestClose()
+    {
+        return Busy
+            ? Task.CompletedTask
+            : OnClose.InvokeAsync();
+    }
+
+    private Task CloseFromBackdrop()
+    {
+        return RequestClose();
+    }
+
+    private Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        return e.Key == "Escape"
+            ? RequestClose()
+            : Task.CompletedTask;
+    }
+}

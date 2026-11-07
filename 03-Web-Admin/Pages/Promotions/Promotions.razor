@@ -1,0 +1,468 @@
+@page "/promotions"
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Khuyến mãi - Coffee Shop</PageTitle>
+
+<div class="promotions-page">
+
+    <section class="panel filters-panel">
+
+        <div class="filter-row">
+
+            <div class="search-field">
+
+                <Icon Name="search" />
+
+                <input @bind="search"
+                       @bind:event="oninput"
+                       placeholder="Tìm mã hoặc tên khuyến mãi" />
+
+            </div>
+
+            <button class="btn primary"
+                    @onclick="Filter">
+
+                <Icon Name="filter" />
+                Lọc
+
+            </button>
+
+            <button class="btn outline"
+                    @onclick="Reset">
+
+                <Icon Name="reset" />
+                Đặt lại
+
+            </button>
+
+        </div>
+
+    </section>
+
+    <section class="panel action-bar">
+
+        <button class="btn primary"
+                @onclick="Add">
+
+            <Icon Name="plus" />
+            Thêm khuyến mãi
+
+        </button>
+
+        <button class="btn outline"
+                @onclick="Edit">
+
+            <Icon Name="edit" />
+            Sửa
+
+        </button>
+
+        <button class="btn danger-outline"
+                @onclick="AskDelete">
+
+            <Icon Name="trash" />
+            Xóa
+
+        </button>
+
+    </section>
+
+    @if (message is not null)
+    {
+        <p class="alert success" role="status">
+            @message
+        </p>
+    }
+
+    <section class="panel list-panel">
+
+        <div class="table-wrap">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+                        <th>Mã KM</th>
+                        <th>Tên chương trình</th>
+                        <th>Giảm giá (%)</th>
+                        <th>Bắt đầu</th>
+                        <th>Kết thúc</th>
+                        <th>Trạng thái</th>
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    @foreach (var item in VisiblePromotions)
+                    {
+                        <tr class="selectable @(selected == item.Code ? "selected" : "")"
+                            tabindex="0"
+                            @onclick="() => selected = item.Code"
+                            @onclick:stopPropagation="true">
+
+                            <td>@item.Code</td>
+                            <td>@item.Name</td>
+                            <td>@item.DiscountPercent%</td>
+
+                            <td>
+                                @item.StartDate?.ToString("dd/MM/yyyy")
+                            </td>
+
+                            <td>
+                                @item.EndDate?.ToString("dd/MM/yyyy")
+                            </td>
+
+                            <td>
+                                <span class="badge @StatusColor(item)">
+                                    @StatusText(item)
+                                </span>
+                            </td>
+
+                        </tr>
+                    }
+
+                    @if (VisiblePromotions.Count == 0)
+                    {
+                        <tr>
+
+                            <td class="empty-cell" colspan="6">
+
+                                <Icon Name="tag" Size="32" />
+
+                                <p>
+                                    Chưa có chương trình khuyến mãi.
+                                </p>
+
+                            </td>
+
+                        </tr>
+                    }
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        <div class="list-footer">
+
+            <span>
+                @FilteredPromotions.Count() khuyến mãi
+                · Trang @(page)/@Pages
+            </span>
+
+            <div class="pagination">
+
+                <button class="page-button"
+                        aria-label="Trang trước"
+                        @onclick="() => Move(-1)">
+                    <Icon Name="left" Size="16" />
+                </button>
+
+                <span class="page-number">@(page)</span>
+
+                <button class="page-button"
+                        aria-label="Trang sau"
+                        @onclick="() => Move(1)">
+                    <Icon Name="right" Size="16" />
+                </button>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</div>
+
+@if (dialog != "")
+{
+    <Modal Title="@DialogTitle"
+           OnClose="Close"
+           Busy="@saving">
+
+        @if (dialog is "form")
+        {
+            <EditForm Model="model"
+                      OnValidSubmit="Save">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-stack">
+
+                    <div class="field">
+                        <label>Mã khuyến mãi</label>
+                        <input value="@model.Code"
+                               placeholder="@(editing
+                                   ? "Chưa chọn"
+                                   : "Tự động tạo khi lưu")"
+                               readonly />
+                    </div>
+
+                    <div class="field">
+                        <label for="pm-name">Tên chương trình *</label>
+                        <InputText id="pm-name"
+                                   @bind-Value="model.Name"
+                                   placeholder="Nhập tên khuyến mãi" />
+                        <ValidationMessage For="@(() => model.Name)" />
+                    </div>
+
+                    <div class="field">
+                        <label for="pm-discount">Giảm giá (%) *</label>
+                        <InputNumber id="pm-discount"
+                                     @bind-Value="model.DiscountPercent"
+                                     step="1" />
+                        <ValidationMessage For="@(() => model.DiscountPercent)" />
+                    </div>
+
+                    <div class="field">
+                        <label for="pm-start">Ngày bắt đầu</label>
+                        <InputDate id="pm-start"
+                                   @bind-Value="model.StartDate" />
+                    </div>
+
+                    <div class="field">
+                        <label for="pm-end">Ngày kết thúc</label>
+                        <InputDate id="pm-end"
+                                   @bind-Value="model.EndDate" />
+                        <ValidationMessage For="@(() => model.EndDate)" />
+                    </div>
+
+                </div>
+
+                @if (error is not null)
+                {
+                    <p class="alert error" role="alert">@error</p>
+                }
+
+                <div class="modal-footer">
+
+                    <button type="button" class="btn outline"
+                            @onclick="Close">
+                        Hủy
+                    </button>
+
+                    <button type="submit" class="btn primary">
+                        @(saving ? "Đang lưu…"
+                            : editing ? "Lưu thay đổi"
+                            : "Thêm khuyến mãi")
+                    </button>
+
+                </div>
+
+            </EditForm>
+        }
+
+        @if (dialog == "delete")
+        {
+            <p>Xóa khuyến mãi <strong>@selected</strong>?</p>
+
+            @if (error is not null)
+            {
+                <p class="alert error" role="alert">@error</p>
+            }
+
+            <div class="modal-footer">
+
+                <button class="btn outline" @onclick="Close">
+                    Hủy
+                </button>
+
+                <button class="btn danger" @onclick="Delete">
+                    @(saving ? "Đang xóa…" : "Xóa khuyến mãi")
+                </button>
+
+            </div>
+        }
+
+    </Modal>
+}
+
+@code {
+    private List<Promotion> promotions = [];
+
+    private string search = "";
+    private string? selected;
+    private int page = 1;
+    private const int PageSize = 10;
+
+    private string dialog = "";
+    private bool editing;
+    private bool saving;
+    private string? error;
+    private string? message;
+
+    private Promotion model = new();
+
+    private string DialogTitle => dialog switch
+    {
+        "form" => editing ? "Sửa khuyến mãi" : "Thêm khuyến mãi",
+        "delete" => "Xóa khuyến mãi",
+        _ => ""
+    };
+
+    private IEnumerable<Promotion> FilteredPromotions =>
+        promotions.Where(p =>
+            search == ""
+            || p.Code.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || p.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+        );
+
+    private List<Promotion> VisiblePromotions =>
+        FilteredPromotions
+            .Skip((page - 1) * PageSize)
+            .Take(PageSize)
+            .ToList();
+
+    private int Pages => Math.Max(1,
+        (int)Math.Ceiling(
+            FilteredPromotions.Count() / (double)PageSize
+        ));
+
+    private static string StatusText(Promotion p)
+    {
+        if (p.EndDate.HasValue && p.EndDate.Value < DateTime.Today)
+            return "Đã kết thúc";
+        if (p.StartDate.HasValue && p.StartDate.Value > DateTime.Today)
+            return "Chưa bắt đầu";
+        return "Đang áp dụng";
+    }
+
+    private static string StatusColor(Promotion p)
+    {
+        if (p.EndDate.HasValue && p.EndDate.Value < DateTime.Today)
+            return "gray";
+        if (p.StartDate.HasValue && p.StartDate.Value > DateTime.Today)
+            return "yellow";
+        return "green";
+    }
+
+    private void Filter() { page = 1; }
+
+    private void Reset()
+    {
+        search = "";
+        page = 1;
+    }
+
+    private void Move(int direction)
+    {
+        int next = page + direction;
+        if (next >= 1 && next <= Pages) page = next;
+    }
+
+    private void Add()
+    {
+        editing = false;
+        error = null;
+        model = new Promotion();
+        dialog = "form";
+    }
+
+    private void Edit()
+    {
+        if (selected is null) return;
+
+        editing = true;
+        error = null;
+
+        var source = promotions.FirstOrDefault(
+            p => p.Code == selected
+        );
+
+        model = source is not null
+            ? new Promotion
+              {
+                  Code = source.Code,
+                  Name = source.Name,
+                  DiscountPercent = source.DiscountPercent,
+                  StartDate = source.StartDate,
+                  EndDate = source.EndDate
+              }
+            : new Promotion();
+
+        dialog = "form";
+    }
+
+    private void AskDelete()
+    {
+        if (selected is null) return;
+        error = null;
+        dialog = "delete";
+    }
+
+    private void Close()
+    {
+        dialog = "";
+        error = null;
+    }
+
+    private async Task Save()
+    {
+        if (saving) return;
+
+        try
+        {
+            saving = true;
+            error = null;
+
+            if (editing)
+            {
+                var existing = promotions.FirstOrDefault(
+                    p => p.Code == selected
+                );
+
+                if (existing is not null)
+                {
+                    existing.Name = model.Name;
+                    existing.DiscountPercent = model.DiscountPercent;
+                    existing.StartDate = model.StartDate;
+                    existing.EndDate = model.EndDate;
+                }
+
+                message = $"Đã cập nhật khuyến mãi {model.Name}.";
+            }
+            else
+            {
+                model.Code = $"KM{promotions.Count + 1:D4}";
+                promotions.Add(new Promotion
+                {
+                    Code = model.Code,
+                    Name = model.Name,
+                    DiscountPercent = model.DiscountPercent,
+                    StartDate = model.StartDate,
+                    EndDate = model.EndDate
+                });
+
+                message = $"Đã thêm khuyến mãi {model.Name}.";
+            }
+
+            dialog = "";
+            await Task.CompletedTask;
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { saving = false; }
+    }
+
+    private async Task Delete()
+    {
+        if (saving || selected is null) return;
+
+        try
+        {
+            saving = true;
+            error = null;
+
+            promotions.RemoveAll(p => p.Code == selected);
+            message = "Đã xóa khuyến mãi.";
+            selected = null;
+            dialog = "";
+            await Task.CompletedTask;
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { saving = false; }
+    }
+}
+
