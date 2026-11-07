@@ -1,0 +1,154 @@
+@page "/my-account"
+@* Mọi tài khoản đã đăng nhập (nhân viên và chủ quán) — [Authorize] từ Pages/_Imports.razor *@
+
+<PageTitle>Tài khoản của tôi - Coffee Shop</PageTitle>
+
+@if (success is not null)
+{
+    <p class="alert success" role="status">@success</p>
+}
+
+<section class="panel my-account">
+
+    <div class="my-account-head">
+        <span class="my-account-avatar" aria-hidden="true">
+            <Icon Name="user" Size="28" />
+        </span>
+        <div>
+            <h2>@(account?.FullName ?? "Tài khoản của tôi")</h2>
+            @if (account is not null)
+            {
+                <span class="badge @(account.Role == Roles.Admin ? "yellow" : "green")">
+                    @Roles.Label(account.Role)
+                </span>
+            }
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <p class="muted">Đang tải thông tin…</p>
+    }
+    else if (loadError is not null)
+    {
+        <p class="alert error" role="alert">@loadError</p>
+        <button type="button" class="btn outline" @onclick="LoadAsync">Thử lại</button>
+    }
+    else if (account is not null)
+    {
+        <dl class="info-list">
+            <div>
+                <dt>Mã tài khoản</dt>
+                <dd>@account.Code</dd>
+            </div>
+            <div>
+                <dt>Họ và tên</dt>
+                <dd>@account.FullName</dd>
+            </div>
+            <div>
+                <dt>Tên đăng nhập</dt>
+                <dd>@account.Username</dd>
+            </div>
+            <div>
+                <dt>Email</dt>
+                <dd>@account.Email</dd>
+            </div>
+        </dl>
+
+        @if (account.Role == Roles.Admin)
+        {
+            <p class="form-note">
+                Sửa họ tên, email hoặc vai trò tại trang <a href="accounts">Quản lý tài khoản</a>.
+            </p>
+        }
+        else
+        {
+            <p class="form-note">
+                Cần sửa họ tên, email hoặc vai trò? Liên hệ chủ quán. Bạn có thể tự đổi mật khẩu của mình.
+            </p>
+        }
+
+        <div class="actions">
+            <button type="button" class="btn primary" @onclick="OpenChangePassword">
+                <Icon Name="lock" Size="18" />
+                Đổi mật khẩu
+            </button>
+        </div>
+    }
+
+</section>
+
+@if (changing)
+{
+    <Modal Title="Đổi mật khẩu" Busy="saving" FocusWindow="false" OnClose="CloseChangePassword">
+
+        <EditForm Model="form" OnValidSubmit="SavePassword" OnInvalidSubmit="ClearErrors" novalidate>
+
+            <DataAnnotationsValidator />
+
+            @* Ô tên đăng nhập ẩn: giúp trình quản lý mật khẩu lưu đúng tài khoản *@
+            <input type="text" autocomplete="username" value="@account?.Username" hidden readonly />
+
+            <div class="form-stack">
+
+                <div class="field">
+                    <label for="current-password">Mật khẩu hiện tại</label>
+                    <InputTextLive id="current-password"
+                                   @ref="currentInput"
+                                   class="@(currentPasswordError is null ? null : "invalid")"
+                                   type="@(showPassword ? "text" : "password")"
+                                   @bind-Value="form.CurrentPassword"
+                                   @bind-Value:after="ClearErrors"
+                                   aria-describedby="@(currentPasswordError is null ? null : "current-password-error")"
+                                   autocomplete="current-password" />
+                    <ValidationMessage For="@(() => form.CurrentPassword)" />
+                    @if (currentPasswordError is not null)
+                    {
+                        <div id="current-password-error" class="validation-message" role="alert">@currentPasswordError</div>
+                    }
+                </div>
+
+                <div class="field">
+                    <label for="new-password">Mật khẩu mới</label>
+                    <InputTextLive id="new-password"
+                                   type="@(showPassword ? "text" : "password")"
+                                   @bind-Value="form.NewPassword"
+                                   @bind-Value:after="ClearSaveError"
+                                   autocomplete="new-password"
+                                   placeholder="Tối thiểu 6 ký tự" />
+                    <ValidationMessage For="@(() => form.NewPassword)" />
+                </div>
+
+                <div class="field">
+                    <label for="confirm-password">Nhập lại mật khẩu mới</label>
+                    <InputTextLive id="confirm-password"
+                                   type="@(showPassword ? "text" : "password")"
+                                   @bind-Value="form.ConfirmPassword"
+                                   @bind-Value:after="ClearSaveError"
+                                   autocomplete="new-password" />
+                    <ValidationMessage For="@(() => form.ConfirmPassword)" />
+                </div>
+
+                <label class="checkbox-line">
+                    <input type="checkbox" @bind="showPassword" />
+                    Hiện mật khẩu
+                </label>
+
+            </div>
+
+            @if (saveError is not null)
+            {
+                <p class="alert error modal-error" role="alert">@saveError</p>
+            }
+
+            <div class="modal-footer">
+                <button type="button" class="btn outline" disabled="@saving" @onclick="CloseChangePassword">Hủy</button>
+                <button type="submit" class="btn primary" disabled="@saving">
+                    @(saving ? "Đang lưu…" : "Lưu mật khẩu mới")
+                </button>
+            </div>
+
+        </EditForm>
+
+    </Modal>
+}
