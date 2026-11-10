@@ -54,6 +54,7 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
 
 // Application State & Services
 builder.Services.AddSingleton<AppState>();
+builder.Services.AddScoped<ApiClient>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<CategoryService>();
@@ -72,6 +73,26 @@ var host = builder.Build();
 
 // Khôi phục phiên đăng nhập (sessionStorage) TRƯỚC khi vẽ giao diện
 // → không có pha "đang kiểm tra" và không chớp khung quản trị khi F5 / khi chưa đăng nhập.
-await host.Services.GetRequiredService<TokenAuthenticationStateProvider>().InitializeAsync();
+var authProvider = host.Services.GetRequiredService<TokenAuthenticationStateProvider>();
+await authProvider.InitializeAsync();
+
+// CHẾ ĐỘ DEMO: bỏ qua màn hình đăng nhập — tự đăng nhập bằng tài khoản ghi ở Demo:AutoLoginAs (appsettings.json).
+// Chỉ chạy khi dùng API giả: lỡ quên tắt thì khi nối backend thật vẫn phải đăng nhập bình thường.
+// Tắt: để trống "AutoLoginAs": "". Bấm Đăng xuất vẫn về trang Đăng nhập để thử tài khoản khác.
+string? autoLoginAs = builder.Configuration["Demo:AutoLoginAs"];
+
+if (useMock
+    && !string.IsNullOrWhiteSpace(autoLoginAs)
+    && !host.Services.GetRequiredService<AppState>().IsLoggedIn)
+{
+    var demoAccount = host.Services.GetRequiredService<MockDatabase>().NguoiDungs
+        .FirstOrDefault(a => a.TenDangNhap.Equals(autoLoginAs, StringComparison.OrdinalIgnoreCase));
+
+    if (demoAccount is not null)
+    {
+        // Token cùng dạng API giả cấp khi đăng nhập thật → mọi API gọi sau đó đều hợp lệ
+        await authProvider.SignInAsync($"mock-token-{demoAccount.TenDangNhap}", demoAccount.HoTen, demoAccount.VaiTro);
+    }
+}
 
 await host.RunAsync();

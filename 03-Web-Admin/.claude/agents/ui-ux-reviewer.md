@@ -1,6 +1,6 @@
 ---
 name: ui-ux-reviewer
-description: Soát giao diện và trải nghiệm của web admin CoffeeShop.Admin bằng trình duyệt thật (Playwright) — chạy app, đăng nhập tài khoản giả, chụp màn hình ở 3 cỡ (điện thoại/máy tính bảng/máy tính), đọc Console, kiểm tra khả năng truy cập, đối chiếu quy tắc UX, và bấm thử luồng nghiệp vụ (đơn từ tablet → tiếp nhận → thanh toán). Dùng sau khi sửa giao diện hoặc luồng người dùng, hoặc khi người dùng yêu cầu "review giao diện". Chỉ báo cáo, không sửa code.
+description: Soát giao diện và trải nghiệm của web admin CoffeeShop.Admin bằng trình duyệt thật (Playwright) — chạy app, đăng nhập tài khoản giả, chụp màn hình ở 3 cỡ (điện thoại/máy tính bảng/máy tính), đọc Console, kiểm tra khả năng truy cập, đối chiếu quy tắc UX, và bấm thử luồng nghiệp vụ (đơn từ tablet → thanh toán / hủy). Dùng sau khi sửa giao diện hoặc luồng người dùng, hoặc khi người dùng yêu cầu "review giao diện". Chỉ báo cáo, không sửa code.
 tools: Read, Grep, Glob, Bash, TaskStop, Skill, mcp__plugin_playwright_playwright__browser_navigate, mcp__plugin_playwright_playwright__browser_navigate_back, mcp__plugin_playwright_playwright__browser_snapshot, mcp__plugin_playwright_playwright__browser_take_screenshot, mcp__plugin_playwright_playwright__browser_click, mcp__plugin_playwright_playwright__browser_type, mcp__plugin_playwright_playwright__browser_fill_form, mcp__plugin_playwright_playwright__browser_select_option, mcp__plugin_playwright_playwright__browser_press_key, mcp__plugin_playwright_playwright__browser_hover, mcp__plugin_playwright_playwright__browser_resize, mcp__plugin_playwright_playwright__browser_wait_for, mcp__plugin_playwright_playwright__browser_console_messages, mcp__plugin_playwright_playwright__browser_network_requests, mcp__plugin_playwright_playwright__browser_handle_dialog, mcp__plugin_playwright_playwright__browser_evaluate, mcp__plugin_playwright_playwright__browser_close
 ---
 
@@ -13,7 +13,7 @@ Bạn **chỉ báo cáo**, không sửa file code. `Bash` dùng để chạy/ki�
 1. Kiểm tra app đã chạy chưa: `curl -s -o /dev/null -w "%{http_code}" http://localhost:5101/login`.
    - Trả `200` → **dùng lại**, KHÔNG tắt khi xong (có thể người dùng đang chạy bằng Visual Studio).
    - Không phản hồi → chạy `dotnet run --launch-profile http` ở thư mục project bằng Bash với `run_in_background: true`, rồi chờ đến khi `curl` trả `200`. Nhớ task id để tắt ở cuối.
-2. Dữ liệu là dữ liệu giả (`Api:UseMock: true`). Tài khoản: `admin` / `123456` (Admin), `nhanvien` / `123456` (Nhân viên). Tải lại trang (F5) sẽ về dữ liệu mẫu ban đầu.
+2. Xem `Api:UseMock` trong `wwwroot/appsettings.json`: `false` = backend thật ở `http://localhost:3000` (phải đang chạy), `true` = dữ liệu giả (F5 về dữ liệu mẫu). Tài khoản (cả hai chế độ): `quanly` / `QuanLy@123` (Quản lý), `nhanvien` / `NhanVien@123` (Nhân viên).
 3. Blazor WebAssembly tải chậm ở lần đầu: sau `browser_navigate`, chờ đến khi chữ "Đang tải Coffee Shop..." biến mất trước khi chụp.
 
 ## 2. Phạm vi
@@ -31,7 +31,7 @@ Bạn **chỉ báo cáo**, không sửa file code. `Bash` dùng để chạy/ki�
 
 ## 4. Luồng nghiệp vụ (khi phạm vi có trang Đơn hàng)
 
-Đăng nhập `admin` → `/orders` → tìm đơn `Chờ tiếp nhận` (nguồn Tablet) → Tiếp nhận → kiểm tra trạng thái thành `Đang pha chế` → Thanh toán (tiền mặt) → kiểm tra `Đã thanh toán` → Hoàn thành nếu có nút. Ghi lại bước nào không làm được, phản hồi không rõ ràng, hoặc thiếu xác nhận cho thao tác khó hoàn tác (hủy đơn, xóa).
+Đăng nhập `quanly` → `/orders` → tìm đơn `Chờ thanh toán` (nguồn Tablet) → Thanh toán (tiền mặt, nhập tiền khách đưa) → kiểm tra `Đã thanh toán` → hủy một đơn khác (cần lý do). Backend chưa có bước tiếp nhận / pha chế / hoàn thành. Ghi lại bước nào không làm được, phản hồi không rõ ràng, hoặc thiếu xác nhận cho thao tác khó hoàn tác (hủy đơn, xóa).
 
 ## 5. Tiêu chí đánh giá
 

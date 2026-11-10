@@ -16,7 +16,7 @@ public partial class MyAccount : IDisposable
 
     private readonly CancellationTokenSource pageCts = new();
 
-    private Account? account;
+    private NguoiDung? account;
     private bool loading = true;
     private string? loadError;
     private string? success;

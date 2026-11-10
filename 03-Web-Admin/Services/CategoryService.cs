@@ -1,52 +1,44 @@
-using System.Net.Http.Json;
 using CoffeeShop.Admin.Models;
 
 namespace CoffeeShop.Admin.Services;
 
 /// <summary>
-/// Service gọi API danh mục sản phẩm.
+/// Danh mục món — api/v1/danh-muc; kích thước ly — api/v1/kich-thuoc.
 /// </summary>
 public class CategoryService
 {
-    private readonly HttpClient _http;
+    private readonly ApiClient _api;
 
-    public CategoryService(HttpClient http)
+    public CategoryService(ApiClient api)
     {
-        _http = http;
+        _api = api;
     }
 
-    public async Task<List<Category>> GetAllAsync()
-    {
-        return await _http.GetFromJsonAsync<List<Category>>("api/categories")
-               ?? [];
-    }
+    public Task<List<DanhMuc>> GetAllAsync(CancellationToken ct = default) =>
+        _api.GetAsync<List<DanhMuc>>("api/v1/danh-muc", ct);
 
-    public async Task<Category> CreateAsync(Category category)
-    {
-        var response = await _http.PostAsJsonAsync(
-            "api/categories",
-            category
-        );
+    public Task<DanhMuc> CreateAsync(string tenDanhMuc, CancellationToken ct = default) =>
+        _api.PostAsync<DanhMuc>("api/v1/danh-muc", new DanhMucRequest { TenDanhMuc = tenDanhMuc }, ct);
 
-        response.EnsureSuccessStatusCode();
+    public Task<DanhMuc> UpdateAsync(int id, string tenDanhMuc, CancellationToken ct = default) =>
+        _api.PutAsync<DanhMuc>($"api/v1/danh-muc/{id}", new DanhMucRequest { TenDanhMuc = tenDanhMuc }, ct);
 
-        return (await response.Content.ReadFromJsonAsync<Category>())!;
-    }
+    /// <summary>409 nếu danh mục còn món.</summary>
+    public Task DeleteAsync(int id, CancellationToken ct = default) =>
+        _api.DeleteAsync($"api/v1/danh-muc/{id}", ct);
 
-    public async Task UpdateAsync(Category category)
-    {
-        var response = await _http.PutAsJsonAsync(
-            $"api/categories/{category.Code}",
-            category
-        );
+    // ------------------------------------------------------------------ Kích thước
 
-        response.EnsureSuccessStatusCode();
-    }
+    public Task<List<KichThuoc>> GetSizesAsync(CancellationToken ct = default) =>
+        _api.GetAsync<List<KichThuoc>>("api/v1/kich-thuoc", ct);
 
-    public async Task DeleteAsync(string code)
-    {
-        var response = await _http.DeleteAsync($"api/categories/{code}");
-        response.EnsureSuccessStatusCode();
-    }
+    public Task<KichThuoc> CreateSizeAsync(KichThuocRequest request, CancellationToken ct = default) =>
+        _api.PostAsync<KichThuoc>("api/v1/kich-thuoc", request, ct);
+
+    public Task<KichThuoc> UpdateSizeAsync(KichThuocRequest request, CancellationToken ct = default) =>
+        _api.PutAsync<KichThuoc>($"api/v1/kich-thuoc/{Uri.EscapeDataString(request.MaKichThuoc)}", request, ct);
+
+    /// <summary>409 nếu kích thước đang có trong bảng giá món.</summary>
+    public Task DeleteSizeAsync(string maKichThuoc, CancellationToken ct = default) =>
+        _api.DeleteAsync($"api/v1/kich-thuoc/{Uri.EscapeDataString(maKichThuoc)}", ct);
 }
-

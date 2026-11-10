@@ -1,73 +1,35 @@
-﻿<div class="brand @(Large ? "large" : "")">
+﻿@* Logo do nhóm thiết kế: cắt tròn, nền ngoài trong suốt, nền trong là kem ấm cho hợp giao diện.
+   logo.png (400px) cho trang đăng nhập, logo-sm.png (128px) cho sidebar. *@
+<div class="brand @(Large ? "large" : "")">
 
-    <svg class="brand-mark"
-         viewBox="0 0 100 100"
-         role="img"
-         aria-label="Logo Coffee Shop">
+    @if (Large)
+    {
+        @* Trang đăng nhập: chữ "COFFEE SHOP" nằm trong logo nên alt chính là tên quán *@
+        <img class="brand-mark"
+             src="images/logo.png"
+             alt="Coffee Shop"
+             width="400"
+             height="400" />
 
-        <circle cx="50"
-                cy="50"
-                r="48"
-                fill="#fffaf1"
-                stroke="#b88f6b" />
+        <p class="brand-caption">Quản lý quán cà phê</p>
+    }
+    else
+    {
+        @* Sidebar: tên quán đã có chữ bên cạnh → ảnh chỉ để trang trí *@
+        <img class="brand-mark"
+             src="images/logo-sm.png"
+             alt=""
+             width="128"
+             height="128" />
 
-        <defs>
-            <path id="@arc"
-                  d="M17 40 A35 35 0 0 1 83 40" />
-        </defs>
-
-        <text fill="#74472d"
-              font-size="10"
-              font-weight="700"
-              letter-spacing="2">
-
-            <textPath href="@("#" + arc)"
-                      startOffset="50%"
-                      text-anchor="middle">
-                COFFEE SHOP
-            </textPath>
-
-        </text>
-
-        <g fill="none"
-           stroke="#74472d"
-           stroke-width="1.6"
-           stroke-linecap="round">
-
-            <path d="M30 43h35v12a17 17 0 0 1-35 0ZM65 45h5a7 7 0 0 1 0 14h-6M25 73h47M45 20c-8 9 11 12 2 20M54 25c-6 6 7 9 1 13" />
-
-            <ellipse cx="48"
-                     cy="78"
-                     rx="25"
-                     ry="4" />
-
-        </g>
-
-        <text x="50"
-              y="91"
-              text-anchor="middle"
-              fill="#74472d"
-              font-size="4"
-              letter-spacing="1">
-            QUẢN LÝ QUÁN
-        </text>
-
-    </svg>
-
-    <span class="brand-name">
-        <strong>Coffee Shop</strong>
-
-        <small>
-            @(Large ? "Quản lý quán cà phê" : "QUẢN LÝ QUÁN")
-        </small>
-    </span>
+        <span class="brand-name">
+            <strong>Coffee Shop</strong>
+        </span>
+    }
 
 </div>
 
 @code {
     [Parameter]
     public bool Large { get; set; }
-
-    private readonly string arc =
-        "brand-" + Guid.NewGuid().ToString("N");
 }

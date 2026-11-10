@@ -1,5 +1,6 @@
 using CoffeeShop.Admin.Models;
 using CoffeeShop.Admin.Services;
+using CoffeeShop.Admin.Utilities;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 
@@ -40,7 +41,7 @@ public partial class Login
 
             if (state.User.Identity?.IsAuthenticated == true)
             {
-                Navigation.NavigateTo(TargetAfterLogin(state.User.IsInRole("Admin")), replace: true);
+                Navigation.NavigateTo(TargetAfterLogin(state.User.IsInRole(Roles.Admin)), replace: true);
             }
         }
     }
@@ -58,7 +59,7 @@ public partial class Login
 
             if (result.Success)
             {
-                Navigation.NavigateTo(TargetAfterLogin(result.Role == "Admin"), replace: true);
+                Navigation.NavigateTo(TargetAfterLogin(result.Role == Roles.Admin), replace: true);
             }
             else
             {

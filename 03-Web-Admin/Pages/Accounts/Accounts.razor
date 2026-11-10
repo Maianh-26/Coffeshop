@@ -1,5 +1,8 @@
 @page "/accounts"
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize(Roles = Roles.Admin)]
+@implements IDisposable
+@inject AccountService AccountApi
+@inject AuthenticationService AuthService
 
 <PageTitle>Tài khoản - Coffee Shop</PageTitle>
 
@@ -15,26 +18,31 @@
 
                 <input @bind="search"
                        @bind:event="oninput"
-                       placeholder="Tìm mã, tên hoặc email" />
+                       @bind:after="Filter"
+                       placeholder="Tìm mã, tên, tên đăng nhập hoặc email"
+                       aria-label="Tìm tài khoản" />
 
             </div>
 
             <select aria-label="Lọc vai trò"
-                    @bind="roleFilter">
+                    @bind="roleFilter"
+                    @bind:after="Filter">
 
                 <option value="">Tất cả vai trò</option>
-                <option value="Admin">Quản lý</option>
-                <option>Nhân viên</option>
+                <option value="@Roles.Admin">@Roles.Label(Roles.Admin)</option>
+                <option value="@Roles.Staff">@Roles.Label(Roles.Staff)</option>
 
             </select>
 
-            <button class="btn primary"
-                    @onclick="Filter">
+            <select aria-label="Lọc trạng thái"
+                    @bind="statusFilter"
+                    @bind:after="Filter">
 
-                <Icon Name="filter" />
-                Lọc
+                <option value="">Tất cả trạng thái</option>
+                <option value="active">Đang hoạt động</option>
+                <option value="locked">Đã khóa</option>
 
-            </button>
+            </select>
 
             <button class="btn outline"
                     @onclick="Reset">
@@ -59,6 +67,7 @@
         </button>
 
         <button class="btn outline"
+                disabled="@(Selected is null)"
                 @onclick="Edit">
 
             <Icon Name="edit" />
@@ -67,10 +76,12 @@
         </button>
 
         <button class="btn danger-outline"
-                @onclick="AskDelete">
+                disabled="@(Selected is null || IsMe(Selected))"
+                title="@(IsMe(Selected) ? "Không thể tự khóa tài khoản đang đăng nhập" : null)"
+                @onclick="AskToggleLock">
 
-            <Icon Name="trash" />
-            Xóa
+            <Icon Name="lock" />
+            @(Selected is { TrangThai: false } ? "Mở khóa" : "Khóa tài khoản")
 
         </button>
 
@@ -80,6 +91,14 @@
     {
         <p class="alert success" role="status">
             @message
+        </p>
+    }
+
+    @if (loadError is not null)
+    {
+        <p class="alert error" role="alert">
+            @loadError
+            <button type="button" class="text-button" @onclick="Load">Thử lại</button>
         </p>
     }
 
@@ -97,6 +116,7 @@
                         <th>Tên đăng nhập</th>
                         <th>Email</th>
                         <th>Vai trò</th>
+                        <th>Trạng thái</th>
                     </tr>
 
                 </thead>
@@ -105,19 +125,25 @@
 
                     @foreach (var item in VisibleAccounts)
                     {
-                        <tr class="selectable @(selected == item.Code ? "selected" : "")"
+                        <tr class="selectable @(selected == item.MaNguoiDung ? "selected" : "")"
                             tabindex="0"
-                            @onclick="() => selected = item.Code"
-                            @onclick:stopPropagation="true">
+                            @onclick="() => selected = item.MaNguoiDung"
+                            @onkeydown="e => SelectKey(e, item.MaNguoiDung)">
 
-                            <td>@item.Code</td>
-                            <td>@item.FullName</td>
-                            <td>@item.Username</td>
+                            <td>@item.MaNguoiDung</td>
+                            <td>@item.HoTen</td>
+                            <td>@item.TenDangNhap</td>
                             <td>@item.Email</td>
 
                             <td>
-                                <span class="badge @(item.Role == "Admin" ? "yellow" : "green")">
-                                    @Roles.Label(item.Role)
+                                <span class="badge @(item.VaiTro == Roles.Admin ? "yellow" : "green")">
+                                    @Roles.Label(item.VaiTro)
+                                </span>
+                            </td>
+
+                            <td>
+                                <span class="badge @(item.TrangThai ? "green" : "red")">
+                                    @(item.TrangThai ? "Đang hoạt động" : "Đã khóa")
                                 </span>
                             </td>
 
@@ -128,12 +154,12 @@
                     {
                         <tr>
 
-                            <td class="empty-cell" colspan="5">
+                            <td class="empty-cell" colspan="6">
 
                                 <Icon Name="user" Size="32" />
 
                                 <p>
-                                    Chưa có tài khoản nào.
+                                    @(loading ? "Đang tải danh sách tài khoản…" : "Không có tài khoản phù hợp.")
                                 </p>
 
                             </td>
@@ -158,6 +184,7 @@
 
                 <button class="page-button"
                         aria-label="Trang trước"
+                        disabled="@(page <= 1)"
                         @onclick="() => Move(-1)">
                     <Icon Name="left" Size="16" />
                 </button>
@@ -166,6 +193,7 @@
 
                 <button class="page-button"
                         aria-label="Trang sau"
+                        disabled="@(page >= Pages)"
                         @onclick="() => Move(1)">
                     <Icon Name="right" Size="16" />
                 </button>
@@ -194,28 +222,25 @@
                 <div class="form-stack">
 
                     <div class="field">
-                        <label>Mã tài khoản</label>
-                        <input value="@model.Code"
-                               placeholder="@(editing
-                                   ? "Chưa chọn"
-                                   : "Tự động tạo khi lưu")"
-                               readonly />
+                        <label for="a-username">Tên đăng nhập *</label>
+                        <InputText id="a-username"
+                                   @bind-Value="model.TenDangNhap"
+                                   readonly="@editing"
+                                   placeholder="ví dụ: lan.nv"
+                                   autocomplete="off" />
+                        <ValidationMessage For="@(() => model.TenDangNhap)" />
+                        @if (editing)
+                        {
+                            <small class="form-note">Không đổi được tên đăng nhập.</small>
+                        }
                     </div>
 
                     <div class="field">
                         <label for="a-name">Họ và tên *</label>
                         <InputText id="a-name"
-                                   @bind-Value="model.FullName"
+                                   @bind-Value="model.HoTen"
                                    placeholder="Nhập họ và tên" />
-                        <ValidationMessage For="@(() => model.FullName)" />
-                    </div>
-
-                    <div class="field">
-                        <label for="a-username">Tên đăng nhập *</label>
-                        <InputText id="a-username"
-                                   @bind-Value="model.Username"
-                                   placeholder="Nhập tên đăng nhập" />
-                        <ValidationMessage For="@(() => model.Username)" />
+                        <ValidationMessage For="@(() => model.HoTen)" />
                     </div>
 
                     <div class="field">
@@ -230,10 +255,20 @@
                     <div class="field">
                         <label for="a-role">Vai trò</label>
                         <InputSelect id="a-role"
-                                     @bind-Value="model.Role">
-                            <option>Nhân viên</option>
-                            <option value="Admin">Quản lý</option>
+                                     @bind-Value="model.VaiTro">
+                            <option value="@Roles.Staff">@Roles.Label(Roles.Staff)</option>
+                            <option value="@Roles.Admin">@Roles.Label(Roles.Admin)</option>
                         </InputSelect>
+                    </div>
+
+                    <div class="field">
+                        <label for="a-password">@(editing ? "Đặt lại mật khẩu" : "Mật khẩu *")</label>
+                        <InputText id="a-password"
+                                   type="password"
+                                   @bind-Value="model.MatKhau"
+                                   placeholder="@(editing ? "Để trống nếu giữ mật khẩu cũ" : "Tối thiểu 6 ký tự")"
+                                   autocomplete="new-password" />
+                        <ValidationMessage For="@(() => model.MatKhau)" />
                     </div>
 
                 </div>
@@ -246,11 +281,12 @@
                 <div class="modal-footer">
 
                     <button type="button" class="btn outline"
+                            disabled="@saving"
                             @onclick="Close">
                         Hủy
                     </button>
 
-                    <button type="submit" class="btn primary">
+                    <button type="submit" class="btn primary" disabled="@saving">
                         @(saving ? "Đang lưu…"
                             : editing ? "Lưu thay đổi"
                             : "Thêm tài khoản")
@@ -261,9 +297,18 @@
             </EditForm>
         }
 
-        @if (dialog == "delete")
+        @if (dialog == "lock" && Selected is { } target)
         {
-            <p>Xóa tài khoản <strong>@selected</strong>?</p>
+            <p>
+                @(target.TrangThai ? "Khóa" : "Mở khóa") tài khoản
+                <strong>@target.HoTen (@target.TenDangNhap)</strong>?
+            </p>
+
+            <p class="form-note">
+                @(target.TrangThai
+                    ? "Tài khoản bị khóa sẽ không đăng nhập được. Lịch sử đơn hàng vẫn được giữ."
+                    : "Tài khoản sẽ đăng nhập lại được bằng mật khẩu hiện tại.")
+            </p>
 
             @if (error is not null)
             {
@@ -272,12 +317,12 @@
 
             <div class="modal-footer">
 
-                <button class="btn outline" @onclick="Close">
+                <button class="btn outline" disabled="@saving" @onclick="Close">
                     Hủy
                 </button>
 
-                <button class="btn danger" @onclick="Delete">
-                    @(saving ? "Đang xóa…" : "Xóa tài khoản")
+                <button class="btn @(target.TrangThai ? "danger" : "primary")" disabled="@saving" @onclick="ToggleLock">
+                    @(saving ? "Đang lưu…" : target.TrangThai ? "Khóa tài khoản" : "Mở khóa")
                 </button>
 
             </div>
@@ -287,58 +332,100 @@
 }
 
 @code {
-    private List<Account> accounts = [];
+    private readonly CancellationTokenSource pageCts = new();
+
+    private List<NguoiDung> accounts = [];
 
     private string search = "";
     private string roleFilter = "";
-    private string? selected;
+    private string statusFilter = "";
+    private int? selected;
     private int page = 1;
     private const int PageSize = 10;
 
     private string dialog = "";
     private bool editing;
+    private bool loading;
     private bool saving;
     private string? error;
+    private string? loadError;
     private string? message;
 
-    private Account model = new();
+    private NguoiDungForm model = new();
+
+    private NguoiDung? Selected => accounts.FirstOrDefault(a => a.MaNguoiDung == selected);
+
+    /// <summary>Mã tài khoản đang đăng nhập (backend cũng chặn tự khóa / tự hạ quyền — 409).</summary>
+    private int? myId;
+
+    private bool IsMe(NguoiDung? account) => account is not null && account.MaNguoiDung == myId;
 
     private string DialogTitle => dialog switch
     {
         "form" => editing ? "Sửa tài khoản" : "Thêm tài khoản",
-        "delete" => "Xóa tài khoản",
+        "lock" => Selected is { TrangThai: false } ? "Mở khóa tài khoản" : "Khóa tài khoản",
         _ => ""
     };
 
-    private IEnumerable<Account> FilteredAccounts =>
+    private IEnumerable<NguoiDung> FilteredAccounts =>
         accounts.Where(a =>
-            (roleFilter == "" || a.Role == roleFilter)
+            (roleFilter == "" || a.VaiTro == roleFilter)
+            && (statusFilter == "" || a.TrangThai == (statusFilter == "active"))
             && (search == ""
-                || a.Code.Contains(
-                    search, StringComparison.OrdinalIgnoreCase)
-                || a.FullName.Contains(
-                    search, StringComparison.OrdinalIgnoreCase)
-                || a.Email.Contains(
-                    search, StringComparison.OrdinalIgnoreCase))
-        );
+                || a.MaNguoiDung.ToString().Contains(search, StringComparison.OrdinalIgnoreCase)
+                || a.HoTen.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || a.TenDangNhap.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || a.Email.Contains(search, StringComparison.OrdinalIgnoreCase)));
 
-    private List<Account> VisibleAccounts =>
+    private List<NguoiDung> VisibleAccounts =>
         FilteredAccounts
             .Skip((page - 1) * PageSize)
             .Take(PageSize)
             .ToList();
 
-    private int Pages => Math.Max(1,
-        (int)Math.Ceiling(
-            FilteredAccounts.Count() / (double)PageSize
-        ));
+    private int Pages => Math.Max(1, (int)Math.Ceiling(FilteredAccounts.Count() / (double)PageSize));
 
-    private void Filter() { page = 1; }
+    protected override async Task OnInitializedAsync()
+    {
+        var me = await AuthService.GetMyAccountAsync(pageCts.Token);
+        myId = me.Success ? me.Data?.MaNguoiDung : null;
+
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        loading = true;
+        loadError = null;
+
+        try
+        {
+            accounts = await AccountApi.GetAllAsync(pageCts.Token);
+            page = Math.Clamp(page, 1, Pages);
+        }
+        catch (ApiException ex)
+        {
+            loadError = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void Filter()
+    {
+        page = 1;
+    }
 
     private void Reset()
     {
         search = "";
         roleFilter = "";
+        statusFilter = "";
         page = 1;
     }
 
@@ -348,48 +435,52 @@
         if (next >= 1 && next <= Pages) page = next;
     }
 
+    private void SelectKey(KeyboardEventArgs e, int id)
+    {
+        if (e.Key is "Enter" or " ") selected = id;
+    }
+
     private void Add()
     {
         editing = false;
         error = null;
-        model = new Account { Role = "Nhân viên" };
+        message = null;
+        model = new NguoiDungForm { VaiTro = Roles.Staff, IsNew = true };
         dialog = "form";
     }
 
     private void Edit()
     {
-        if (selected is null) return;
+        if (Selected is not { } source) return;
 
         editing = true;
         error = null;
-
-        var source = accounts.FirstOrDefault(
-            a => a.Code == selected
-        );
-
-        model = source is not null
-            ? new Account
-              {
-                  Code = source.Code,
-                  FullName = source.FullName,
-                  Username = source.Username,
-                  Email = source.Email,
-                  Role = source.Role
-              }
-            : new Account();
-
+        message = null;
+        model = new NguoiDungForm
+        {
+            MaNguoiDung = source.MaNguoiDung,
+            TenDangNhap = source.TenDangNhap,
+            HoTen = source.HoTen,
+            Email = source.Email,
+            VaiTro = source.VaiTro,
+            TrangThai = source.TrangThai
+        };
         dialog = "form";
     }
 
-    private void AskDelete()
+    private void AskToggleLock()
     {
-        if (selected is null) return;
+        if (Selected is null || IsMe(Selected)) return;
+
         error = null;
-        dialog = "delete";
+        message = null;
+        dialog = "lock";
     }
 
     private void Close()
     {
+        if (saving) return;
+
         dialog = "";
         error = null;
     }
@@ -398,66 +489,95 @@
     {
         if (saving) return;
 
+        if (!editing && string.IsNullOrEmpty(model.MatKhau))
+        {
+            error = "Nhập mật khẩu cho tài khoản mới (tối thiểu 6 ký tự).";
+            return;
+        }
+
+        saving = true;
+        error = null;
+
         try
         {
-            saving = true;
-            error = null;
+            NguoiDung saved;
 
             if (editing)
             {
-                var existing = accounts.FirstOrDefault(
-                    a => a.Code == selected
-                );
-
-                if (existing is not null)
+                saved = await AccountApi.UpdateAsync(model.MaNguoiDung, new NguoiDungCapNhatRequest
                 {
-                    existing.FullName = model.FullName;
-                    existing.Username = model.Username;
-                    existing.Email = model.Email;
-                    existing.Role = model.Role;
-                }
+                    HoTen = model.HoTen.Trim(),
+                    Email = model.Email.Trim(),
+                    VaiTro = model.VaiTro,
+                    MatKhauMoi = string.IsNullOrEmpty(model.MatKhau) ? null : model.MatKhau
+                }, pageCts.Token);
 
-                message = $"Đã cập nhật tài khoản {model.FullName}.";
+                message = $"Đã cập nhật tài khoản {saved.HoTen}.";
             }
             else
             {
-                model.Code = $"TK{accounts.Count + 1:D4}";
-                accounts.Add(new Account
+                saved = await AccountApi.CreateAsync(new NguoiDungTaoRequest
                 {
-                    Code = model.Code,
-                    FullName = model.FullName,
-                    Username = model.Username,
-                    Email = model.Email,
-                    Role = model.Role
-                });
+                    TenDangNhap = model.TenDangNhap.Trim(),
+                    MatKhau = model.MatKhau!,
+                    HoTen = model.HoTen.Trim(),
+                    Email = model.Email.Trim(),
+                    VaiTro = model.VaiTro
+                }, pageCts.Token);
 
-                message = $"Đã thêm tài khoản {model.FullName}.";
+                message = $"Đã thêm tài khoản {saved.HoTen}.";
             }
 
             dialog = "";
-            await Task.CompletedTask;
+            selected = saved.MaNguoiDung;
+            await Load();
         }
-        catch (Exception ex) { error = ex.Message; }
-        finally { saving = false; }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            saving = false;
+        }
     }
 
-    private async Task Delete()
+    private async Task ToggleLock()
     {
-        if (saving || selected is null) return;
+        if (saving || Selected is not { } target || IsMe(target)) return;
+
+        saving = true;
+        error = null;
 
         try
         {
-            saving = true;
-            error = null;
+            bool unlock = !target.TrangThai;
+            var saved = await AccountApi.UpdateAsync(target.MaNguoiDung,
+                new NguoiDungCapNhatRequest { TrangThai = unlock }, pageCts.Token);
 
-            accounts.RemoveAll(a => a.Code == selected);
-            message = "Đã xóa tài khoản.";
-            selected = null;
+            message = unlock ? $"Đã mở khóa tài khoản {saved.HoTen}." : $"Đã khóa tài khoản {saved.HoTen}.";
             dialog = "";
-            await Task.CompletedTask;
+            await Load();
         }
-        catch (Exception ex) { error = ex.Message; }
-        finally { saving = false; }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        pageCts.Cancel();
+        pageCts.Dispose();
     }
 }
-

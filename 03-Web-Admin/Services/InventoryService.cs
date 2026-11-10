@@ -1,81 +1,53 @@
-using System.Net.Http.Json;
 using CoffeeShop.Admin.Models;
 
 namespace CoffeeShop.Admin.Services;
 
 /// <summary>
-/// Service gọi API kho nguyên liệu.
+/// Kho nguyên liệu — api/v1/nguyen-lieu, api/v1/lich-su-kho (chỉ Quản lý).
 /// </summary>
 public class InventoryService
 {
-    private readonly HttpClient _http;
+    private readonly ApiClient _api;
 
-    public InventoryService(HttpClient http)
+    public InventoryService(ApiClient api)
     {
-        _http = http;
+        _api = api;
     }
 
-    public async Task<List<Ingredient>> GetIngredientsAsync()
-    {
-        return await _http.GetFromJsonAsync<List<Ingredient>>(
-            "api/ingredients"
-        ) ?? [];
-    }
+    /// <summary>Danh sách nguyên liệu kèm dự báo số ngày còn dùng.</summary>
+    public Task<List<NguyenLieu>> GetIngredientsAsync(bool? sapHet = null, bool? dangSuDung = null, CancellationToken ct = default) =>
+        _api.GetAsync<List<NguyenLieu>>(Query.Build("api/v1/nguyen-lieu", ("sapHet", sapHet), ("dangSuDung", dangSuDung)), ct);
 
-    public async Task<Ingredient> CreateIngredientAsync(
-        Ingredient ingredient
-    )
-    {
-        var response = await _http.PostAsJsonAsync(
-            "api/ingredients",
-            ingredient
-        );
+    public Task<NguyenLieu> CreateAsync(NguyenLieuRequest request, CancellationToken ct = default) =>
+        _api.PostAsync<NguyenLieu>("api/v1/nguyen-lieu", request, ct);
 
-        response.EnsureSuccessStatusCode();
+    public Task<NguyenLieu> UpdateAsync(int id, NguyenLieuCapNhatRequest request, CancellationToken ct = default) =>
+        _api.PatchAsync<NguyenLieu>($"api/v1/nguyen-lieu/{id}", request, ct);
 
-        return (await response.Content
-            .ReadFromJsonAsync<Ingredient>())!;
-    }
+    /// <summary>Xóa mềm: nguyên liệu chuyển sang "Ngừng sử dụng".</summary>
+    public Task DeleteAsync(int id, CancellationToken ct = default) =>
+        _api.DeleteAsync($"api/v1/nguyen-lieu/{id}", ct);
 
-    public async Task UpdateIngredientAsync(Ingredient ingredient)
-    {
-        var response = await _http.PutAsJsonAsync(
-            $"api/ingredients/{ingredient.Code}",
-            ingredient
-        );
+    /// <summary>Nhập hàng (+) hoặc xuất hủy (−); luôn ghi lịch sử kho.</summary>
+    public Task<NguyenLieu> TransactAsync(int id, string loai, GiaoDichKhoRequest request, CancellationToken ct = default) =>
+        _api.PostAsync<NguyenLieu>(
+            $"api/v1/nguyen-lieu/{id}/{(loai == LoaiGiaoDichKho.XuatHuy ? "xuat-huy" : "nhap-kho")}",
+            request,
+            ct);
 
-        response.EnsureSuccessStatusCode();
-    }
-
-    public async Task DeleteIngredientAsync(string code)
-    {
-        var response = await _http.DeleteAsync(
-            $"api/ingredients/{code}"
-        );
-
-        response.EnsureSuccessStatusCode();
-    }
-
-    public async Task<List<InventoryTransaction>> GetTransactionsAsync()
-    {
-        return await _http.GetFromJsonAsync<List<InventoryTransaction>>(
-            "api/inventory/transactions"
-        ) ?? [];
-    }
-
-    public async Task<InventoryTransaction> CreateTransactionAsync(
-        InventoryTransaction transaction
-    )
-    {
-        var response = await _http.PostAsJsonAsync(
-            "api/inventory/transactions",
-            transaction
-        );
-
-        response.EnsureSuccessStatusCode();
-
-        return (await response.Content
-            .ReadFromJsonAsync<InventoryTransaction>())!;
-    }
+    public Task<PagedResult<LichSuKho>> GetHistoryAsync(
+        int page,
+        int limit,
+        int? maNguyenLieu = null,
+        string? loaiGiaoDich = null,
+        DateTime? tuNgay = null,
+        DateTime? denNgay = null,
+        CancellationToken ct = default) =>
+        _api.GetAsync<PagedResult<LichSuKho>>(Query.Build("api/v1/lich-su-kho",
+            ("page", page),
+            ("limit", limit),
+            ("maNguyenLieu", maNguyenLieu),
+            ("loaiGiaoDich", loaiGiaoDich),
+            ("tuNgay", tuNgay?.Date),
+            ("denNgay", Query.EndOfDay(denNgay))), ct);
 }
-

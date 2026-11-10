@@ -1,36 +1,106 @@
 using CoffeeShop.Admin.Models;
+using CoffeeShop.Admin.Utilities;
 
 namespace CoffeeShop.Admin.Services.Mock;
 
 /// <summary>
-/// Dữ liệu giả lập trong bộ nhớ, dùng khi chưa có backend (Api:UseMock = true).
+/// Dữ liệu giả lập trong bộ nhớ, dùng khi không chạy backend (Api:UseMock = true).
+/// Cấu trúc bảng mô phỏng CSDL QuanCaPheDB của backend; <see cref="MockApiHandler"/> dựng DTO từ đây.
 /// Dữ liệu sống trong suốt phiên trình duyệt; tải lại trang (F5) sẽ về dữ liệu mẫu ban đầu.
 /// </summary>
 public class MockDatabase
 {
-    public List<Category> Categories { get; } = [];
-    public List<Product> Products { get; } = [];
-    public List<Topping> Toppings { get; } = [];
-    public List<Ingredient> Ingredients { get; } = [];
-    public List<InventoryTransaction> Transactions { get; } = [];
-    public List<Order> Orders { get; } = [];
-    public List<Promotion> Promotions { get; } = [];
-    public List<Account> Accounts { get; } = [];
+    // ------------------------------------------------------------------ Bảng
+    public List<NguoiDung> NguoiDungs { get; } = [];
+    public List<DanhMuc> DanhMucs { get; } = [];
+    public List<KichThuoc> KichThuocs { get; } = [];
+    public List<MonRow> Mons { get; } = [];
+    public List<ToppingRow> Toppings { get; } = [];
+    public List<CongThucRow> CongThucs { get; } = [];
+    public List<KhuyenMaiRow> KhuyenMais { get; } = [];
+    public List<NguyenLieuRow> NguyenLieus { get; } = [];
+    public List<LichSuKho> LichSuKhos { get; } = [];
+    public List<DonHang> DonHangs { get; } = [];
+
+    /// <summary>Lần cuối mock tự thêm đơn "khách đặt từ tablet".</summary>
+    public DateTime LastTabletOrder { get; set; } = DateTime.Now;
 
     /// <summary>
-    /// Mật khẩu mặc định của mọi tài khoản giả lập (và tài khoản chủ quán tạo mới trong chế độ giả lập).
+    /// Nút "Mô phỏng gửi đơn từ Tablet" (chỉ hiện ở chế độ giả lập) bật cờ này:
+    /// lần tải danh sách đơn kế tiếp sẽ có thêm một đơn tablet mới.
     /// </summary>
-    public const string DefaultPassword = "123456";
+    public bool TabletOrderRequested { get; set; }
 
-    /// <summary>Tài khoản đăng nhập giả lập: username → mật khẩu.</summary>
-    public Dictionary<string, string> Passwords { get; } = new(StringComparer.OrdinalIgnoreCase)
+    /// <summary>Mật khẩu giả lập: tên đăng nhập → mật khẩu (giống tài khoản mẫu của backend).</summary>
+    public Dictionary<string, string> MatKhaus { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public class MonRow
     {
-        ["admin"] = DefaultPassword,
-        ["nhanvien"] = DefaultPassword,
-        ["minh.nv"] = DefaultPassword,
-        ["lan.nv"] = DefaultPassword
-    };
+        public int MaTenMon { get; set; }
+        public int MaDanhMuc { get; set; }
+        public string TenMon { get; set; } = "";
+        public string? HinhAnh { get; set; }
+        public bool ConHang { get; set; } = true;
+        public bool NgungBan { get; set; }
+        public int? MaKhuyenMai { get; set; }
+        public List<ChiTietMonRow> Sizes { get; set; } = [];
+    }
 
+    public class ChiTietMonRow
+    {
+        public int MaChiTietMon { get; set; }
+        public string MaKichThuoc { get; set; } = "";
+        public decimal GiaBan { get; set; }
+        public bool DangApDung { get; set; } = true;
+    }
+
+    public class ToppingRow
+    {
+        public int MaTopping { get; set; }
+        public string TenTopping { get; set; } = "";
+        public decimal GiaThem { get; set; }
+        public bool ConHang { get; set; } = true;
+        public bool NgungBan { get; set; }
+    }
+
+    /// <summary>Định mức: thuộc MỘT món-size (MaChiTietMon) HOẶC MỘT topping (MaTopping).</summary>
+    public class CongThucRow
+    {
+        public int MaCongThuc { get; set; }
+        public int? MaChiTietMon { get; set; }
+        public int? MaTopping { get; set; }
+        public int MaNguyenLieu { get; set; }
+        public decimal LuongSuDung { get; set; }
+    }
+
+    public class KhuyenMaiRow
+    {
+        public int MaKhuyenMai { get; set; }
+        public string Code { get; set; } = "";
+        public decimal PhanTramGiam { get; set; }
+        public DateTime NgayBatDau { get; set; }
+        public DateTime NgayKetThuc { get; set; }
+        public TimeSpan? GioBatDau { get; set; }
+        public TimeSpan? GioKetThuc { get; set; }
+
+        /// <summary>Giống backend: trong khoảng ngày và (nếu có) trong khung giờ vàng.</summary>
+        public bool DangApDung(DateTime now) =>
+            now >= NgayBatDau && now <= NgayKetThuc
+            && (GioBatDau is null || GioKetThuc is null
+                || (now.TimeOfDay >= GioBatDau && now.TimeOfDay <= GioKetThuc));
+    }
+
+    public class NguyenLieuRow
+    {
+        public int MaNguyenLieu { get; set; }
+        public string TenNguyenLieu { get; set; } = "";
+        public string DonViTinh { get; set; } = "";
+        public decimal SoLuongTon { get; set; }
+        public decimal MucCanhBaoToiThieu { get; set; }
+        public bool DangSuDung { get; set; } = true;
+    }
+
+    // ------------------------------------------------------------------ Quên mật khẩu (chỉ giả lập)
     /// <summary>Mã xác minh quên mật khẩu đang chờ: email → thông tin mã.</summary>
     public Dictionary<string, ResetCode> ResetCodes { get; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -40,7 +110,7 @@ public class MockDatabase
     /// </summary>
     public Dictionary<string, List<DateTime>> ResetRequestLog { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Token đặt lại mật khẩu (dùng một lần): token → (username, hết hạn).</summary>
+    /// <summary>Token đặt lại mật khẩu (dùng một lần): token → (tên đăng nhập, hết hạn).</summary>
     public Dictionary<string, (string Username, DateTime ExpiresAt)> ResetTokens { get; } = [];
 
     public class ResetCode
@@ -52,278 +122,186 @@ public class MockDatabase
         public int FailedAttempts { get; set; }
     }
 
+    // ------------------------------------------------------------------ Khóa tự tăng
+    public static int NextId<T>(IEnumerable<T> rows, Func<T, int> id) => rows.Select(id).DefaultIfEmpty(0).Max() + 1;
+
     public MockDatabase()
     {
-        SeedCatalog();
-        SeedInventory();
+        SeedAccounts();
+        SeedMenu();
         SeedOrders();
-        SeedPromotionsAndAccounts();
     }
 
-    /// <summary>
-    /// Sinh mã kế tiếp theo tiền tố, ví dụ "SP" + danh sách có SP0005 → "SP0006".
-    /// </summary>
-    public static string NextCode(IEnumerable<string> existing, string prefix, int width = 4)
+    private void SeedAccounts()
     {
-        int max = 0;
-
-        foreach (string code in existing)
-        {
-            if (code.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
-                && int.TryParse(code[prefix.Length..], out int number))
-            {
-                max = Math.Max(max, number);
-                width = Math.Max(width, code.Length - prefix.Length);
-            }
-        }
-
-        return prefix + (max + 1).ToString().PadLeft(width, '0');
-    }
-
-    private void SeedCatalog()
-    {
-        Categories.AddRange(
+        NguoiDungs.AddRange(
         [
-            new() { Code = "DM0001", Name = "Cà phê", SortOrder = 1, Visible = true },
-            new() { Code = "DM0002", Name = "Trà sữa", SortOrder = 2, Visible = true },
-            new() { Code = "DM0003", Name = "Trà trái cây", SortOrder = 3, Visible = true },
-            new() { Code = "DM0004", Name = "Bánh & Ăn kèm", SortOrder = 4, Visible = true }
+            new() { MaNguoiDung = 1, TenDangNhap = "quanly", HoTen = "Chủ quán", Email = "quanly@coffee.vn", VaiTro = Roles.Admin },
+            new() { MaNguoiDung = 2, TenDangNhap = "nhanvien", HoTen = "Thu ngân A", Email = "nhanvien@coffee.vn", VaiTro = Roles.Staff },
+            new() { MaNguoiDung = 3, TenDangNhap = "minh.nv", HoTen = "Lê Minh", Email = "minh.nv@coffee.vn", VaiTro = Roles.Staff },
         ]);
 
-        Ingredients.AddRange(
+        MatKhaus["quanly"] = "QuanLy@123";
+        MatKhaus["nhanvien"] = "NhanVien@123";
+        MatKhaus["minh.nv"] = "NhanVien@123";
+    }
+
+    private void SeedMenu()
+    {
+        DateTime today = DateTime.Today;
+
+        DanhMucs.AddRange(
         [
-            new() { Code = "NL0001", Name = "Cà phê hạt Arabica", Unit = "g" },
-            new() { Code = "NL0002", Name = "Sữa đặc Ngôi Sao", Unit = "ml" },
-            new() { Code = "NL0003", Name = "Sữa tươi thanh trùng", Unit = "ml" },
-            new() { Code = "NL0004", Name = "Trân châu đen thô", Unit = "g" },
-            new() { Code = "NL0005", Name = "Bột phô mai Macchiato", Unit = "g" },
-            new() { Code = "NL0006", Name = "Bột Pudding trứng", Unit = "g" },
-            new() { Code = "NL0007", Name = "Ly giấy 500ml", Unit = "cái" },
-            new() { Code = "NL0008", Name = "Ly giấy 700ml", Unit = "cái" }
+            new() { MaDanhMuc = 1, TenDanhMuc = "Cà phê" },
+            new() { MaDanhMuc = 2, TenDanhMuc = "Trà" },
+            new() { MaDanhMuc = 3, TenDanhMuc = "Bánh ngọt" },
+        ]);
+
+        KichThuocs.AddRange(
+        [
+            new() { MaKichThuoc = "S", TenKichThuoc = "Nhỏ" },
+            new() { MaKichThuoc = "M", TenKichThuoc = "Vừa" },
+            new() { MaKichThuoc = "L", TenKichThuoc = "Lớn" },
+        ]);
+
+        KhuyenMais.AddRange(
+        [
+            new() { MaKhuyenMai = 1, Code = "GIOVANG20", PhanTramGiam = 20, NgayBatDau = today.AddDays(-1), NgayKetThuc = today.AddMonths(3), GioBatDau = new TimeSpan(14, 0, 0), GioKetThuc = new TimeSpan(16, 0, 0) },
+            new() { MaKhuyenMai = 2, Code = "KHAITRUONG10", PhanTramGiam = 10, NgayBatDau = today.AddDays(-1), NgayKetThuc = today.AddMonths(1) },
+        ]);
+
+        NguyenLieus.AddRange(
+        [
+            new() { MaNguyenLieu = 1, TenNguyenLieu = "Cà phê hạt", DonViTinh = "gram", SoLuongTon = 5000, MucCanhBaoToiThieu = 500 },
+            new() { MaNguyenLieu = 2, TenNguyenLieu = "Sữa đặc", DonViTinh = "ml", SoLuongTon = 3000, MucCanhBaoToiThieu = 300 },
+            new() { MaNguyenLieu = 3, TenNguyenLieu = "Sữa tươi", DonViTinh = "ml", SoLuongTon = 4000, MucCanhBaoToiThieu = 500 },
+            new() { MaNguyenLieu = 4, TenNguyenLieu = "Đá viên", DonViTinh = "gram", SoLuongTon = 50000, MucCanhBaoToiThieu = 5000 },
+            new() { MaNguyenLieu = 5, TenNguyenLieu = "Trà đen", DonViTinh = "gram", SoLuongTon = 2000, MucCanhBaoToiThieu = 200 },
+            new() { MaNguyenLieu = 6, TenNguyenLieu = "Đào ngâm", DonViTinh = "gram", SoLuongTon = 3000, MucCanhBaoToiThieu = 300 },
+            new() { MaNguyenLieu = 7, TenNguyenLieu = "Trân châu", DonViTinh = "gram", SoLuongTon = 2000, MucCanhBaoToiThieu = 200 },
+            new() { MaNguyenLieu = 8, TenNguyenLieu = "Kem cheese", DonViTinh = "gram", SoLuongTon = 1000, MucCanhBaoToiThieu = 100 },
+            new() { MaNguyenLieu = 9, TenNguyenLieu = "Bánh tiramisu", DonViTinh = "mieng", SoLuongTon = 3, MucCanhBaoToiThieu = 5 },
+        ]);
+
+        int ct = 1;
+        MonRow Mon(int id, int danhMuc, string ten, int? km, params (string Size, decimal Gia)[] sizes) => new()
+        {
+            MaTenMon = id,
+            MaDanhMuc = danhMuc,
+            TenMon = ten,
+            MaKhuyenMai = km,
+            Sizes = sizes.Select(s => new ChiTietMonRow { MaChiTietMon = ct++, MaKichThuoc = s.Size, GiaBan = s.Gia }).ToList()
+        };
+
+        Mons.AddRange(
+        [
+            Mon(1, 1, "Cà phê sữa đá", null, ("M", 29000), ("L", 35000)),
+            Mon(2, 1, "Cà phê đen", 1, ("M", 25000), ("L", 30000)),
+            Mon(3, 1, "Bạc xỉu", 2, ("M", 32000), ("L", 38000)),
+            Mon(4, 2, "Trà đào cam sả", 1, ("M", 39000), ("L", 45000)),
+            Mon(5, 2, "Trà sữa trân châu", null, ("S", 30000), ("M", 35000), ("L", 42000)),
+            Mon(6, 3, "Bánh tiramisu", null, ("M", 45000)),
         ]);
 
         Toppings.AddRange(
         [
-            new() { Code = "SZ-M", Name = "Size M (Vừa 500ml)", Type = "Size", ExtraPrice = 0, Status = "Đang phục vụ", Description = "Kích cỡ chuẩn mặc định", Recipe = [new() { IngredientId = "NL0007", Quantity = 1 }] },
-            new() { Code = "SZ-L", Name = "Size L (Lớn 700ml)", Type = "Size", ExtraPrice = 6000, Status = "Đang phục vụ", Description = "Kích cỡ lớn (+6.000 đ)", Recipe = [new() { IngredientId = "NL0008", Quantity = 1 }] },
-            new() { Code = "SZ-XL", Name = "Size XL (Khổng lồ 1000ml)", Type = "Size", ExtraPrice = 12000, Status = "Đang phục vụ", Description = "Kích cỡ siêu to (+12.000 đ)" },
-            new() { Code = "TP-TC", Name = "Trân châu đen", Type = "Topping", ExtraPrice = 8000, Status = "Đang phục vụ", Description = "Trân châu đường đen dẻo bùi", Recipe = [new() { IngredientId = "NL0004", Quantity = 35 }] },
-            new() { Code = "TP-TCTRANG", Name = "Trân châu trắng", Type = "Topping", ExtraPrice = 8000, Status = "Đang phục vụ", Description = "Trân châu thủy tinh giòn sần sật" },
-            new() { Code = "TP-KEM", Name = "Kem Cheese Macchiato", Type = "Topping", ExtraPrice = 10000, Status = "Đang phục vụ", Description = "Lớp kem béo ngậy vị mặn nhẹ", Recipe = [new() { IngredientId = "NL0005", Quantity = 25 }] },
-            new() { Code = "TP-FLAN", Name = "Pudding trứng", Type = "Topping", ExtraPrice = 10000, Status = "Đang phục vụ", Description = "Pudding mềm mịn tan trong miệng", Recipe = [new() { IngredientId = "NL0006", Quantity = 30 }] },
-            new() { Code = "TP-THACH", Name = "Thạch nha đam", Type = "Topping", ExtraPrice = 6000, Status = "Tạm hết", Description = "Nha đam giòn ngọt thanh nhiệt" }
+            new() { MaTopping = 1, TenTopping = "Trân châu đen", GiaThem = 5000 },
+            new() { MaTopping = 2, TenTopping = "Kem cheese", GiaThem = 10000 },
+            new() { MaTopping = 3, TenTopping = "Thêm shot espresso", GiaThem = 10000 },
         ]);
 
-        Products.AddRange(
-        [
-            new() { Code = "SP0001", Name = "Cà phê sữa đá", CategoryId = "DM0001", Price = 29000, Status = "Đang bán", Description = "Cà phê pha phin truyền thống thơm đượm", Recipe = [new() { IngredientId = "NL0001", Quantity = 25 }, new() { IngredientId = "NL0002", Quantity = 40 }] },
-            new() { Code = "SP0002", Name = "Bạc xỉu", CategoryId = "DM0001", Price = 32000, Status = "Đang bán", Description = "Nhiều sữa ít cà phê, béo ngậy ngọt ngào", Recipe = [new() { IngredientId = "NL0001", Quantity = 15 }, new() { IngredientId = "NL0002", Quantity = 30 }, new() { IngredientId = "NL0003", Quantity = 80 }] },
-            new() { Code = "SP0003", Name = "Trà sữa Oolong nướng", CategoryId = "DM0002", Price = 42000, Status = "Đang bán", Description = "Vị trà oolong đậm đà hòa quyện khói nướng đặc trưng" },
-            new() { Code = "SP0004", Name = "Trà đào cam sả", CategoryId = "DM0003", Price = 39000, Status = "Đang bán", Description = "Thanh mát giải nhiệt cùng đào miếng giòn ngọt" },
-            new() { Code = "SP0005", Name = "Trà sữa Matcha Nhật", CategoryId = "DM0002", Price = 45000, Status = "Đang bán", Description = "Matcha Uji nguyên chất thơm thanh tao" },
-            new() { Code = "SP0006", Name = "Cà phê đen đá", CategoryId = "DM0001", Price = 25000, Status = "Ngừng bán", Description = "Cà phê phin nguyên chất, đậm vị", Recipe = [new() { IngredientId = "NL0001", Quantity = 25 }] }
-        ]);
-    }
-
-    private void SeedInventory()
-    {
-        DateTime today = DateTime.Today;
-
-        (string ingredient, decimal quantity, decimal unitCost, int daysAgo)[] purchases =
-        [
-            ("NL0001", 5000, 350, 6),
-            ("NL0002", 10000, 60, 6),
-            ("NL0003", 20000, 35, 4),
-            ("NL0004", 3000, 90, 3),
-            ("NL0007", 500, 900, 2),
-            ("NL0008", 500, 1100, 1)
-        ];
-
-        foreach (var p in purchases)
+        int cth = 1;
+        void Recipe(int? chiTietMon, int? topping, params (int NguyenLieu, decimal Luong)[] lines)
         {
-            Ingredient ingredient = Ingredients.First(i => i.Code == p.ingredient);
-
-            Transactions.Add(new InventoryTransaction
+            foreach (var (nl, luong) in lines)
             {
-                Code = NextCode(Transactions.Select(t => t.Code), "PK"),
-                IngredientId = ingredient.Code,
-                IngredientName = ingredient.Name,
-                Unit = ingredient.Unit,
-                Type = "Nhập mua",
-                Quantity = p.quantity,
-                UnitCost = p.unitCost,
-                CreatedAt = today.AddDays(-p.daysAgo).AddHours(8)
-            });
-        }
-    }
-
-    private void SeedOrders()
-    {
-        DateTime now = DateTime.Now;
-
-        // Lịch sử 6 ngày trước: mỗi ngày vài đơn đã thanh toán, để Dashboard có số liệu.
-        int sequence = 100;
-
-        for (int day = 6; day >= 1; day--)
-        {
-            for (int i = 0; i < 2 + day % 3; i++)
-            {
-                DateTime created = now.Date.AddDays(-day).AddHours(8 + i * 3);
-                Product product = Products[(day + i) % 5];
-
-                Orders.Add(new Order
+                CongThucs.Add(new CongThucRow
                 {
-                    Code = $"DH{sequence++:00000}",
-                    CreatedAt = created,
-                    AcceptedAt = created.AddMinutes(2),
-                    PaidAt = created.AddMinutes(5),
-                    Status = "Hoàn thành",
-                    PaymentStatus = "Đã thanh toán",
-                    PaymentMethod = i % 2 == 0 ? "Tiền mặt" : "Chuyển khoản QR",
-                    Source = i % 2 == 0 ? "Tablet" : "Tại quầy",
-                    CashierName = "Nguyễn Thu Hà",
-                    TableOrArea = i % 2 == 0 ? $"Bàn {i + 1:00}" : "Mang đi",
-                    Items =
-                    [
-                        new OrderItem
-                        {
-                            ProductCode = product.Code,
-                            ProductName = product.Name,
-                            BasePrice = product.Price ?? 0,
-                            Quantity = 1 + i % 2,
-                            SizeName = "Size M (Vừa 500ml)"
-                        }
-                    ]
+                    MaCongThuc = cth++, MaChiTietMon = chiTietMon, MaTopping = topping, MaNguyenLieu = nl, LuongSuDung = luong
                 });
             }
         }
 
-        // Ba đơn hôm nay (giống dữ liệu mẫu cũ trong trang Đơn hàng).
-        Orders.Add(new Order
-        {
-            Code = "DH00123",
-            CreatedAt = now.AddHours(-1),
-            AcceptedAt = now.AddHours(-1).AddMinutes(2),
-            PaidAt = now.AddHours(-1).AddMinutes(5),
-            Status = "Hoàn thành",
-            PaymentStatus = "Đã thanh toán",
-            CashierName = "Nguyễn Thu Hà",
-            TableOrArea = "Mang đi",
-            PaymentMethod = "Tiền mặt",
-            Source = "Tại quầy",
-            Items = [new OrderItem { ProductCode = "SP0001", ProductName = "Cà phê sữa đá", BasePrice = 29000, Quantity = 2, SizeName = "Size M (Vừa 500ml)" }]
-        });
-
-        Orders.Add(new Order
-        {
-            Code = "DH00124",
-            CreatedAt = now.AddMinutes(-20),
-            AcceptedAt = now.AddMinutes(-18),
-            Status = "Đang pha chế",
-            PaymentStatus = "Chưa thanh toán",
-            CashierName = "Tablet (Khách gọi)",
-            TableOrArea = "Bàn 02 (Sân vườn)",
-            PaymentMethod = "Chuyển khoản QR",
-            Source = "Tablet",
-            Items =
-            [
-                new OrderItem
-                {
-                    ProductCode = "SP0004", ProductName = "Trà đào cam sả", BasePrice = 39000, Quantity = 2,
-                    SizeName = "Size L (Lớn 700ml)", SizeExtraPrice = 6000, Note = "Đậm vị đào",
-                    Toppings =
-                    [
-                        new() { ToppingCode = "TP-THACH", ToppingName = "Thạch nha đam", Price = 6000 },
-                        new() { ToppingCode = "TP-TCTRANG", ToppingName = "Trân châu trắng", Price = 8000 }
-                    ]
-                }
-            ]
-        });
-
-        Orders.Add(new Order
-        {
-            Code = "DH00125",
-            CreatedAt = now.AddMinutes(-5),
-            Status = "Chờ tiếp nhận",
-            PaymentStatus = "Chưa thanh toán",
-            CashierName = "Tablet (Khách gọi)",
-            TableOrArea = "Bàn 04 (Tầng 1)",
-            PaymentMethod = "Tiền mặt",
-            Source = "Tablet",
-            Items =
-            [
-                new OrderItem
-                {
-                    ProductCode = "SP0003", ProductName = "Trà sữa Oolong nướng", BasePrice = 42000, Quantity = 1,
-                    SizeName = "Size L (Lớn 700ml)", SizeExtraPrice = 6000, Note = "50% đường, ít đá",
-                    Toppings =
-                    [
-                        new() { ToppingCode = "TP-TC", ToppingName = "Trân châu đen", Price = 8000 },
-                        new() { ToppingCode = "TP-KEM", ToppingName = "Kem Cheese", Price = 10000 }
-                    ]
-                },
-                new OrderItem
-                {
-                    ProductCode = "SP0001", ProductName = "Cà phê sữa đá", BasePrice = 29000, Quantity = 1,
-                    SizeName = "Size M (Vừa 500ml)", Note = "Nhiều sữa ít ngọt",
-                    Toppings = [new() { ToppingCode = "TP-THACH", ToppingName = "Thạch nha đam", Price = 6000 }]
-                }
-            ]
-        });
+        Recipe(null, 1, (7, 30));
+        Recipe(null, 2, (8, 25));
+        Recipe(null, 3, (1, 18));
+        Recipe(1, null, (1, 16), (2, 24), (4, 120));   // Cà phê sữa đá M
+        Recipe(2, null, (1, 20), (2, 30), (4, 160));   // Cà phê sữa đá L
+        Recipe(3, null, (1, 18), (4, 120));            // Cà phê đen M
+        Recipe(5, null, (1, 10), (2, 20), (3, 80), (4, 100)); // Bạc xỉu M
+        Recipe(7, null, (5, 8), (6, 50), (4, 150));    // Trà đào M
+        Recipe(12, null, (9, 1));                       // Bánh tiramisu
     }
 
-    private void SeedPromotionsAndAccounts()
+    private void SeedOrders()
     {
-        DateTime today = DateTime.Today;
+        var now = DateTime.Now;
 
-        Promotions.AddRange(
-        [
-            new() { Code = "KM0001", Name = "Giảm 10% cuối tuần", DiscountPercent = 10, StartDate = today.AddDays(-3), EndDate = today.AddDays(4) },
-            new() { Code = "KM0002", Name = "Khai trương giảm 20%", DiscountPercent = 20, StartDate = today.AddDays(-40), EndDate = today.AddDays(-30) }
-        ]);
+        // Đơn cũ đã thanh toán trong 7 ngày → có dữ liệu cho báo cáo
+        int id = 1;
+        for (int day = 6; day >= 1; day--)
+        {
+            for (int i = 0; i < 2 + day % 3; i++)
+            {
+                var created = now.Date.AddDays(-day).AddHours(8 + (i * 3 + day) % 12).AddMinutes(i * 7);
+                var order = NewOrder(id++, i % 2 == 0 ? null : 2, created,
+                    i % 3 == 0 ? PhuongThucThanhToans.QrTransfer : PhuongThucThanhToans.Cash,
+                    (1 + (i + day) % 5, 1 + i % 2, i % 2 == 0 ? [1] : []));
+                order.TrangThaiThanhToan = TrangThaiDon.Paid;
+                DonHangs.Add(order);
+            }
+        }
 
-        Accounts.AddRange(
-        [
-            // Mật khẩu của tất cả: DefaultPassword (123456)
-            new() { Code = "TK0001", FullName = "Chủ quán", Username = "admin", Email = "admin@coffeeshop.local", Role = "Admin" },
-            new() { Code = "TK0002", FullName = "Nguyễn Thu Hà", Username = "nhanvien", Email = "thuha@coffeeshop.local", Role = "Nhân viên" },
-            new() { Code = "TK0003", FullName = "Lê Minh", Username = "minh.nv", Email = "minh.nv@coffeeshop.local", Role = "Nhân viên" },
-            new() { Code = "TK0004", FullName = "Phạm Ngọc Lan", Username = "lan.nv", Email = "lan.nv@coffeeshop.local", Role = "Nhân viên" }
-        ]);
+        // Đơn hôm nay
+        var paid = NewOrder(id++, 2, now.AddHours(-1), PhuongThucThanhToans.Cash, (1, 2, []));
+        paid.TrangThaiThanhToan = TrangThaiDon.Paid;
+        DonHangs.Add(paid);
+
+        DonHangs.Add(NewOrder(id++, null, now.AddMinutes(-20), PhuongThucThanhToans.QrTransfer, (4, 2, [1])));
+        DonHangs.Add(NewOrder(id, null, now.AddMinutes(-5), PhuongThucThanhToans.Cash, (5, 1, [1, 2]), (1, 1, [])));
     }
 
     /// <summary>
-    /// Giả lập khách vừa đặt một đơn mới từ tablet.
+    /// Tạo đơn mẫu (bỏ qua kiểm tra tồn kho). Mỗi dòng: (mã món, số lượng, mã topping); size = size đầu tiên của món.
     /// </summary>
-    public Order AddRandomTabletOrder()
+    private DonHang NewOrder(int id, int? maNhanVien, DateTime created, string method,
+        params (int Mon, int SoLuong, int[] Toppings)[] lines)
     {
-        var sellable = Products.Where(p => p.Status == "Đang bán").ToList();
-        Product product = sellable[Random.Shared.Next(sellable.Count)];
-
-        var order = new Order
+        var order = new DonHang
         {
-            Code = NextCode(Orders.Select(o => o.Code), "DH", 5),
-            CreatedAt = DateTime.Now,
-            Status = "Chờ tiếp nhận",
-            PaymentStatus = "Chưa thanh toán",
-            CashierName = "Tablet (Khách gọi)",
-            TableOrArea = $"Bàn {Random.Shared.Next(1, 13):00}",
-            PaymentMethod = "Tiền mặt",
-            Source = "Tablet",
-            Items =
-            [
-                new OrderItem
-                {
-                    ProductCode = product.Code,
-                    ProductName = product.Name,
-                    BasePrice = product.Price ?? 0,
-                    Quantity = Random.Shared.Next(1, 3),
-                    SizeName = "Size M (Vừa 500ml)"
-                }
-            ]
+            MaDonHang = id,
+            MaNguoiDung = maNhanVien,
+            TenNhanVien = NguoiDungs.FirstOrDefault(u => u.MaNguoiDung == maNhanVien)?.HoTen,
+            PhuongThucThanhToan = method,
+            TrangThaiThanhToan = TrangThaiDon.Pending,
+            ThoiGianTao = created,
+            ChiTiet = []
         };
 
-        Orders.Add(order);
+        int lineId = DonHangs.SelectMany(d => d.ChiTiet ?? []).Select(c => c.MaChiTietDon).DefaultIfEmpty(0).Max() + 1;
+
+        foreach (var (monId, soLuong, toppingIds) in lines)
+        {
+            var mon = Mons.First(m => m.MaTenMon == monId);
+            var size = mon.Sizes[0];
+            var toppings = toppingIds
+                .Select(t => Toppings.First(x => x.MaTopping == t))
+                .Select(t => new ToppingDaChon { MaTopping = t.MaTopping, TenToppingLuu = t.TenTopping, DonGiaTopping = t.GiaThem })
+                .ToList();
+
+            order.ChiTiet.Add(new ChiTietDon
+            {
+                MaChiTietDon = lineId++,
+                MaChiTietMon = size.MaChiTietMon,
+                TenMonLuu = $"{mon.TenMon} - {KichThuocs.First(k => k.MaKichThuoc == size.MaKichThuoc).TenKichThuoc}",
+                DonGiaBan = size.GiaBan,
+                SoLuong = soLuong,
+                Toppings = toppings,
+                ThanhTien = (size.GiaBan + toppings.Sum(t => t.DonGiaTopping)) * soLuong
+            });
+        }
+
+        order.TongTien = order.ChiTiet.Sum(c => c.ThanhTien);
         return order;
     }
 }

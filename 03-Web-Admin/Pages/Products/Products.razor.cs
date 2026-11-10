@@ -1,402 +1,334 @@
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using CoffeeShop.Admin.Models;
+using CoffeeShop.Admin.Services;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 
 namespace CoffeeShop.Admin.Pages.Products;
 
-public partial class Products
+/// <summary>
+/// Quản lý thực đơn: món (giá theo size), danh mục, topping, kích thước và công thức (định mức nguyên liệu).
+/// API: api/v1/mon, danh-muc, topping, kich-thuoc, chi-tiet-mon/{id}/cong-thuc, topping/{id}/cong-thuc.
+/// </summary>
+public partial class Products : IDisposable
 {
-    private List<Product> products = [];
-    private List<Category> categories = [];
-    private List<Ingredient> ingredients = [];
+    [Inject] private ProductService ProductApi { get; set; } = default!;
+    [Inject] private CategoryService CategoryApi { get; set; } = default!;
+    [Inject] private ToppingService ToppingApi { get; set; } = default!;
+    [Inject] private PromotionService PromotionApi { get; set; } = default!;
+    [Inject] private InventoryService InventoryApi { get; set; } = default!;
+
+    private readonly CancellationTokenSource pageCts = new();
+
+    private List<Mon> products = [];
+    private List<DanhMuc> categories = [];
     private List<Topping> toppings = [];
+    private List<KichThuoc> sizes = [];
+    private List<KhuyenMai> promotions = [];
+    private List<NguyenLieu> ingredients = [];
 
-    private List<RecipeLine> recipe = [];
+    /// <summary>"products" | "categories" | "toppings" | "sizes"</summary>
+    private string activeTab = "products";
+    private bool ProductTab => activeTab == "products";
+    private bool CategoryTab => activeTab == "categories";
+    private bool ToppingTab => activeTab == "toppings";
+    private bool SizeTab => activeTab == "sizes";
 
-    private Product model = new();
-    private Category categoryModel = new();
-    private Topping toppingModel = new();
-
-    private string activeTab = "products"; // "products", "categories", "toppings"
-    private bool categoryTab => activeTab == "categories";
-    private bool toppingTab => activeTab == "toppings";
-
-    private bool editing;
+    private bool loading;
     private bool saving;
-    private bool reading;
-
-    private int page = 1;
-    private const int Size = 8;
-
-    private string search = "";
-    private string category = "";
-    private string status = "";
-    private string toppingType = "";
-    private string toppingStatus = "";
-
-    private string appliedSearch = "";
-    private string appliedCategory = "";
-    private string appliedStatus = "";
-    private string appliedToppingType = "";
-    private string appliedToppingStatus = "";
-
-    private string dialog = "";
-    private string target = "";
-    private string? selected;
+    private bool editing;
+    private string? loadError;
     private string? error;
     private string? message;
-    private string? imageError;
 
-    private IEnumerable<Product> Matches =>
-        products.Where(product =>
-            (
-                product.Code.Contains(appliedSearch, StringComparison.OrdinalIgnoreCase) ||
-                product.Name.Contains(appliedSearch, StringComparison.OrdinalIgnoreCase)
-            ) &&
-            (appliedCategory == "" || product.CategoryId == appliedCategory) &&
-            (appliedStatus == "" || product.Status == appliedStatus)
-        );
+    private int page = 1;
+    private const int PageSize = 8;
 
-    private IEnumerable<Category> CategoryMatches =>
-        categories.Where(item =>
-            item.Code.Contains(appliedSearch, StringComparison.OrdinalIgnoreCase) ||
-            item.Name.Contains(appliedSearch, StringComparison.OrdinalIgnoreCase)
-        );
+    private string search = "";
+    private string categoryFilter = "";
+    private string statusFilter = "";
+
+    /// <summary>Khóa dòng đang chọn: số (món/danh mục/topping) hoặc mã kích thước.</summary>
+    private string? selected;
+
+    /// <summary>"" | "product" | "category" | "topping" | "size" | "delete" | "recipe"</summary>
+    private string dialog = "";
+
+    private ProductForm productModel = new();
+    private NameForm nameModel = new();
+    private ToppingForm toppingModel = new();
+    private SizeForm sizeModel = new();
+
+    // Công thức
+    private int recipeOwner;      // MaChiTietMon (món) hoặc MaTopping
+    private bool recipeLoading;
+    private List<RecipeRow> recipe = [];
+
+    private static readonly CultureInfo Vi = new("vi-VN");
+
+    private static string Money(decimal value) => value.ToString("N0", Vi) + " đ";
+
+    // =====================================================================
+    // FORM
+    // =====================================================================
+
+    public class ProductForm
+    {
+        public int MaTenMon { get; set; }
+
+        [Required(ErrorMessage = "Nhập tên món.")]
+        [StringLength(150, ErrorMessage = "Tên món tối đa 150 ký tự.")]
+        public string TenMon { get; set; } = "";
+
+        [Range(1, int.MaxValue, ErrorMessage = "Chọn danh mục.")]
+        public int MaDanhMuc { get; set; }
+
+        [StringLength(255, ErrorMessage = "Đường dẫn ảnh tối đa 255 ký tự.")]
+        public string? HinhAnh { get; set; }
+
+        /// <summary>0 = không áp khuyến mãi.</summary>
+        public int MaKhuyenMai { get; set; }
+
+        public bool ConHang { get; set; } = true;
+        public bool NgungBan { get; set; }
+
+        public List<SizePrice> Prices { get; set; } = [];
+    }
+
+    public class SizePrice
+    {
+        public string MaKichThuoc { get; set; } = "";
+        public string TenKichThuoc { get; set; } = "";
+        public bool Ban { get; set; }
+        public decimal? GiaBan { get; set; }
+    }
+
+    public class NameForm
+    {
+        public int Id { get; set; }
+
+        [Required(ErrorMessage = "Nhập tên danh mục.")]
+        [StringLength(100, ErrorMessage = "Tên tối đa 100 ký tự.")]
+        public string Ten { get; set; } = "";
+    }
+
+    public class ToppingForm
+    {
+        public int MaTopping { get; set; }
+
+        [Required(ErrorMessage = "Nhập tên topping.")]
+        [StringLength(100, ErrorMessage = "Tên tối đa 100 ký tự.")]
+        public string TenTopping { get; set; } = "";
+
+        [Required(ErrorMessage = "Nhập giá thêm.")]
+        [Range(0, 1_000_000_000, ErrorMessage = "Giá thêm không được âm.")]
+        public decimal? GiaThem { get; set; }
+
+        public bool ConHang { get; set; } = true;
+        public bool NgungBan { get; set; }
+    }
+
+    public class SizeForm
+    {
+        [Required(ErrorMessage = "Nhập mã kích thước.")]
+        [RegularExpression("^[A-Za-z0-9]{1,10}$", ErrorMessage = "Mã 1–10 ký tự chữ không dấu hoặc số (ví dụ: S, M, L, XL).")]
+        public string MaKichThuoc { get; set; } = "";
+
+        [Required(ErrorMessage = "Nhập tên kích thước.")]
+        [StringLength(50, ErrorMessage = "Tên tối đa 50 ký tự.")]
+        public string TenKichThuoc { get; set; } = "";
+    }
+
+    public class RecipeRow
+    {
+        public int MaNguyenLieu { get; set; }
+        public decimal? LuongSuDung { get; set; }
+    }
+
+    // =====================================================================
+    // DANH SÁCH & LỌC
+    // =====================================================================
+
+    private IEnumerable<Mon> ProductMatches =>
+        products.Where(p =>
+            (search == ""
+             || p.MaTenMon.ToString().Contains(search, StringComparison.OrdinalIgnoreCase)
+             || p.TenMon.Contains(search, StringComparison.OrdinalIgnoreCase))
+            && (categoryFilter == "" || p.MaDanhMuc.ToString() == categoryFilter)
+            && (statusFilter == "" || TrangThaiMon.Of(p) == statusFilter));
+
+    private IEnumerable<DanhMuc> CategoryMatches =>
+        categories.Where(c =>
+            search == ""
+            || c.MaDanhMuc.ToString().Contains(search, StringComparison.OrdinalIgnoreCase)
+            || c.TenDanhMuc.Contains(search, StringComparison.OrdinalIgnoreCase));
 
     private IEnumerable<Topping> ToppingMatches =>
-        toppings.Where(item =>
-            (
-                item.Code.Contains(appliedSearch, StringComparison.OrdinalIgnoreCase) ||
-                item.Name.Contains(appliedSearch, StringComparison.OrdinalIgnoreCase)
-            ) &&
-            (appliedToppingType == "" || item.Type == appliedToppingType) &&
-            (appliedToppingStatus == "" || item.Status == appliedToppingStatus)
-        );
+        toppings.Where(t =>
+            (search == ""
+             || t.MaTopping.ToString().Contains(search, StringComparison.OrdinalIgnoreCase)
+             || t.TenTopping.Contains(search, StringComparison.OrdinalIgnoreCase))
+            && (statusFilter == "" || TrangThaiMon.Of(t) == statusFilter));
 
-    private IEnumerable<Product> VisibleProducts =>
-        Matches.Skip((page - 1) * Size).Take(Size);
-
-    private IEnumerable<Category> VisibleCategories =>
-        CategoryMatches.Skip((page - 1) * Size).Take(Size);
-
-    private IEnumerable<Topping> VisibleToppings =>
-        ToppingMatches.Skip((page - 1) * Size).Take(Size);
+    private IEnumerable<KichThuoc> SizeMatches =>
+        sizes.Where(s =>
+            search == ""
+            || s.MaKichThuoc.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || s.TenKichThuoc.Contains(search, StringComparison.OrdinalIgnoreCase));
 
     private int Count =>
-        toppingTab ? ToppingMatches.Count() :
-        categoryTab ? CategoryMatches.Count() :
-        Matches.Count();
+        ToppingTab ? ToppingMatches.Count()
+        : CategoryTab ? CategoryMatches.Count()
+        : SizeTab ? SizeMatches.Count()
+        : ProductMatches.Count();
 
-    private int Pages =>
-        Math.Max(1, (Count + Size - 1) / Size);
+    private int Pages => Math.Max(1, (Count + PageSize - 1) / PageSize);
+
+    private IEnumerable<T> Paged<T>(IEnumerable<T> items) => items.Skip((page - 1) * PageSize).Take(PageSize);
+
+    private Mon? SelectedProduct => ProductTab ? products.FirstOrDefault(p => p.MaTenMon.ToString() == selected) : null;
+    private DanhMuc? SelectedCategory => CategoryTab ? categories.FirstOrDefault(c => c.MaDanhMuc.ToString() == selected) : null;
+    private Topping? SelectedTopping => ToppingTab ? toppings.FirstOrDefault(t => t.MaTopping.ToString() == selected) : null;
+    private KichThuoc? SelectedSize => SizeTab ? sizes.FirstOrDefault(s => s.MaKichThuoc == selected) : null;
+
+    private bool HasSelection => SelectedProduct is not null || SelectedCategory is not null
+                                 || SelectedTopping is not null || SelectedSize is not null;
+
+    private string SelectedName =>
+        SelectedProduct?.TenMon ?? SelectedCategory?.TenDanhMuc ?? SelectedTopping?.TenTopping
+        ?? (SelectedSize is { } s ? $"{s.MaKichThuoc} – {s.TenKichThuoc}" : "");
 
     private string DialogTitle => dialog switch
     {
         "product" => editing ? "Sửa món" : "Thêm món mới",
         "category" => editing ? "Sửa danh mục" : "Thêm danh mục",
-        "topping" => editing ? "Sửa Topping / Size" : "Thêm Topping / Size mới",
-        "delete" => toppingTab ? "Xóa Topping / Size" : (categoryTab ? "Xóa danh mục" : "Xóa món"),
-        "recipe" => toppingTab ? "Định mức tiêu hao Topping / Size" : "Định mức nguyên liệu món",
-        _ => "Thông báo"
+        "topping" => editing ? "Sửa topping" : "Thêm topping",
+        "size" => editing ? "Sửa kích thước" : "Thêm kích thước",
+        "delete" => ProductTab ? "Ngừng bán món" : ToppingTab ? "Ngừng bán topping" : CategoryTab ? "Xóa danh mục" : "Xóa kích thước",
+        "recipe" => ToppingTab ? "Định mức nguyên liệu topping" : "Định mức nguyên liệu món",
+        _ => ""
     };
 
-    private static string Money(decimal value)
-    {
-        return value.ToString("N0", new CultureInfo("vi-VN")) + " đ";
-    }
+    /// <summary>Giá theo size đang bán, ví dụ "M 29.000 đ · L 35.000 đ".</summary>
+    private static IEnumerable<GiaTheoSize> ActiveSizes(Mon m) => m.KichThuoc.Where(s => s.DangApDung);
 
-    private static string Color(string value)
-    {
-        return value switch
-        {
-            "Đang bán" or "Đang phục vụ" => "green",
-            "Tạm hết" => "yellow",
-            _ => "red"
-        };
-    }
+    protected override Task OnInitializedAsync() => Load();
 
-    protected override async Task OnInitializedAsync()
+    private async Task Load()
     {
+        loading = true;
+        loadError = null;
+
         try
         {
-            categories = new()
-            {
-                new() { Code = "DM0001", Name = "Cà phê", SortOrder = 1, Visible = true },
-                new() { Code = "DM0002", Name = "Trà sữa", SortOrder = 2, Visible = true },
-                new() { Code = "DM0003", Name = "Trà trái cây", SortOrder = 3, Visible = true },
-                new() { Code = "DM0004", Name = "Bánh & Ăn kèm", SortOrder = 4, Visible = true }
-            };
+            var productTask = ProductApi.GetAllAsync(pageCts.Token);
+            var categoryTask = CategoryApi.GetAllAsync(pageCts.Token);
+            var toppingTask = ToppingApi.GetAllAsync(includeStopped: true, pageCts.Token);
+            var sizeTask = CategoryApi.GetSizesAsync(pageCts.Token);
+            var promotionTask = PromotionApi.GetAllAsync(pageCts.Token);
 
-            ingredients = new()
-            {
-                new() { Code = "NL0001", Name = "Cà phê hạt Arabica", Unit = "g" },
-                new() { Code = "NL0002", Name = "Sữa đặc Ngôi Sao", Unit = "ml" },
-                new() { Code = "NL0003", Name = "Sữa tươi thanh trùng", Unit = "ml" },
-                new() { Code = "NL0004", Name = "Trân châu đen thô", Unit = "g" },
-                new() { Code = "NL0005", Name = "Bột phô mai Macchiato", Unit = "g" },
-                new() { Code = "NL0006", Name = "Bột Pudding trứng", Unit = "g" },
-                new() { Code = "NL0007", Name = "Ly giấy 500ml", Unit = "cái" },
-                new() { Code = "NL0008", Name = "Ly giấy 700ml", Unit = "cái" }
-            };
-
-            toppings = new()
-            {
-                new()
-                {
-                    Code = "SZ-M",
-                    Name = "Size M (Vừa 500ml)",
-                    Type = "Size",
-                    ExtraPrice = 0,
-                    Status = "Đang phục vụ",
-                    Description = "Kích cỡ chuẩn mặc định",
-                    Recipe = new List<RecipeLine> { new() { IngredientId = "NL0007", Quantity = 1 } }
-                },
-                new()
-                {
-                    Code = "SZ-L",
-                    Name = "Size L (Lớn 700ml)",
-                    Type = "Size",
-                    ExtraPrice = 6000,
-                    Status = "Đang phục vụ",
-                    Description = "Kích cỡ lớn (+6.000 đ)",
-                    Recipe = new List<RecipeLine> { new() { IngredientId = "NL0008", Quantity = 1 } }
-                },
-                new()
-                {
-                    Code = "SZ-XL",
-                    Name = "Size XL (Khổng lồ 1000ml)",
-                    Type = "Size",
-                    ExtraPrice = 12000,
-                    Status = "Đang phục vụ",
-                    Description = "Kích cỡ siêu to (+12.000 đ)"
-                },
-                new()
-                {
-                    Code = "TP-TC",
-                    Name = "Trân châu đen",
-                    Type = "Topping",
-                    ExtraPrice = 8000,
-                    Status = "Đang phục vụ",
-                    Description = "Trân châu đường đen dẻo bùi",
-                    Recipe = new List<RecipeLine> { new() { IngredientId = "NL0004", Quantity = 35 } }
-                },
-                new()
-                {
-                    Code = "TP-TCTRANG",
-                    Name = "Trân châu trắng",
-                    Type = "Topping",
-                    ExtraPrice = 8000,
-                    Status = "Đang phục vụ",
-                    Description = "Trân châu thủy tinh giòn sần sật"
-                },
-                new()
-                {
-                    Code = "TP-KEM",
-                    Name = "Kem Cheese Macchiato",
-                    Type = "Topping",
-                    ExtraPrice = 10000,
-                    Status = "Đang phục vụ",
-                    Description = "Lớp kem béo ngậy vị mặn nhẹ",
-                    Recipe = new List<RecipeLine> { new() { IngredientId = "NL0005", Quantity = 25 } }
-                },
-                new()
-                {
-                    Code = "TP-FLAN",
-                    Name = "Pudding trứng",
-                    Type = "Topping",
-                    ExtraPrice = 10000,
-                    Status = "Đang phục vụ",
-                    Description = "Pudding mềm mịn tan trong miệng",
-                    Recipe = new List<RecipeLine> { new() { IngredientId = "NL0006", Quantity = 30 } }
-                },
-                new()
-                {
-                    Code = "TP-THACH",
-                    Name = "Thạch nha đam",
-                    Type = "Topping",
-                    ExtraPrice = 6000,
-                    Status = "Đang phục vụ",
-                    Description = "Nha đam giòn ngọt thanh nhiệt"
-                }
-            };
-
-            products = new()
-            {
-                new()
-                {
-                    Code = "SP0001",
-                    Name = "Cà phê sữa đá",
-                    CategoryId = "DM0001",
-                    Price = 29000,
-                    Status = "Đang bán",
-                    Description = "Cà phê pha phin truyền thống thơm đượm",
-                    Recipe = new List<RecipeLine>
-                    {
-                        new() { IngredientId = "NL0001", Quantity = 25 },
-                        new() { IngredientId = "NL0002", Quantity = 40 }
-                    }
-                },
-                new()
-                {
-                    Code = "SP0002",
-                    Name = "Bạc xỉu",
-                    CategoryId = "DM0001",
-                    Price = 32000,
-                    Status = "Đang bán",
-                    Description = "Nhiều sữa ít cà phê, béo ngậy ngọt ngào",
-                    Recipe = new List<RecipeLine>
-                    {
-                        new() { IngredientId = "NL0001", Quantity = 15 },
-                        new() { IngredientId = "NL0002", Quantity = 30 },
-                        new() { IngredientId = "NL0003", Quantity = 80 }
-                    }
-                },
-                new()
-                {
-                    Code = "SP0003",
-                    Name = "Trà sữa Oolong nướng",
-                    CategoryId = "DM0002",
-                    Price = 42000,
-                    Status = "Đang bán",
-                    Description = "Vị trà oolong đậm đà hòa quyện khói nướng đặc trưng"
-                },
-                new()
-                {
-                    Code = "SP0004",
-                    Name = "Trà đào cam sả",
-                    CategoryId = "DM0003",
-                    Price = 39000,
-                    Status = "Đang bán",
-                    Description = "Thanh mát giải nhiệt cùng đào miếng giòn ngọt"
-                },
-                new()
-                {
-                    Code = "SP0005",
-                    Name = "Trà sữa Matcha Nhật",
-                    CategoryId = "DM0002",
-                    Price = 45000,
-                    Status = "Đang bán",
-                    Description = "Matcha Uji nguyên chất thơm thanh tao"
-                }
-            };
+            products = await productTask;
+            categories = await categoryTask;
+            toppings = await toppingTask;
+            sizes = await sizeTask;
+            promotions = await promotionTask;
 
             page = Math.Clamp(page, 1, Pages);
         }
-        catch (Exception exception)
+        catch (ApiException ex)
         {
-            Notice(exception.Message);
+            loadError = ex.Message;
         }
-        await Task.CompletedTask;
-    }
-
-    private async Task Reload()
-    {
-        page = Math.Clamp(page, 1, Pages);
-        await Task.CompletedTask;
-    }
-
-    private void SearchKey(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
         {
-            Filter();
+        }
+        finally
+        {
+            loading = false;
         }
     }
 
-    private void SelectKey(KeyboardEventArgs e, string code)
+    private void SelectKey(KeyboardEventArgs e, string key)
     {
-        if (e.Key is "Enter" or " ")
-        {
-            selected = code;
-        }
+        if (e.Key is "Enter" or " ") selected = key;
     }
 
     private void Filter()
     {
-        appliedSearch = search.Trim();
-        appliedCategory = category;
-        appliedStatus = status;
-        appliedToppingType = toppingType;
-        appliedToppingStatus = toppingStatus;
-
         selected = null;
         page = 1;
-        message = null;
     }
 
     private void Reset()
     {
         search = "";
-        category = "";
-        status = "";
-        toppingType = "";
-        toppingStatus = "";
-
+        categoryFilter = "";
+        statusFilter = "";
         Filter();
     }
 
     private void SwitchTab(string tab)
     {
         activeTab = tab;
-        Reset();
-    }
-
-    private void SwitchTab(bool isCategory)
-    {
-        activeTab = isCategory ? "categories" : "products";
+        message = null;
         Reset();
     }
 
     private void Move(int delta)
     {
-        int nextPage = page + delta;
+        int next = page + delta;
+        if (next < 1 || next > Pages) return;
 
-        if (nextPage < 1 || nextPage > Pages)
-        {
-            Notice("Không có trang dữ liệu khác.");
-            return;
-        }
-
-        page = nextPage;
+        page = next;
         selected = null;
-    }
-
-    private void Notice(string text)
-    {
-        error = text;
-        dialog = "notice";
     }
 
     private void Prepare()
     {
         error = null;
-        imageError = null;
         message = null;
-        target = selected ?? "";
     }
+
+    private void Close()
+    {
+        if (saving) return;
+
+        dialog = "";
+        error = null;
+    }
+
+    // =====================================================================
+    // THÊM / SỬA
+    // =====================================================================
 
     private void Add()
     {
         Prepare();
         editing = false;
-        target = "";
 
-        if (toppingTab)
+        switch (activeTab)
         {
-            toppingModel = new Topping { Type = "Topping", Status = "Đang phục vụ", ExtraPrice = 0 };
-            dialog = "topping";
-        }
-        else if (categoryTab)
-        {
-            categoryModel = new Category();
-            dialog = "category";
-        }
-        else
-        {
-            model = new Product();
-            dialog = "product";
+            case "categories":
+                nameModel = new NameForm();
+                dialog = "category";
+                break;
+            case "toppings":
+                toppingModel = new ToppingForm();
+                dialog = "topping";
+                break;
+            case "sizes":
+                sizeModel = new SizeForm();
+                dialog = "size";
+                break;
+            default:
+                productModel = new ProductForm
+                {
+                    MaDanhMuc = categories.FirstOrDefault()?.MaDanhMuc ?? 0,
+                    Prices = sizes.Select(s => new SizePrice { MaKichThuoc = s.MaKichThuoc, TenKichThuoc = s.TenKichThuoc }).ToList()
+                };
+                dialog = "product";
+                break;
         }
     }
 
@@ -404,132 +336,355 @@ public partial class Products
     {
         Prepare();
         editing = true;
-        LoadEditTarget();
 
-        if (toppingTab)
+        if (SelectedProduct is { } p)
         {
-            dialog = "topping";
-        }
-        else if (categoryTab)
-        {
-            dialog = "category";
-        }
-        else
-        {
+            productModel = new ProductForm
+            {
+                MaTenMon = p.MaTenMon,
+                TenMon = p.TenMon,
+                MaDanhMuc = p.MaDanhMuc,
+                HinhAnh = p.HinhAnh,
+                MaKhuyenMai = p.KhuyenMai?.MaKhuyenMai ?? 0,
+                ConHang = p.ConHang,
+                NgungBan = p.NgungBan,
+                Prices = sizes.Select(s =>
+                {
+                    var price = p.KichThuoc.FirstOrDefault(k => k.MaKichThuoc == s.MaKichThuoc);
+                    return new SizePrice
+                    {
+                        MaKichThuoc = s.MaKichThuoc,
+                        TenKichThuoc = s.TenKichThuoc,
+                        Ban = price?.DangApDung ?? false,
+                        GiaBan = price?.GiaBan
+                    };
+                }).ToList()
+            };
             dialog = "product";
         }
-    }
-
-    private void LoadEditTarget()
-    {
-        if (toppingTab)
+        else if (SelectedCategory is { } c)
         {
-            var top = toppings.FirstOrDefault(t => t.Code == target);
-            toppingModel = top != null
-                ? new Topping
-                {
-                    Code = top.Code,
-                    Name = top.Name,
-                    Type = top.Type,
-                    ExtraPrice = top.ExtraPrice,
-                    Status = top.Status,
-                    Description = top.Description,
-                    Recipe = top.Recipe != null ? new List<RecipeLine>(top.Recipe) : []
-                }
-                : new Topping { Type = "Topping" };
+            nameModel = new NameForm { Id = c.MaDanhMuc, Ten = c.TenDanhMuc };
+            dialog = "category";
         }
-        else if (categoryTab)
+        else if (SelectedTopping is { } t)
         {
-            categoryModel = new Category
+            toppingModel = new ToppingForm
             {
-                Code = categories.FirstOrDefault(item => item.Code == target)?.Code ?? "",
-                Name = categories.FirstOrDefault(item => item.Code == target)?.Name ?? "",
-                SortOrder = categories.FirstOrDefault(item => item.Code == target)?.SortOrder ?? 1,
-                Visible = categories.FirstOrDefault(item => item.Code == target)?.Visible ?? true
+                MaTopping = t.MaTopping, TenTopping = t.TenTopping, GiaThem = t.GiaThem, ConHang = t.ConHang, NgungBan = t.NgungBan
             };
+            dialog = "topping";
         }
-        else
+        else if (SelectedSize is { } s)
         {
-            model = new Product
-            {
-                Code = products.FirstOrDefault(product => product.Code == target)?.Code ?? "",
-                Name = products.FirstOrDefault(product => product.Code == target)?.Name ?? "",
-                CategoryId = products.FirstOrDefault(product => product.Code == target)?.CategoryId ?? "",
-                Price = products.FirstOrDefault(product => product.Code == target)?.Price,
-                Status = products.FirstOrDefault(product => product.Code == target)?.Status ?? "Ngừng bán",
-                Description = products.FirstOrDefault(product => product.Code == target)?.Description,
-                ImageUrl = products.FirstOrDefault(product => product.Code == target)?.ImageUrl,
-                Recipe = products.FirstOrDefault(product => product.Code == target)?.Recipe ?? []
-            };
+            sizeModel = new SizeForm { MaKichThuoc = s.MaKichThuoc, TenKichThuoc = s.TenKichThuoc };
+            dialog = "size";
         }
     }
 
-    private void PickEdit(ChangeEventArgs e)
+    /// <summary>Gọi API ghi: khóa nút, báo lỗi trong hộp thoại, đóng hộp thoại và tải lại khi xong.</summary>
+    private async Task Execute(Func<Task<string>> action)
     {
-        if (reading || saving)
+        if (saving) return;
+
+        saving = true;
+        error = null;
+
+        try
         {
+            message = await action();
+            dialog = "";
+            await Load();
+        }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task SaveProduct()
+    {
+        var prices = productModel.Prices.Where(p => p.Ban).ToList();
+
+        if (prices.Count == 0)
+        {
+            error = "Chọn ít nhất một kích thước và nhập giá bán.";
             return;
         }
 
-        target = e.Value?.ToString() ?? "";
-        LoadEditTarget();
+        if (prices.Any(p => p.GiaBan is null or < 0))
+        {
+            error = "Nhập giá bán (không âm) cho mọi kích thước đã chọn.";
+            return;
+        }
 
-        error = null;
-        imageError = null;
+        var priceRequests = prices
+            .Select(p => new GiaSizeRequest { MaKichThuoc = p.MaKichThuoc, GiaBan = p.GiaBan, DangApDung = true })
+            .ToList();
+        string? image = string.IsNullOrWhiteSpace(productModel.HinhAnh) ? null : productModel.HinhAnh.Trim();
+
+        await Execute(async () =>
+        {
+            Mon saved;
+
+            if (editing)
+            {
+                var original = products.First(p => p.MaTenMon == productModel.MaTenMon);
+
+                saved = await ProductApi.UpdateAsync(productModel.MaTenMon, new MonCapNhatRequest
+                {
+                    MaDanhMuc = productModel.MaDanhMuc,
+                    TenMon = productModel.TenMon.Trim(),
+                    // Backend giữ ảnh cũ khi gửi null → gửi chuỗi rỗng để xóa ảnh
+                    HinhAnh = image ?? (original.HinhAnh is null ? null : ""),
+                    MaKhuyenMai = productModel.MaKhuyenMai, // 0 = gỡ khuyến mãi
+                    NgungBan = productModel.NgungBan
+                }, pageCts.Token);
+
+                saved = await ProductApi.SetPricesAsync(saved.MaTenMon, priceRequests, pageCts.Token);
+            }
+            else
+            {
+                saved = await ProductApi.CreateAsync(new MonTaoRequest
+                {
+                    MaDanhMuc = productModel.MaDanhMuc,
+                    TenMon = productModel.TenMon.Trim(),
+                    HinhAnh = image,
+                    MaKhuyenMai = productModel.MaKhuyenMai == 0 ? null : productModel.MaKhuyenMai,
+                    KichThuoc = priceRequests
+                }, pageCts.Token);
+            }
+
+            if (saved.ConHang != productModel.ConHang)
+            {
+                saved = await ProductApi.SetAvailableAsync(saved.MaTenMon, productModel.ConHang, pageCts.Token);
+            }
+
+            selected = saved.MaTenMon.ToString();
+            return editing ? $"Đã cập nhật món {saved.TenMon}." : $"Đã thêm món {saved.TenMon}. Nhớ thiết lập công thức để món bán được.";
+        });
+
+        // Lưu món gồm 2–3 lời gọi API: nếu bước sau lỗi thì bước trước đã ghi → tải lại để danh sách khớp máy chủ
+        if (error is not null)
+        {
+            error += " Một phần thay đổi có thể đã được lưu — kiểm tra lại danh sách.";
+            await Load();
+        }
     }
+
+    private Task SaveCategory() => Execute(async () =>
+    {
+        var saved = editing
+            ? await CategoryApi.UpdateAsync(nameModel.Id, nameModel.Ten.Trim(), pageCts.Token)
+            : await CategoryApi.CreateAsync(nameModel.Ten.Trim(), pageCts.Token);
+
+        selected = saved.MaDanhMuc.ToString();
+        return editing ? $"Đã cập nhật danh mục {saved.TenDanhMuc}." : $"Đã thêm danh mục {saved.TenDanhMuc}.";
+    });
+
+    private Task SaveTopping() => Execute(async () =>
+    {
+        var request = new ToppingRequest
+        {
+            TenTopping = toppingModel.TenTopping.Trim(),
+            GiaThem = toppingModel.GiaThem,
+            ConHang = toppingModel.ConHang,
+            NgungBan = toppingModel.NgungBan
+        };
+
+        var saved = editing
+            ? await ToppingApi.UpdateAsync(toppingModel.MaTopping, request, pageCts.Token)
+            : await ToppingApi.CreateAsync(request, pageCts.Token);
+
+        selected = saved.MaTopping.ToString();
+        return editing ? $"Đã cập nhật topping {saved.TenTopping}." : $"Đã thêm topping {saved.TenTopping}.";
+    });
+
+    private Task SaveSize() => Execute(async () =>
+    {
+        var request = new KichThuocRequest
+        {
+            MaKichThuoc = sizeModel.MaKichThuoc.Trim().ToUpperInvariant(),
+            TenKichThuoc = sizeModel.TenKichThuoc.Trim()
+        };
+
+        var saved = editing
+            ? await CategoryApi.UpdateSizeAsync(request, pageCts.Token)
+            : await CategoryApi.CreateSizeAsync(request, pageCts.Token);
+
+        selected = saved.MaKichThuoc;
+        return editing ? $"Đã cập nhật kích thước {saved.MaKichThuoc}." : $"Đã thêm kích thước {saved.MaKichThuoc}.";
+    });
+
+    // =====================================================================
+    // XÓA / TẠM HẾT
+    // =====================================================================
 
     private void AskDelete()
     {
+        if (!HasSelection) return;
+
         Prepare();
         dialog = "delete";
     }
 
+    private Task Delete() => Execute(async () =>
+    {
+        string name = SelectedName;
+
+        if (SelectedProduct is { } p) await ProductApi.DeleteAsync(p.MaTenMon, pageCts.Token);
+        else if (SelectedTopping is { } t) await ToppingApi.DeleteAsync(t.MaTopping, pageCts.Token);
+        else if (SelectedCategory is { } c) await CategoryApi.DeleteAsync(c.MaDanhMuc, pageCts.Token);
+        else if (SelectedSize is { } s) await CategoryApi.DeleteSizeAsync(s.MaKichThuoc, pageCts.Token);
+
+        bool soft = ProductTab || ToppingTab;
+        if (!soft) selected = null;
+        return soft ? $"Đã chuyển {name} sang Ngừng bán." : $"Đã xóa {name}.";
+    });
+
+    /// <summary>Báo tạm hết / có hàng lại trong ngày (món hoặc topping đang chọn).</summary>
+    private async Task ToggleAvailable()
+    {
+        if (saving) return;
+
+        Prepare();
+        saving = true;
+
+        try
+        {
+            if (SelectedProduct is { } p)
+            {
+                var saved = await ProductApi.SetAvailableAsync(p.MaTenMon, !p.ConHang, pageCts.Token);
+                message = saved.ConHang ? $"{saved.TenMon} đã có hàng trở lại." : $"Đã báo {saved.TenMon} tạm hết.";
+            }
+            else if (SelectedTopping is { } t)
+            {
+                var saved = await ToppingApi.SetAvailableAsync(t.MaTopping, !t.ConHang, pageCts.Token);
+                message = saved.ConHang ? $"{saved.TenTopping} đã có hàng trở lại." : $"Đã báo {saved.TenTopping} tạm hết.";
+            }
+
+            await Load();
+        }
+        catch (ApiException ex)
+        {
+            loadError = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    // =====================================================================
+    // CÔNG THỨC
+    // =====================================================================
+
+    /// <summary>Các món-size có thể đặt công thức (mọi size của món, kể cả đang tắt).</summary>
+    private IEnumerable<(int Id, string Label)> RecipeTargets =>
+        ToppingTab
+            ? toppings.OrderBy(t => t.TenTopping).Select(t => (t.MaTopping, $"{t.TenTopping}"))
+            : products.OrderBy(p => p.TenMon)
+                .SelectMany(p => p.KichThuoc.Select(s => (s.MaChiTietMon, $"{p.TenMon} – {s.TenKichThuoc}{(s.DangApDung ? "" : " (đã tắt)")}")));
+
     private async Task OpenRecipe()
     {
         Prepare();
+        recipe = [];
 
-        if (toppingTab)
-        {
-            recipe = target == ""
-                ? []
-                : (toppings.FirstOrDefault(t => t.Code == target)?.Recipe ?? []).ToList();
-        }
-        else
-        {
-            recipe = target == ""
-                ? []
-                : (products.FirstOrDefault(p => p.Code == target)?.Recipe ?? []).ToList();
-        }
+        recipeOwner = SelectedTopping?.MaTopping
+                      ?? SelectedProduct?.KichThuoc.FirstOrDefault(s => s.DangApDung)?.MaChiTietMon
+                      ?? SelectedProduct?.KichThuoc.FirstOrDefault()?.MaChiTietMon
+                      ?? 0;
 
         dialog = "recipe";
-        await Task.CompletedTask;
+
+        try
+        {
+            ingredients = (await InventoryApi.GetIngredientsAsync(ct: pageCts.Token))
+                .OrderBy(i => i.TenNguyenLieu)
+                .ToList();
+        }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+            return;
+        }
+
+        await LoadRecipe();
     }
 
     private async Task PickRecipe(ChangeEventArgs e)
     {
-        target = e.Value?.ToString() ?? "";
-
-        if (toppingTab)
-        {
-            recipe = target == ""
-                ? []
-                : (toppings.FirstOrDefault(t => t.Code == target)?.Recipe ?? []).ToList();
-        }
-        else
-        {
-            recipe = target == ""
-                ? []
-                : (products.FirstOrDefault(p => p.Code == target)?.Recipe ?? []).ToList();
-        }
-
+        recipeOwner = int.TryParse(e.Value?.ToString(), out int id) ? id : 0;
         error = null;
-        await Task.CompletedTask;
+        await LoadRecipe();
     }
 
-    private async Task Execute(Func<Task> action, string success)
+    private async Task LoadRecipe()
     {
-        if (saving || reading)
+        recipe = [];
+        if (recipeOwner == 0) return;
+
+        recipeLoading = true;
+
+        try
         {
+            var lines = ToppingTab
+                ? await ToppingApi.GetRecipeAsync(recipeOwner, pageCts.Token)
+                : await ProductApi.GetRecipeAsync(recipeOwner, pageCts.Token);
+
+            recipe = lines.Select(l => new RecipeRow { MaNguyenLieu = l.MaNguyenLieu, LuongSuDung = l.LuongSuDung }).ToList();
+        }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            recipeLoading = false;
+        }
+    }
+
+    private async Task SaveRecipe()
+    {
+        if (saving) return;
+
+        if (recipeOwner == 0)
+        {
+            error = "Chọn món / topping trước khi lưu công thức.";
+            return;
+        }
+
+        var lines = recipe.Where(r => r.MaNguyenLieu > 0).ToList();
+
+        if (recipe.Any(r => r.MaNguyenLieu == 0))
+        {
+            error = "Chọn nguyên liệu cho mọi dòng (hoặc xóa dòng trống).";
+            return;
+        }
+
+        if (lines.Any(r => r.LuongSuDung is null or < 0.01m))
+        {
+            error = "Định lượng phải lớn hơn 0.";
+            return;
+        }
+
+        if (lines.Select(r => r.MaNguyenLieu).Distinct().Count() != lines.Count)
+        {
+            error = "Mỗi nguyên liệu chỉ xuất hiện một lần trong công thức.";
             return;
         }
 
@@ -538,16 +693,23 @@ public partial class Products
 
         try
         {
-            await action();
-            await Reload();
+            var request = lines
+                .Select(r => new CongThucDongRequest { MaNguyenLieu = r.MaNguyenLieu, LuongSuDung = r.LuongSuDung })
+                .ToList();
 
+            if (ToppingTab) await ToppingApi.SaveRecipeAsync(recipeOwner, request, pageCts.Token);
+            else await ProductApi.SaveRecipeAsync(recipeOwner, request, pageCts.Token);
+
+            message = "Đã lưu công thức. Đơn mới sẽ trừ kho theo định mức này.";
             dialog = "";
-            selected = null;
-            message = success;
+            await Load(); // tình trạng "đủ nguyên liệu" của món có thể đổi
         }
-        catch (Exception exception)
+        catch (ApiException ex)
         {
-            error = exception.Message;
+            error = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
         }
         finally
         {
@@ -555,259 +717,12 @@ public partial class Products
         }
     }
 
-    private Task SaveProduct()
+    private string UnitOf(int maNguyenLieu) =>
+        ingredients.FirstOrDefault(i => i.MaNguyenLieu == maNguyenLieu)?.DonViTinh ?? "";
+
+    public void Dispose()
     {
-        if (editing && model.Code == "")
-        {
-            error = "Chọn món cần sửa.";
-            return Task.CompletedTask;
-        }
-
-        if (imageError is not null)
-        {
-            return Task.CompletedTask;
-        }
-
-        return Execute(
-            () =>
-            {
-                if (editing)
-                {
-                    var existing = products.FirstOrDefault(p => p.Code == target);
-                    if (existing != null)
-                    {
-                        existing.Name = model.Name;
-                        existing.CategoryId = model.CategoryId;
-                        existing.Price = model.Price;
-                        existing.Status = model.Status;
-                        existing.Description = model.Description;
-                        existing.ImageUrl = model.ImageUrl;
-                    }
-                }
-                else
-                {
-                    model.Code = $"SP{products.Count + 1:D4}";
-                    products.Add(new Product
-                    {
-                        Code = model.Code,
-                        Name = model.Name,
-                        CategoryId = model.CategoryId,
-                        Price = model.Price,
-                        Status = model.Status,
-                        Description = model.Description,
-                        ImageUrl = model.ImageUrl,
-                        Recipe = model.Recipe
-                    });
-                }
-                return Task.CompletedTask;
-            },
-            editing ? "Đã cập nhật món." : "Đã thêm món mới."
-        );
-    }
-
-    private Task SaveCategory()
-    {
-        if (editing && categoryModel.Code == "")
-        {
-            error = "Chọn danh mục cần sửa.";
-            return Task.CompletedTask;
-        }
-
-        return Execute(
-            () =>
-            {
-                if (editing)
-                {
-                    var existing = categories.FirstOrDefault(c => c.Code == target);
-                    if (existing != null)
-                    {
-                        existing.Name = categoryModel.Name;
-                        existing.SortOrder = categoryModel.SortOrder;
-                        existing.Visible = categoryModel.Visible;
-                    }
-                }
-                else
-                {
-                    categoryModel.Code = $"DM{categories.Count + 1:D4}";
-                    categories.Add(new Category
-                    {
-                        Code = categoryModel.Code,
-                        Name = categoryModel.Name,
-                        SortOrder = categoryModel.SortOrder,
-                        Visible = categoryModel.Visible
-                    });
-                }
-                return Task.CompletedTask;
-            },
-            editing ? "Đã cập nhật danh mục." : "Đã thêm danh mục mới."
-        );
-    }
-
-    private Task SaveTopping()
-    {
-        if (editing && toppingModel.Code == "")
-        {
-            error = "Chọn Topping / Size cần sửa.";
-            return Task.CompletedTask;
-        }
-
-        return Execute(
-            () =>
-            {
-                if (editing)
-                {
-                    var existing = toppings.FirstOrDefault(t => t.Code == target);
-                    if (existing != null)
-                    {
-                        existing.Name = toppingModel.Name;
-                        existing.Type = toppingModel.Type;
-                        existing.ExtraPrice = toppingModel.ExtraPrice;
-                        existing.Status = toppingModel.Status;
-                        existing.Description = toppingModel.Description;
-                    }
-                }
-                else
-                {
-                    string prefix = toppingModel.Type == "Size" ? "SZ" : "TP";
-                    int countOfType = toppings.Count(t => t.Type == toppingModel.Type) + 1;
-                    toppingModel.Code = $"{prefix}-{countOfType:D2}";
-                    toppings.Add(new Topping
-                    {
-                        Code = toppingModel.Code,
-                        Name = toppingModel.Name,
-                        Type = toppingModel.Type,
-                        ExtraPrice = toppingModel.ExtraPrice,
-                        Status = toppingModel.Status,
-                        Description = toppingModel.Description,
-                        Recipe = toppingModel.Recipe
-                    });
-                }
-                return Task.CompletedTask;
-            },
-            editing ? "Đã cập nhật Topping / Size." : "Đã thêm Topping / Size mới."
-        );
-    }
-
-    private Task SaveRecipe()
-    {
-        if (target == "")
-        {
-            error = "Chọn đối tượng trước khi lưu công thức.";
-            return Task.CompletedTask;
-        }
-
-        if (toppingTab)
-        {
-            var top = toppings.FirstOrDefault(t => t.Code == target);
-            if (top != null)
-            {
-                top.Recipe = new List<RecipeLine>(recipe);
-            }
-        }
-        else
-        {
-            var product = products.FirstOrDefault(p => p.Code == target);
-            if (product != null)
-            {
-                product.Recipe = new List<RecipeLine>(recipe);
-            }
-        }
-
-        return Execute(
-            () => Task.CompletedTask,
-            "Đã lưu công thức tiêu hao."
-        );
-    }
-
-    private Task Delete()
-    {
-        if (target == "")
-        {
-            error = "Chọn đối tượng cần xóa.";
-            return Task.CompletedTask;
-        }
-
-        return Execute(
-            () =>
-            {
-                if (toppingTab)
-                {
-                    toppings.RemoveAll(t => t.Code == target);
-                }
-                else if (categoryTab)
-                {
-                    categories.RemoveAll(c => c.Code == target);
-                }
-                else
-                {
-                    products.RemoveAll(p => p.Code == target);
-                }
-                return Task.CompletedTask;
-            },
-            "Đã xóa thành công."
-        );
-    }
-
-    private void Close()
-    {
-        if (saving || reading)
-        {
-            return;
-        }
-
-        dialog = "";
-        error = null;
-        imageError = null;
-    }
-
-    private void RemoveImage()
-    {
-        if (reading)
-        {
-            return;
-        }
-
-        model.ImageUrl = null;
-        imageError = null;
-    }
-
-    private async Task ReadImage(InputFileChangeEventArgs e)
-    {
-        if (reading)
-        {
-            return;
-        }
-
-        imageError = null;
-        IBrowserFile file = e.File;
-
-        bool invalidType = file.ContentType is not ("image/png" or "image/jpeg");
-        bool tooLarge = file.Size > 2 * 1024 * 1024;
-
-        if (invalidType || tooLarge)
-        {
-            imageError = "Chọn ảnh JPG/PNG không quá 2 MB.";
-            return;
-        }
-
-        reading = true;
-
-        try
-        {
-            IBrowserFile image = await file.RequestImageFileAsync("image/jpeg", 600, 600);
-            await using Stream stream = image.OpenReadStream(3 * 1024 * 1024);
-            using var memory = new MemoryStream();
-            await stream.CopyToAsync(memory);
-
-            model.ImageUrl = "data:image/jpeg;base64," + Convert.ToBase64String(memory.ToArray());
-        }
-        catch
-        {
-            imageError = "Không đọc được ảnh. Hãy chọn lại.";
-        }
-        finally
-        {
-            reading = false;
-        }
+        pageCts.Cancel();
+        pageCts.Dispose();
     }
 }
