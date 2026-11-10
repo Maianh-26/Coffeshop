@@ -1,5 +1,8 @@
 @page "/promotions"
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize(Roles = Roles.Admin)]
+@implements IDisposable
+@inject PromotionService PromotionApi
+@inject ProductService ProductApi
 
 <PageTitle>Khuyến mãi - Coffee Shop</PageTitle>
 
@@ -15,17 +18,19 @@
 
                 <input @bind="search"
                        @bind:event="oninput"
-                       placeholder="Tìm mã hoặc tên khuyến mãi" />
+                       @bind:after="Filter"
+                       placeholder="Tìm mã khuyến mãi"
+                       aria-label="Tìm khuyến mãi" />
 
             </div>
 
-            <button class="btn primary"
-                    @onclick="Filter">
-
-                <Icon Name="filter" />
-                Lọc
-
-            </button>
+            <select aria-label="Lọc trạng thái" @bind="statusFilter" @bind:after="Filter">
+                <option value="">Tất cả trạng thái</option>
+                <option>Đang áp dụng</option>
+                <option>Ngoài khung giờ</option>
+                <option>Chưa bắt đầu</option>
+                <option>Đã kết thúc</option>
+            </select>
 
             <button class="btn outline"
                     @onclick="Reset">
@@ -50,6 +55,7 @@
         </button>
 
         <button class="btn outline"
+                disabled="@(Selected is null)"
                 @onclick="Edit">
 
             <Icon Name="edit" />
@@ -58,6 +64,7 @@
         </button>
 
         <button class="btn danger-outline"
+                disabled="@(Selected is null)"
                 @onclick="AskDelete">
 
             <Icon Name="trash" />
@@ -74,6 +81,14 @@
         </p>
     }
 
+    @if (loadError is not null)
+    {
+        <p class="alert error" role="alert">
+            @loadError
+            <button type="button" class="text-button" @onclick="Load">Thử lại</button>
+        </p>
+    }
+
     <section class="panel list-panel">
 
         <div class="table-wrap">
@@ -84,10 +99,11 @@
 
                     <tr>
                         <th>Mã KM</th>
-                        <th>Tên chương trình</th>
-                        <th>Giảm giá (%)</th>
+                        <th>Giảm giá</th>
                         <th>Bắt đầu</th>
                         <th>Kết thúc</th>
+                        <th>Giờ vàng</th>
+                        <th>Số món</th>
                         <th>Trạng thái</th>
                     </tr>
 
@@ -97,26 +113,23 @@
 
                     @foreach (var item in VisiblePromotions)
                     {
-                        <tr class="selectable @(selected == item.Code ? "selected" : "")"
+                        string status = StatusText(item);
+
+                        <tr class="selectable @(selected == item.MaKhuyenMai ? "selected" : "")"
                             tabindex="0"
-                            @onclick="() => selected = item.Code"
-                            @onclick:stopPropagation="true">
+                            @onclick="() => selected = item.MaKhuyenMai"
+                            @onkeydown="e => SelectKey(e, item.MaKhuyenMai)">
 
-                            <td>@item.Code</td>
-                            <td>@item.Name</td>
-                            <td>@item.DiscountPercent%</td>
-
-                            <td>
-                                @item.StartDate?.ToString("dd/MM/yyyy")
-                            </td>
-
-                            <td>
-                                @item.EndDate?.ToString("dd/MM/yyyy")
-                            </td>
+                            <td><strong>@item.Code</strong></td>
+                            <td>@item.PhanTramGiam.ToString("0.##", Vi)%</td>
+                            <td>@item.NgayBatDau.ToString("dd/MM/yyyy")</td>
+                            <td>@item.NgayKetThuc.ToString("dd/MM/yyyy")</td>
+                            <td>@(item.GioBatDau is null ? "Cả ngày" : $"{item.GioBatDau} – {item.GioKetThuc}")</td>
+                            <td>@item.SoMonApDung</td>
 
                             <td>
-                                <span class="badge @StatusColor(item)">
-                                    @StatusText(item)
+                                <span class="badge @StatusColor(status)">
+                                    @status
                                 </span>
                             </td>
 
@@ -127,12 +140,12 @@
                     {
                         <tr>
 
-                            <td class="empty-cell" colspan="6">
+                            <td class="empty-cell" colspan="7">
 
                                 <Icon Name="tag" Size="32" />
 
                                 <p>
-                                    Chưa có chương trình khuyến mãi.
+                                    @(loading ? "Đang tải khuyến mãi…" : "Chưa có chương trình khuyến mãi phù hợp.")
                                 </p>
 
                             </td>
@@ -157,6 +170,7 @@
 
                 <button class="page-button"
                         aria-label="Trang trước"
+                        disabled="@(page <= 1)"
                         @onclick="() => Move(-1)">
                     <Icon Name="left" Size="16" />
                 </button>
@@ -165,6 +179,7 @@
 
                 <button class="page-button"
                         aria-label="Trang sau"
+                        disabled="@(page >= Pages)"
                         @onclick="() => Move(1)">
                     <Icon Name="right" Size="16" />
                 </button>
@@ -190,47 +205,89 @@
 
                 <DataAnnotationsValidator />
 
-                <div class="form-stack">
+                <div class="form-grid">
 
                     <div class="field">
-                        <label>Mã khuyến mãi</label>
-                        <input value="@model.Code"
-                               placeholder="@(editing
-                                   ? "Chưa chọn"
-                                   : "Tự động tạo khi lưu")"
-                               readonly />
-                    </div>
-
-                    <div class="field">
-                        <label for="pm-name">Tên chương trình *</label>
-                        <InputText id="pm-name"
-                                   @bind-Value="model.Name"
-                                   placeholder="Nhập tên khuyến mãi" />
-                        <ValidationMessage For="@(() => model.Name)" />
+                        <label for="pm-code">Mã khuyến mãi *</label>
+                        <InputText id="pm-code"
+                                   @bind-Value="model.Code"
+                                   placeholder="ví dụ: GIOVANG20" />
+                        <ValidationMessage For="@(() => model.Code)" />
                     </div>
 
                     <div class="field">
                         <label for="pm-discount">Giảm giá (%) *</label>
                         <InputNumber id="pm-discount"
-                                     @bind-Value="model.DiscountPercent"
+                                     @bind-Value="model.PhanTramGiam"
                                      step="1" />
-                        <ValidationMessage For="@(() => model.DiscountPercent)" />
+                        <ValidationMessage For="@(() => model.PhanTramGiam)" />
                     </div>
 
                     <div class="field">
-                        <label for="pm-start">Ngày bắt đầu</label>
+                        <label for="pm-start">Ngày bắt đầu *</label>
                         <InputDate id="pm-start"
-                                   @bind-Value="model.StartDate" />
+                                   @bind-Value="model.NgayBatDau" />
+                        <ValidationMessage For="@(() => model.NgayBatDau)" />
                     </div>
 
                     <div class="field">
-                        <label for="pm-end">Ngày kết thúc</label>
+                        <label for="pm-end">Ngày kết thúc *</label>
                         <InputDate id="pm-end"
-                                   @bind-Value="model.EndDate" />
-                        <ValidationMessage For="@(() => model.EndDate)" />
+                                   @bind-Value="model.NgayKetThuc" />
+                        <ValidationMessage For="@(() => model.NgayKetThuc)" />
+                    </div>
+
+                    <div class="field">
+                        <label for="pm-from">Giờ vàng từ</label>
+                        <InputDate id="pm-from"
+                                   Type="InputDateType.Time"
+                                   @bind-Value="model.GioBatDau" />
+                    </div>
+
+                    <div class="field">
+                        <label for="pm-to">Đến</label>
+                        <InputDate id="pm-to"
+                                   Type="InputDateType.Time"
+                                   @bind-Value="model.GioKetThuc" />
+                        <ValidationMessage For="@(() => model.GioKetThuc)" />
                     </div>
 
                 </div>
+
+                <p class="form-note">Bỏ trống giờ vàng nếu khuyến mãi áp dụng cả ngày.</p>
+
+                <fieldset class="field">
+                    <legend>Món áp dụng (@model.MaTenMons.Count)</legend>
+
+                    @if (products.Count == 0)
+                    {
+                        <p class="form-note">@(productsError ?? "Chưa có món nào.")</p>
+                    }
+                    else
+                    {
+                        <div class="toppings-picker-grid">
+                            @foreach (var mon in products)
+                            {
+                                var other = mon.KhuyenMai is { } km && km.MaKhuyenMai != model.MaKhuyenMai ? km.Code : null;
+
+                                <label class="topping-checkbox-item">
+                                    <input type="checkbox"
+                                           checked="@model.MaTenMons.Contains(mon.MaTenMon)"
+                                           @onchange="e => ToggleProduct(mon.MaTenMon, e)" />
+                                    <span>
+                                        @mon.TenMon
+                                        @if (other is not null)
+                                        {
+                                            <small class="muted"> (đang thuộc @other)</small>
+                                        }
+                                    </span>
+                                </label>
+                            }
+                        </div>
+
+                        <p class="form-note">Mỗi món chỉ thuộc một khuyến mãi — chọn món đang thuộc khuyến mãi khác sẽ chuyển món sang khuyến mãi này.</p>
+                    }
+                </fieldset>
 
                 @if (error is not null)
                 {
@@ -240,11 +297,12 @@
                 <div class="modal-footer">
 
                     <button type="button" class="btn outline"
+                            disabled="@saving"
                             @onclick="Close">
                         Hủy
                     </button>
 
-                    <button type="submit" class="btn primary">
+                    <button type="submit" class="btn primary" disabled="@(saving || productsLoading)">
                         @(saving ? "Đang lưu…"
                             : editing ? "Lưu thay đổi"
                             : "Thêm khuyến mãi")
@@ -255,9 +313,15 @@
             </EditForm>
         }
 
-        @if (dialog == "delete")
+        @if (dialog == "delete" && Selected is { } target)
         {
-            <p>Xóa khuyến mãi <strong>@selected</strong>?</p>
+            <p>Xóa khuyến mãi <strong>@target.Code</strong>?</p>
+
+            <p class="form-note">
+                @(target.SoMonApDung > 0
+                    ? $"{target.SoMonApDung} món đang áp dụng sẽ được gỡ khuyến mãi và trở về giá gốc."
+                    : "Khuyến mãi chưa gắn với món nào.")
+            </p>
 
             @if (error is not null)
             {
@@ -266,11 +330,11 @@
 
             <div class="modal-footer">
 
-                <button class="btn outline" @onclick="Close">
+                <button class="btn outline" disabled="@saving" @onclick="Close">
                     Hủy
                 </button>
 
-                <button class="btn danger" @onclick="Delete">
+                <button class="btn danger" disabled="@saving" @onclick="Delete">
                     @(saving ? "Đang xóa…" : "Xóa khuyến mãi")
                 </button>
 
@@ -281,20 +345,38 @@
 }
 
 @code {
-    private List<Promotion> promotions = [];
+    private static readonly System.Globalization.CultureInfo Vi = new("vi-VN");
+
+    private readonly CancellationTokenSource pageCts = new();
+
+    private List<KhuyenMai> promotions = [];
+    private List<Mon> products = [];
+    private string? productsError;
+
+    // Danh sách món chưa tải xong → KHÔNG được gửi maTenMons (backend sẽ coi là "gỡ hết món")
+    private bool productsLoading;
+    private bool productsReady;
+
+    // Món đã ngừng bán đang gắn khuyến mãi này: không hiện trong ô chọn nhưng phải giữ khi lưu
+    private List<int> stoppedProductIds = [];
 
     private string search = "";
-    private string? selected;
+    private string statusFilter = "";
+    private int? selected;
     private int page = 1;
     private const int PageSize = 10;
 
     private string dialog = "";
     private bool editing;
+    private bool loading;
     private bool saving;
     private string? error;
+    private string? loadError;
     private string? message;
 
-    private Promotion model = new();
+    private KhuyenMaiForm model = new();
+
+    private KhuyenMai? Selected => promotions.FirstOrDefault(p => p.MaKhuyenMai == selected);
 
     private string DialogTitle => dialog switch
     {
@@ -303,47 +385,103 @@
         _ => ""
     };
 
-    private IEnumerable<Promotion> FilteredPromotions =>
+    private IEnumerable<KhuyenMai> FilteredPromotions =>
         promotions.Where(p =>
-            search == ""
-            || p.Code.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || p.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
-        );
+            (search == "" || p.Code.Contains(search, StringComparison.OrdinalIgnoreCase))
+            && (statusFilter == "" || StatusText(p) == statusFilter));
 
-    private List<Promotion> VisiblePromotions =>
+    private List<KhuyenMai> VisiblePromotions =>
         FilteredPromotions
             .Skip((page - 1) * PageSize)
             .Take(PageSize)
             .ToList();
 
-    private int Pages => Math.Max(1,
-        (int)Math.Ceiling(
-            FilteredPromotions.Count() / (double)PageSize
-        ));
+    private int Pages => Math.Max(1, (int)Math.Ceiling(FilteredPromotions.Count() / (double)PageSize));
 
-    private static string StatusText(Promotion p)
+    /// <summary>
+    /// DangApDung do backend tính (ngày + khung giờ); các trạng thái còn lại suy ra từ ngày.
+    /// </summary>
+    private static string StatusText(KhuyenMai p)
     {
-        if (p.EndDate.HasValue && p.EndDate.Value < DateTime.Today)
-            return "Đã kết thúc";
-        if (p.StartDate.HasValue && p.StartDate.Value > DateTime.Today)
-            return "Chưa bắt đầu";
-        return "Đang áp dụng";
+        var now = DateTime.Now;
+
+        if (p.DangApDung) return "Đang áp dụng";
+        if (now > p.NgayKetThuc) return "Đã kết thúc";
+        if (now < p.NgayBatDau) return "Chưa bắt đầu";
+        return "Ngoài khung giờ";
     }
 
-    private static string StatusColor(Promotion p)
+    private static string StatusColor(string status) => status switch
     {
-        if (p.EndDate.HasValue && p.EndDate.Value < DateTime.Today)
-            return "gray";
-        if (p.StartDate.HasValue && p.StartDate.Value > DateTime.Today)
-            return "yellow";
-        return "green";
+        "Đang áp dụng" => "green",
+        "Đã kết thúc" => "gray",
+        _ => "yellow"
+    };
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        loading = true;
+        loadError = null;
+
+        try
+        {
+            promotions = await PromotionApi.GetAllAsync(pageCts.Token);
+            page = Math.Clamp(page, 1, Pages);
+        }
+        catch (ApiException ex)
+        {
+            loadError = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            loading = false;
+        }
     }
 
-    private void Filter() { page = 1; }
+    /// <summary>Danh sách món cho ô "Món áp dụng" (tải lại mỗi lần mở form để thấy khuyến mãi hiện tại của món).</summary>
+    private async Task LoadProducts()
+    {
+        productsError = null;
+        productsReady = false;
+        productsLoading = true;
+        products = [];
+        stoppedProductIds = [];
+
+        try
+        {
+            var all = await ProductApi.GetAllAsync(pageCts.Token);
+
+            products = all.Where(m => !m.NgungBan).OrderBy(m => m.TenMon).ToList();
+            stoppedProductIds = all
+                .Where(m => m.NgungBan && m.KhuyenMai is { } km && km.MaKhuyenMai == model.MaKhuyenMai && model.MaKhuyenMai != 0)
+                .Select(m => m.MaTenMon)
+                .ToList();
+            productsReady = true;
+        }
+        catch (ApiException ex)
+        {
+            productsError = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            productsLoading = false;
+        }
+    }
+
+    private void Filter() => page = 1;
 
     private void Reset()
     {
         search = "";
+        statusFilter = "";
         page = 1;
     }
 
@@ -353,116 +491,151 @@
         if (next >= 1 && next <= Pages) page = next;
     }
 
-    private void Add()
+    private void SelectKey(KeyboardEventArgs e, int id)
+    {
+        if (e.Key is "Enter" or " ") selected = id;
+    }
+
+    private async Task Add()
     {
         editing = false;
         error = null;
-        model = new Promotion();
+        message = null;
+        model = new KhuyenMaiForm { NgayBatDau = DateTime.Today, NgayKetThuc = DateTime.Today.AddDays(7) };
         dialog = "form";
+        await LoadProducts();
     }
 
-    private void Edit()
+    private async Task Edit()
     {
-        if (selected is null) return;
+        if (Selected is not { } source) return;
 
         editing = true;
         error = null;
-
-        var source = promotions.FirstOrDefault(
-            p => p.Code == selected
-        );
-
-        model = source is not null
-            ? new Promotion
-              {
-                  Code = source.Code,
-                  Name = source.Name,
-                  DiscountPercent = source.DiscountPercent,
-                  StartDate = source.StartDate,
-                  EndDate = source.EndDate
-              }
-            : new Promotion();
-
+        message = null;
+        model = new KhuyenMaiForm
+        {
+            MaKhuyenMai = source.MaKhuyenMai,
+            Code = source.Code,
+            PhanTramGiam = source.PhanTramGiam,
+            NgayBatDau = source.NgayBatDau.Date,
+            NgayKetThuc = source.NgayKetThuc.Date,
+            GioBatDau = ParseTime(source.GioBatDau),
+            GioKetThuc = ParseTime(source.GioKetThuc)
+        };
         dialog = "form";
+
+        await LoadProducts();
+        model.MaTenMons = products
+            .Where(m => m.KhuyenMai?.MaKhuyenMai == source.MaKhuyenMai)
+            .Select(m => m.MaTenMon)
+            .ToHashSet();
+    }
+
+    private static TimeOnly? ParseTime(string? hhmm) =>
+        TimeOnly.TryParseExact(hhmm, "HH:mm", out var t) ? t : null;
+
+    private void ToggleProduct(int id, ChangeEventArgs e)
+    {
+        if (e.Value is true) model.MaTenMons.Add(id);
+        else model.MaTenMons.Remove(id);
     }
 
     private void AskDelete()
     {
-        if (selected is null) return;
+        if (Selected is null) return;
+
         error = null;
+        message = null;
         dialog = "delete";
     }
 
     private void Close()
     {
+        if (saving) return;
+
         dialog = "";
         error = null;
     }
 
     private async Task Save()
     {
-        if (saving) return;
+        if (saving || productsLoading) return;
+
+        saving = true;
+        error = null;
+
+        // Ngày chọn trên form là giờ địa phương "không múi giờ" — tránh gửi kèm +07:00
+        static DateTime Plain(DateTime d) => DateTime.SpecifyKind(d, DateTimeKind.Unspecified);
+
+        var request = new KhuyenMaiRequest
+        {
+            Code = model.Code.Trim().ToUpperInvariant(),
+            PhanTramGiam = model.PhanTramGiam,
+            NgayBatDau = Plain(model.NgayBatDau!.Value.Date),
+            NgayKetThuc = Plain(model.NgayKetThuc!.Value.Date.AddDays(1).AddSeconds(-1)),
+            GioBatDau = model.GioBatDau?.ToString("HH:mm"),
+            GioKetThuc = model.GioKetThuc?.ToString("HH:mm"),
+            // Chưa tải được danh sách món → gửi null = giữ nguyên món áp dụng (không gỡ hết).
+            // Có danh sách → món đã chọn + món ngừng bán đang gắn khuyến mãi này (không để mất).
+            MaTenMons = productsReady ? model.MaTenMons.Concat(stoppedProductIds).Distinct().ToList() : null
+        };
 
         try
         {
-            saving = true;
-            error = null;
+            var saved = editing
+                ? await PromotionApi.UpdateAsync(model.MaKhuyenMai, request, pageCts.Token)
+                : await PromotionApi.CreateAsync(request, pageCts.Token);
 
-            if (editing)
-            {
-                var existing = promotions.FirstOrDefault(
-                    p => p.Code == selected
-                );
-
-                if (existing is not null)
-                {
-                    existing.Name = model.Name;
-                    existing.DiscountPercent = model.DiscountPercent;
-                    existing.StartDate = model.StartDate;
-                    existing.EndDate = model.EndDate;
-                }
-
-                message = $"Đã cập nhật khuyến mãi {model.Name}.";
-            }
-            else
-            {
-                model.Code = $"KM{promotions.Count + 1:D4}";
-                promotions.Add(new Promotion
-                {
-                    Code = model.Code,
-                    Name = model.Name,
-                    DiscountPercent = model.DiscountPercent,
-                    StartDate = model.StartDate,
-                    EndDate = model.EndDate
-                });
-
-                message = $"Đã thêm khuyến mãi {model.Name}.";
-            }
-
+            message = editing ? $"Đã cập nhật khuyến mãi {saved.Code}." : $"Đã thêm khuyến mãi {saved.Code}.";
+            selected = saved.MaKhuyenMai;
             dialog = "";
-            await Task.CompletedTask;
+            await Load();
         }
-        catch (Exception ex) { error = ex.Message; }
-        finally { saving = false; }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            saving = false;
+        }
     }
 
     private async Task Delete()
     {
-        if (saving || selected is null) return;
+        if (saving || Selected is not { } target) return;
+
+        saving = true;
+        error = null;
 
         try
         {
-            saving = true;
-            error = null;
-
-            promotions.RemoveAll(p => p.Code == selected);
-            message = "Đã xóa khuyến mãi.";
+            await PromotionApi.DeleteAsync(target.MaKhuyenMai, pageCts.Token);
+            message = $"Đã xóa khuyến mãi {target.Code}.";
             selected = null;
             dialog = "";
-            await Task.CompletedTask;
+            await Load();
         }
-        catch (Exception ex) { error = ex.Message; }
-        finally { saving = false; }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        pageCts.Cancel();
+        pageCts.Dispose();
     }
 }
-

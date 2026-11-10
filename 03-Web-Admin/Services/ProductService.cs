@@ -1,68 +1,52 @@
-using System.Net.Http.Json;
 using CoffeeShop.Admin.Models;
 
 namespace CoffeeShop.Admin.Services;
 
 /// <summary>
-/// Service gọi API sản phẩm.
+/// Món và giá theo size — api/v1/mon, api/v1/chi-tiet-mon/{id}/cong-thuc.
 /// </summary>
 public class ProductService
 {
-    private readonly HttpClient _http;
+    private readonly ApiClient _api;
 
-    public ProductService(HttpClient http)
+    public ProductService(ApiClient api)
     {
-        _http = http;
+        _api = api;
     }
 
-    public async Task<List<Product>> GetAllAsync()
-    {
-        return await _http.GetFromJsonAsync<List<Product>>("api/products")
-               ?? [];
-    }
+    /// <summary>Toàn bộ món (kể cả ngừng bán) cho trang quản lý.</summary>
+    public Task<List<Mon>> GetAllAsync(CancellationToken ct = default) =>
+        _api.GetAllPagesAsync<Mon>("api/v1/mon?baoGomNgungBan=true", ct);
 
-    public async Task<Product?> GetByCodeAsync(string code)
-    {
-        return await _http.GetFromJsonAsync<Product>(
-            $"api/products/{code}"
-        );
-    }
+    /// <summary>Món đang bán được (còn hàng, đủ nguyên liệu) — dùng khi tạo đơn tại quầy.</summary>
+    public Task<List<Mon>> GetSellableAsync(CancellationToken ct = default) =>
+        _api.GetAllPagesAsync<Mon>("api/v1/mon?coTheBan=true", ct);
 
-    public async Task<Product> CreateAsync(Product product)
-    {
-        var response = await _http.PostAsJsonAsync("api/products", product);
-        response.EnsureSuccessStatusCode();
+    public Task<Mon> CreateAsync(MonTaoRequest request, CancellationToken ct = default) =>
+        _api.PostAsync<Mon>("api/v1/mon", request, ct);
 
-        return (await response.Content.ReadFromJsonAsync<Product>())!;
-    }
+    public Task<Mon> UpdateAsync(int id, MonCapNhatRequest request, CancellationToken ct = default) =>
+        _api.PatchAsync<Mon>($"api/v1/mon/{id}", request, ct);
 
-    public async Task UpdateAsync(Product product)
-    {
-        var response = await _http.PutAsJsonAsync(
-            $"api/products/{product.Code}",
-            product
-        );
+    /// <summary>Thay bảng giá theo size; size không gửi lên bị tắt (không xóa vì đơn cũ tham chiếu).</summary>
+    public Task<Mon> SetPricesAsync(int id, List<GiaSizeRequest> prices, CancellationToken ct = default) =>
+        _api.PutAsync<Mon>($"api/v1/mon/{id}/kich-thuoc", prices, ct);
 
-        response.EnsureSuccessStatusCode();
-    }
+    /// <summary>Báo tạm hết / có hàng lại trong ngày.</summary>
+    public Task<Mon> SetAvailableAsync(int id, bool conHang, CancellationToken ct = default) =>
+        _api.PatchAsync<Mon>($"api/v1/mon/{id}/con-hang", new ConHangRequest { ConHang = conHang }, ct);
 
-    public async Task DeleteAsync(string code)
-    {
-        var response = await _http.DeleteAsync($"api/products/{code}");
-        response.EnsureSuccessStatusCode();
-    }
+    /// <summary>Xóa mềm: món chuyển sang "Ngừng bán".</summary>
+    public Task DeleteAsync(int id, CancellationToken ct = default) =>
+        _api.DeleteAsync($"api/v1/mon/{id}", ct);
 
-    public async Task SaveRecipeAsync(
-        string productCode,
-        List<RecipeLine> recipe
-    )
-    {
-        var response = await _http.PutAsJsonAsync(
-            $"api/products/{productCode}/recipe",
-            recipe
-        );
+    /// <summary>Định mức nguyên liệu của một món-size.</summary>
+    public Task<List<CongThucDong>> GetRecipeAsync(int maChiTietMon, CancellationToken ct = default) =>
+        _api.GetAsync<List<CongThucDong>>($"api/v1/chi-tiet-mon/{maChiTietMon}/cong-thuc", ct);
 
-        response.EnsureSuccessStatusCode();
-    }
+    public Task<List<CongThucDong>> SaveRecipeAsync(
+        int maChiTietMon,
+        List<CongThucDongRequest> lines,
+        CancellationToken ct = default) =>
+        _api.PutAsync<List<CongThucDong>>($"api/v1/chi-tiet-mon/{maChiTietMon}/cong-thuc", lines, ct);
 }
-

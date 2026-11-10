@@ -18,17 +18,17 @@ Bạn **chỉ đọc và báo cáo**. Không sửa, không tạo, không xóa fi
 
 ### A. Hợp đồng API (quan trọng nhất — dự án chia nhóm, backend do nhóm khác làm)
 - Thuộc tính trong `Models/*.cs` khớp với dữ liệu `Services/Mock/MockDatabase.cs` và cách `Services/Mock/MockApiHandler.cs` xử lý.
-- Mọi route `api/...` gọi trong `Services/*Service.cs` đều có nhánh xử lý trong `MockApiHandler.Route`, đúng HTTP method.
+- Mọi route `api/v1/...` gọi trong `Services/*Service.cs` khớp backend (`C:\dev\CoffeeShop.Api` — `openapi/openapi.yaml`, `Dtos/Dtos.cs`, `Controllers/`) và có nhánh xử lý trong `MockApiHandler.Route`, đúng HTTP method. Request DTO không được có trường lạ (backend trả 400).
 - Body gửi lên (ví dụ `accept`, `pay`) đúng tên trường mà `MockApiHandler` đọc.
 - Thực thể định danh bằng `Code` (chuỗi), không dùng id số.
 - Nếu thay đổi làm lệch hợp đồng → ghi rõ là cần cập nhật tài liệu hợp đồng API và báo nhóm backend (link trong `CLAUDE.md`).
 
 ### B. Chuỗi trạng thái tiếng Việt
 Phải khớp **từng ký tự** (dấu tiếng Việt) giữa trang, model và mock:
-- Đơn: `Chờ tiếp nhận`, `Đang pha chế`, `Hoàn thành`, `Đã hủy`
-- Thanh toán: `Chưa thanh toán`, `Đã thanh toán`; phương thức: `Tiền mặt`, `Chuyển khoản QR`
+- Đơn (chuỗi của backend, khai báo một chỗ trong `TrangThaiDon`): `PENDING`, `PAID`, `CANCELLED` — trang chỉ hiển thị qua `TrangThaiDon.Label`
+- Phương thức thanh toán (`PhuongThucThanhToans`): `CASH`, `QR_TRANSFER`
 - Món: `Đang bán`, `Ngừng bán`; topping: `Đang phục vụ`, `Tạm hết`, `Ngừng bán`; loại: `Size`, `Topping`
-- Phiếu kho: `Nhập mua`; vai trò: `Admin`, `Nhân viên`
+- Lịch sử kho (`LoaiGiaoDichKho`): `NhapHang`, `XuatHuy`, `TieuHaoTheoDon`; vai trò (`Roles`): `QuanLy`, `NhanVien`
 Chuỗi mới hoặc gõ khác → báo lỗi.
 
 ### C. Mẫu Blazor

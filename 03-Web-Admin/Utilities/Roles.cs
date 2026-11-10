@@ -4,18 +4,24 @@ namespace CoffeeShop.Admin.Utilities;
 
 /// <summary>
 /// Vai trò người dùng — MỘT nơi duy nhất cho chuỗi vai trò, nhãn hiển thị và trang chính,
-/// để không lệch chữ giữa các trang. Chuỗi phải khớp từng ký tự với backend (auth/login, auth/me).
+/// để không lệch chữ giữa các trang. Chuỗi phải khớp từng ký tự với backend
+/// (trường "vaiTro" của api/v1/auth/dang-nhap, auth/toi, nguoi-dung).
 /// </summary>
 public static class Roles
 {
-    /// <summary>Chủ quán — toàn quyền.</summary>
-    public const string Admin = "Admin";
+    /// <summary>Chủ quán — toàn quyền (hiển thị "Quản lý").</summary>
+    public const string Admin = "QuanLy";
 
     /// <summary>Nhân viên — chỉ Đơn hàng và Tài khoản của tôi.</summary>
-    public const string Staff = "Nhân viên";
+    public const string Staff = "NhanVien";
 
     /// <summary>Nhãn tiếng Việt hiển thị cho vai trò.</summary>
-    public static string Label(string? role) => role == Admin ? "Quản lý" : role ?? "";
+    public static string Label(string? role) => role switch
+    {
+        Admin => "Quản lý",
+        Staff => "Nhân viên",
+        _ => role ?? ""
+    };
 
     public static string Label(ClaimsPrincipal user) => user.IsInRole(Admin) ? Label(Admin) : Label(Staff);
 

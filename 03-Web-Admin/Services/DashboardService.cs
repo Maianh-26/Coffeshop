@@ -1,34 +1,31 @@
-using System.Net.Http.Json;
 using CoffeeShop.Admin.Models;
 
 namespace CoffeeShop.Admin.Services;
 
 /// <summary>
-/// Service gọi API tổng quan và báo cáo.
+/// Báo cáo cho chủ quán — api/v1/bao-cao/*. Doanh thu chỉ tính đơn đã thanh toán.
 /// </summary>
 public class DashboardService
 {
-    private readonly HttpClient _http;
+    private readonly ApiClient _api;
 
-    public DashboardService(HttpClient http)
+    public DashboardService(ApiClient api)
     {
-        _http = http;
+        _api = api;
     }
 
-    public async Task<DashboardReport> GetReportAsync(
-        DashboardFilter filter
-    )
-    {
-        string url = "api/dashboard/report";
+    private static string Range(string path, DashboardFilter filter, int? top = null) =>
+        Query.Build(path,
+            ("tuNgay", filter.From?.Date),
+            ("denNgay", Query.EndOfDay(filter.To)),
+            ("soLuong", top));
 
-        if (filter.From.HasValue && filter.To.HasValue)
-        {
-            url += $"?from={filter.From:yyyy-MM-dd}"
-                 + $"&to={filter.To:yyyy-MM-dd}";
-        }
+    public Task<BaoCaoDoanhThu> GetRevenueAsync(DashboardFilter filter, CancellationToken ct = default) =>
+        _api.GetAsync<BaoCaoDoanhThu>(Range("api/v1/bao-cao/doanh-thu", filter), ct);
 
-        return await _http.GetFromJsonAsync<DashboardReport>(url)
-               ?? new DashboardReport();
-    }
+    public Task<List<MonBanChay>> GetBestSellersAsync(DashboardFilter filter, int top = 5, CancellationToken ct = default) =>
+        _api.GetAsync<List<MonBanChay>>(Range("api/v1/bao-cao/mon-ban-chay", filter, top), ct);
+
+    public Task<List<GioCaoDiem>> GetPeakHoursAsync(DashboardFilter filter, CancellationToken ct = default) =>
+        _api.GetAsync<List<GioCaoDiem>>(Range("api/v1/bao-cao/gio-cao-diem", filter), ct);
 }
-

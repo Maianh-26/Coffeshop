@@ -15,11 +15,11 @@
             <Icon Name="user" Size="28" />
         </span>
         <div>
-            <h2>@(account?.FullName ?? "Tài khoản của tôi")</h2>
+            <h2>@(account?.HoTen ?? "Tài khoản của tôi")</h2>
             @if (account is not null)
             {
-                <span class="badge @(account.Role == Roles.Admin ? "yellow" : "green")">
-                    @Roles.Label(account.Role)
+                <span class="badge @(account.VaiTro == Roles.Admin ? "yellow" : "green")">
+                    @Roles.Label(account.VaiTro)
                 </span>
             }
         </div>
@@ -39,15 +39,15 @@
         <dl class="info-list">
             <div>
                 <dt>Mã tài khoản</dt>
-                <dd>@account.Code</dd>
+                <dd>@account.MaNguoiDung</dd>
             </div>
             <div>
                 <dt>Họ và tên</dt>
-                <dd>@account.FullName</dd>
+                <dd>@account.HoTen</dd>
             </div>
             <div>
                 <dt>Tên đăng nhập</dt>
-                <dd>@account.Username</dd>
+                <dd>@account.TenDangNhap</dd>
             </div>
             <div>
                 <dt>Email</dt>
@@ -55,7 +55,7 @@
             </div>
         </dl>
 
-        @if (account.Role == Roles.Admin)
+        @if (account.VaiTro == Roles.Admin)
         {
             <p class="form-note">
                 Sửa họ tên, email hoặc vai trò tại trang <a href="accounts">Quản lý tài khoản</a>.
@@ -87,7 +87,7 @@
             <DataAnnotationsValidator />
 
             @* Ô tên đăng nhập ẩn: giúp trình quản lý mật khẩu lưu đúng tài khoản *@
-            <input type="text" autocomplete="username" value="@account?.Username" hidden readonly />
+            <input type="text" autocomplete="username" value="@account?.TenDangNhap" hidden readonly />
 
             <div class="form-stack">
 

@@ -1,5 +1,7 @@
 @page "/inventory"
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize(Roles = Roles.Admin)]
+@implements IDisposable
+@inject InventoryService InventoryApi
 
 <PageTitle>Kho nguyên liệu - Coffee Shop</PageTitle>
 
@@ -21,7 +23,7 @@
                     @onclick="() => SwitchTab(true)">
 
                 <Icon Name="orders" />
-                Giao dịch kho
+                Lịch sử kho
 
             </button>
 
@@ -29,25 +31,50 @@
 
         <div class="filter-row">
 
-            <div class="search-field">
+            @if (transactionTab)
+            {
+                <select aria-label="Lọc nguyên liệu" @bind="historyIngredient" @bind:after="ReloadHistory">
+                    <option value="0">Tất cả nguyên liệu</option>
+                    @foreach (var item in ingredients)
+                    {
+                        <option value="@item.MaNguyenLieu">@item.TenNguyenLieu</option>
+                    }
+                </select>
 
-                <Icon Name="search" />
+                <select aria-label="Lọc loại giao dịch" @bind="historyType" @bind:after="ReloadHistory">
+                    <option value="">Tất cả loại</option>
+                    <option value="@LoaiGiaoDichKho.NhapHang">@LoaiGiaoDichKho.Label(LoaiGiaoDichKho.NhapHang)</option>
+                    <option value="@LoaiGiaoDichKho.XuatHuy">@LoaiGiaoDichKho.Label(LoaiGiaoDichKho.XuatHuy)</option>
+                    <option value="@LoaiGiaoDichKho.TieuHaoTheoDon">@LoaiGiaoDichKho.Label(LoaiGiaoDichKho.TieuHaoTheoDon)</option>
+                </select>
 
-                <input @bind="search"
-                       @bind:event="oninput"
-                       placeholder="@(transactionTab
-                           ? "Tìm mã giao dịch"
-                           : "Tìm mã hoặc tên nguyên liệu")" />
+                <div class="date-range">
+                    <input type="date" aria-label="Từ ngày" @bind="historyFrom" @bind:after="ReloadHistory" />
+                    <span>–</span>
+                    <input type="date" aria-label="Đến ngày" @bind="historyTo" @bind:after="ReloadHistory" />
+                </div>
+            }
+            else
+            {
+                <div class="search-field">
 
-            </div>
+                    <Icon Name="search" />
 
-            <button class="btn primary"
-                    @onclick="Filter">
+                    <input @bind="search"
+                           @bind:event="oninput"
+                           @bind:after="Filter"
+                           placeholder="Tìm mã hoặc tên nguyên liệu"
+                           aria-label="Tìm nguyên liệu" />
 
-                <Icon Name="filter" />
-                Lọc
+                </div>
 
-            </button>
+                <select aria-label="Lọc tình trạng" @bind="stockFilter" @bind:after="Filter">
+                    <option value="">Đang sử dụng</option>
+                    <option value="low">Sắp hết</option>
+                    <option value="stopped">Ngừng sử dụng</option>
+                    <option value="all">Tất cả</option>
+                </select>
+            }
 
             <button class="btn outline"
                     @onclick="Reset">
@@ -68,13 +95,23 @@
 
             <Icon Name="plus" />
 
-            @(transactionTab ? "Tạo phiếu nhập/xuất" : "Thêm nguyên liệu")
+            @(transactionTab ? "Tạo phiếu nhập / xuất hủy" : "Thêm nguyên liệu")
 
         </button>
 
         @if (!transactionTab)
         {
             <button class="btn outline"
+                    disabled="@(Selected is null)"
+                    @onclick="Transact">
+
+                <Icon Name="box" />
+                Nhập / xuất hủy
+
+            </button>
+
+            <button class="btn outline"
+                    disabled="@(Selected is null)"
                     @onclick="Edit">
 
                 <Icon Name="edit" />
@@ -83,10 +120,11 @@
             </button>
 
             <button class="btn danger-outline"
+                    disabled="@(Selected is not { DangSuDung: true })"
                     @onclick="AskDelete">
 
                 <Icon Name="trash" />
-                Xóa
+                Ngừng sử dụng
 
             </button>
         }
@@ -97,6 +135,21 @@
     {
         <p class="alert success" role="status">
             @message
+        </p>
+    }
+
+    @if (loadError is not null)
+    {
+        <p class="alert error" role="alert">
+            @loadError
+            <button type="button" class="text-button" @onclick="Load">Thử lại</button>
+        </p>
+    }
+
+    @if (!transactionTab && LowStockCount > 0)
+    {
+        <p class="alert error" role="status">
+            Có @LowStockCount nguyên liệu sắp hết — cần nhập thêm.
         </p>
     }
 
@@ -111,13 +164,13 @@
                     @if (transactionTab)
                     {
                         <tr>
-                            <th>Mã GD</th>
+                            <th>Mã</th>
+                            <th>Thời gian</th>
                             <th>Nguyên liệu</th>
                             <th>Loại</th>
-                            <th>Số lượng</th>
-                            <th>Đơn vị</th>
-                            <th>Đơn giá</th>
-                            <th>Ngày tạo</th>
+                            <th>Thay đổi</th>
+                            <th>Đơn hàng</th>
+                            <th>Ghi chú</th>
                         </tr>
                     }
                     else
@@ -125,7 +178,11 @@
                         <tr>
                             <th>Mã NL</th>
                             <th>Tên nguyên liệu</th>
-                            <th>Đơn vị</th>
+                            <th>Tồn kho</th>
+                            <th>Mức cảnh báo</th>
+                            <th>Tiêu hao / ngày</th>
+                            <th>Còn dùng</th>
+                            <th>Tình trạng</th>
                         </tr>
                     }
 
@@ -135,28 +192,25 @@
 
                     @if (transactionTab)
                     {
-                        @foreach (var item in VisibleTransactions)
+                        @foreach (var item in history)
                         {
                             <tr>
-                                <td>@item.Code</td>
-                                <td>@item.IngredientName</td>
+                                <td>@item.MaLichSu</td>
+                                <td>@item.ThoiGian.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>@item.TenNguyenLieu</td>
 
                                 <td>
-                                    <span class="badge @(item.Type == "Nhập mua" ? "green" : "yellow")">
-                                        @item.Type
+                                    <span class="badge @LoaiGiaoDichKho.Color(item.LoaiGiaoDich)">
+                                        @LoaiGiaoDichKho.Label(item.LoaiGiaoDich)
                                     </span>
                                 </td>
 
-                                <td>@item.Quantity</td>
-                                <td>@item.Unit</td>
-
-                                <td>
-                                    @(item.UnitCost.HasValue
-                                        ? Money(item.UnitCost.Value)
-                                        : "—")
+                                <td class="@(item.SoLuongThayDoi < 0 ? "text-danger" : "")">
+                                    @(item.SoLuongThayDoi > 0 ? "+" : "")@Number(item.SoLuongThayDoi) @UnitOf(item.MaNguyenLieu)
                                 </td>
 
-                                <td>@item.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>@(item.MaDonHang is { } don ? $"#{don}" : "—")</td>
+                                <td>@(item.GhiChu ?? "—")</td>
                             </tr>
                         }
                     }
@@ -164,14 +218,23 @@
                     {
                         @foreach (var item in VisibleIngredients)
                         {
-                            <tr class="selectable @(selected == item.Code ? "selected" : "")"
+                            <tr class="selectable @(selected == item.MaNguyenLieu ? "selected" : "")"
                                 tabindex="0"
-                                @onclick="() => selected = item.Code"
-                                @onclick:stopPropagation="true">
+                                @onclick="() => selected = item.MaNguyenLieu"
+                                @onkeydown="e => SelectKey(e, item.MaNguyenLieu)">
 
-                                <td>@item.Code</td>
-                                <td>@item.Name</td>
-                                <td>@item.Unit</td>
+                                <td>@item.MaNguyenLieu</td>
+                                <td>@item.TenNguyenLieu</td>
+                                <td><strong>@Number(item.SoLuongTon)</strong> @item.DonViTinh</td>
+                                <td>@Number(item.MucCanhBaoToiThieu) @item.DonViTinh</td>
+                                <td>@(item.TieuHaoTrungBinhNgay > 0 ? $"{Number(item.TieuHaoTrungBinhNgay)} {item.DonViTinh}" : "—")</td>
+                                <td>@(item.SoNgayConLai is { } days ? $"≈ {Number(days)} ngày" : "—")</td>
+
+                                <td>
+                                    <span class="badge @(!item.DangSuDung ? "gray" : item.SapHet ? "red" : "green")">
+                                        @(!item.DangSuDung ? "Ngừng sử dụng" : item.SapHet ? "Sắp hết" : "Đủ dùng")
+                                    </span>
+                                </td>
 
                             </tr>
                         }
@@ -181,13 +244,12 @@
                     {
                         <tr>
 
-                            <td class="empty-cell"
-                                colspan="@(transactionTab ? 7 : 3)">
+                            <td class="empty-cell" colspan="7">
 
                                 <Icon Name="box" Size="32" />
 
                                 <p>
-                                    Chưa có dữ liệu.
+                                    @(loading ? "Đang tải dữ liệu…" : "Chưa có dữ liệu.")
                                 </p>
 
                             </td>
@@ -204,7 +266,7 @@
         <div class="list-footer">
 
             <span>
-                @ItemCount @(transactionTab ? "giao dịch" : "nguyên liệu")
+                @(transactionTab ? historyTotal : FilteredIngredients.Count()) @(transactionTab ? "giao dịch" : "nguyên liệu")
                 · Trang @(page)/@Pages
             </span>
 
@@ -212,6 +274,7 @@
 
                 <button class="page-button"
                         aria-label="Trang trước"
+                        disabled="@(page <= 1 || loading)"
                         @onclick="() => Move(-1)">
                     <Icon Name="left" Size="16" />
                 </button>
@@ -220,6 +283,7 @@
 
                 <button class="page-button"
                         aria-label="Trang sau"
+                        disabled="@(page >= Pages || loading)"
                         @onclick="() => Move(1)">
                     <Icon Name="right" Size="16" />
                 </button>
@@ -248,27 +312,50 @@
                 <div class="form-stack">
 
                     <div class="field">
-                        <label>Mã nguyên liệu</label>
-                        <input value="@ingredientModel.Code"
-                               placeholder="Tự động tạo khi lưu"
-                               readonly />
-                    </div>
-
-                    <div class="field">
                         <label for="i-name">Tên nguyên liệu *</label>
                         <InputText id="i-name"
-                                   @bind-Value="ingredientModel.Name"
+                                   @bind-Value="ingredientModel.TenNguyenLieu"
                                    placeholder="Nhập tên nguyên liệu" />
-                        <ValidationMessage For="@(() => ingredientModel.Name)" />
+                        <ValidationMessage For="@(() => ingredientModel.TenNguyenLieu)" />
                     </div>
 
                     <div class="field">
-                        <label for="i-unit">Đơn vị *</label>
+                        <label for="i-unit">Đơn vị tính *</label>
                         <InputText id="i-unit"
-                                   @bind-Value="ingredientModel.Unit"
-                                   placeholder="g, ml, quả, gói..." />
-                        <ValidationMessage For="@(() => ingredientModel.Unit)" />
+                                   @bind-Value="ingredientModel.DonViTinh"
+                                   placeholder="gram, ml, cái, miếng…" />
+                        <ValidationMessage For="@(() => ingredientModel.DonViTinh)" />
                     </div>
+
+                    @if (!editingIngredient)
+                    {
+                        <div class="field">
+                            <label for="i-stock">Tồn kho ban đầu</label>
+                            <InputNumber id="i-stock"
+                                         @bind-Value="ingredientModel.SoLuongTon"
+                                         step="0.01" />
+                            <ValidationMessage For="@(() => ingredientModel.SoLuongTon)" />
+                            <small class="form-note">Được ghi vào lịch sử kho như một lần nhập hàng.</small>
+                        </div>
+                    }
+
+                    <div class="field">
+                        <label for="i-min">Mức cảnh báo tối thiểu</label>
+                        <InputNumber id="i-min"
+                                     @bind-Value="ingredientModel.MucCanhBaoToiThieu"
+                                     step="0.01" />
+                        <ValidationMessage For="@(() => ingredientModel.MucCanhBaoToiThieu)" />
+                    </div>
+
+                    @if (editingIngredient)
+                    {
+                        <label class="checkbox-line">
+                            <InputCheckbox @bind-Value="ingredientModel.DangSuDung" />
+                            Đang sử dụng
+                        </label>
+
+                        <p class="form-note">Tồn kho chỉ thay đổi qua phiếu nhập hàng / xuất hủy để có lịch sử.</p>
+                    }
 
                 </div>
 
@@ -280,11 +367,12 @@
                 <div class="modal-footer">
 
                     <button type="button" class="btn outline"
+                            disabled="@saving"
                             @onclick="Close">
                         Hủy
                     </button>
 
-                    <button type="submit" class="btn primary">
+                    <button type="submit" class="btn primary" disabled="@saving">
                         @(saving ? "Đang lưu…"
                             : editingIngredient ? "Lưu thay đổi"
                             : "Thêm nguyên liệu")
@@ -305,52 +393,42 @@
                 <div class="form-stack">
 
                     <div class="field">
-                        <label for="t-type">Loại giao dịch *</label>
+                        <label for="t-type">Loại phiếu *</label>
                         <InputSelect id="t-type"
-                                     @bind-Value="transactionModel.Type">
-                            <option>Nhập mua</option>
-                            <option>Xuất dùng</option>
-                            <option>Kiểm kê</option>
+                                     @bind-Value="transactionModel.Loai">
+                            <option value="@LoaiGiaoDichKho.NhapHang">Nhập hàng (cộng tồn kho)</option>
+                            <option value="@LoaiGiaoDichKho.XuatHuy">Xuất hủy — hỏng, đổ vỡ, hết hạn (trừ tồn kho)</option>
                         </InputSelect>
                     </div>
 
                     <div class="field">
                         <label for="t-ingredient">Nguyên liệu *</label>
                         <InputSelect id="t-ingredient"
-                                     @bind-Value="transactionModel.IngredientId">
-                            <option value="">Chọn nguyên liệu</option>
-                            @foreach (var item in ingredients)
+                                     @bind-Value="transactionModel.MaNguyenLieu">
+                            <option value="0">Chọn nguyên liệu</option>
+                            @foreach (var item in ingredients.Where(i => i.DangSuDung))
                             {
-                                <option value="@item.Code">@item.Name (@item.Unit)</option>
+                                <option value="@item.MaNguyenLieu">@item.TenNguyenLieu (tồn @Number(item.SoLuongTon) @item.DonViTinh)</option>
                             }
                         </InputSelect>
-                        <ValidationMessage For="@(() => transactionModel.IngredientId)" />
+                        <ValidationMessage For="@(() => transactionModel.MaNguyenLieu)" />
                     </div>
 
                     <div class="field">
-                        <label for="t-qty">Số lượng *</label>
+                        <label for="t-qty">Số lượng (@UnitOf(transactionModel.MaNguyenLieu)) *</label>
                         <InputNumber id="t-qty"
-                                     @bind-Value="transactionModel.Quantity"
-                                     step="0.001" />
-                        <ValidationMessage For="@(() => transactionModel.Quantity)" />
+                                     @bind-Value="transactionModel.SoLuong"
+                                     step="0.01" />
+                        <ValidationMessage For="@(() => transactionModel.SoLuong)" />
                     </div>
-
-                    @if (transactionModel.Type == "Nhập mua")
-                    {
-                        <div class="field">
-                            <label for="t-cost">Đơn giá (đ)</label>
-                            <InputNumber id="t-cost"
-                                         @bind-Value="transactionModel.UnitCost"
-                                         step="1" />
-                        </div>
-                    }
 
                     <div class="field">
                         <label for="t-note">Ghi chú</label>
                         <InputTextArea id="t-note"
-                                       @bind-Value="transactionModel.Note"
-                                       placeholder="Không bắt buộc"
+                                       @bind-Value="transactionModel.GhiChu"
+                                       placeholder="Nhà cung cấp, lý do xuất hủy…"
                                        rows="2" />
+                        <ValidationMessage For="@(() => transactionModel.GhiChu)" />
                     </div>
 
                 </div>
@@ -363,12 +441,13 @@
                 <div class="modal-footer">
 
                     <button type="button" class="btn outline"
+                            disabled="@saving"
                             @onclick="Close">
                         Hủy
                     </button>
 
-                    <button type="submit" class="btn primary">
-                        @(saving ? "Đang lưu…" : "Tạo phiếu")
+                    <button type="submit" class="btn primary" disabled="@saving">
+                        @(saving ? "Đang lưu…" : "Lưu phiếu")
                     </button>
 
                 </div>
@@ -376,12 +455,15 @@
             </EditForm>
         }
 
-        @if (dialog == "delete")
+        @if (dialog == "delete" && Selected is { } target)
         {
             <p>
-                Xóa nguyên liệu <strong>@selected</strong>?
-                Chỉ xóa nguyên liệu chưa có giao dịch
-                và chưa dùng trong công thức.
+                Ngừng sử dụng nguyên liệu <strong>@target.TenNguyenLieu</strong>?
+            </p>
+
+            <p class="form-note">
+                Nguyên liệu được ẩn khỏi danh sách đang dùng nhưng vẫn giữ lịch sử kho.
+                Có thể bật lại bằng nút Sửa.
             </p>
 
             @if (error is not null)
@@ -391,10 +473,10 @@
 
             <div class="modal-footer">
 
-                <button class="btn outline" @onclick="Close">Hủy</button>
+                <button class="btn outline" disabled="@saving" @onclick="Close">Hủy</button>
 
-                <button class="btn danger" @onclick="Delete">
-                    @(saving ? "Đang xóa…" : "Xóa nguyên liệu")
+                <button class="btn danger" disabled="@saving" @onclick="Delete">
+                    @(saving ? "Đang lưu…" : "Ngừng sử dụng")
                 </button>
 
             </div>
@@ -404,246 +486,363 @@
 }
 
 @code {
-    private List<Ingredient> ingredients = [];
-    private List<InventoryTransaction> transactions = [];
+    private static readonly System.Globalization.CultureInfo Vi = new("vi-VN");
+
+    private readonly CancellationTokenSource pageCts = new();
+
+    private List<NguyenLieu> ingredients = [];
+    private List<LichSuKho> history = [];
+    private int historyTotal;
+    private int historyPages = 1;
+
+    // Đổi bộ lọc nhanh → nhiều lần tải chồng nhau; chỉ nhận kết quả của lần gọi mới nhất
+    private int historyVersion;
 
     private bool transactionTab;
     private string search = "";
-    private string? selected;
+    private string stockFilter = "";
+    private int historyIngredient;
+    private string historyType = "";
+    private DateTime? historyFrom;
+    private DateTime? historyTo;
+
+    private int? selected;
     private int page = 1;
     private const int PageSize = 10;
 
     private string dialog = "";
     private bool editingIngredient;
+    private bool loading;
     private bool saving;
     private string? error;
+    private string? loadError;
     private string? message;
 
-    private Ingredient ingredientModel = new();
-    private InventoryTransaction transactionModel = new();
+    private NguyenLieuForm ingredientModel = new();
+    private GiaoDichKhoForm transactionModel = new();
 
-    private static readonly System.Globalization.CultureInfo Vi = new("vi-VN");
+    private static string Number(decimal value) => value.ToString("#,##0.##", Vi);
 
-    private static string Money(decimal value)
-    {
-        return value.ToString("N0", Vi) + " đ";
-    }
+    private string UnitOf(int maNguyenLieu) =>
+        ingredients.FirstOrDefault(i => i.MaNguyenLieu == maNguyenLieu)?.DonViTinh ?? "";
+
+    private NguyenLieu? Selected => ingredients.FirstOrDefault(i => i.MaNguyenLieu == selected);
+
+    private int LowStockCount => ingredients.Count(i => i.DangSuDung && i.SapHet);
 
     private string DialogTitle => dialog switch
     {
         "ingredient" => editingIngredient ? "Sửa nguyên liệu" : "Thêm nguyên liệu",
-        "transaction" => "Tạo phiếu nhập/xuất",
-        "delete" => "Xóa nguyên liệu",
+        "transaction" => "Phiếu nhập hàng / xuất hủy",
+        "delete" => "Ngừng sử dụng nguyên liệu",
         _ => ""
     };
 
-    private IEnumerable<Ingredient> FilteredIngredients =>
+    private IEnumerable<NguyenLieu> FilteredIngredients =>
         ingredients.Where(i =>
-            search == ""
-            || i.Code.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || i.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
-        );
+            (search == ""
+             || i.MaNguyenLieu.ToString().Contains(search, StringComparison.OrdinalIgnoreCase)
+             || i.TenNguyenLieu.Contains(search, StringComparison.OrdinalIgnoreCase))
+            && stockFilter switch
+            {
+                "low" => i.DangSuDung && i.SapHet,
+                "stopped" => !i.DangSuDung,
+                "all" => true,
+                _ => i.DangSuDung
+            });
 
-    private IEnumerable<InventoryTransaction> FilteredTransactions =>
-        transactions.Where(t =>
-            search == ""
-            || t.Code.Contains(search, StringComparison.OrdinalIgnoreCase)
-        );
-
-    private List<Ingredient> VisibleIngredients =>
+    private List<NguyenLieu> VisibleIngredients =>
         FilteredIngredients
             .Skip((page - 1) * PageSize)
             .Take(PageSize)
             .ToList();
 
-    private List<InventoryTransaction> VisibleTransactions =>
-        FilteredTransactions
-            .OrderByDescending(t => t.CreatedAt)
-            .Skip((page - 1) * PageSize)
-            .Take(PageSize)
-            .ToList();
+    private int ItemCount => transactionTab ? history.Count : VisibleIngredients.Count;
 
-    private int ItemCount => transactionTab
-        ? FilteredTransactions.Count()
-        : FilteredIngredients.Count();
+    private int Pages => transactionTab
+        ? Math.Max(1, historyPages)
+        : Math.Max(1, (int)Math.Ceiling(FilteredIngredients.Count() / (double)PageSize));
 
-    private int Pages => Math.Max(1,
-        (int)Math.Ceiling(ItemCount / (double)PageSize));
+    protected override Task OnInitializedAsync() => Load();
 
-    private void SwitchTab(bool isTransaction)
+    private async Task Load()
+    {
+        loading = true;
+        loadError = null;
+
+        try
+        {
+            ingredients = await InventoryApi.GetIngredientsAsync(ct: pageCts.Token);
+
+            if (transactionTab)
+            {
+                await LoadHistory();
+            }
+
+            page = Math.Clamp(page, 1, Pages);
+        }
+        catch (ApiException ex)
+        {
+            loadError = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    /// <summary>Lịch sử kho phân trang ở máy chủ (có thể rất nhiều dòng).</summary>
+    private async Task LoadHistory()
+    {
+        int version = ++historyVersion;
+
+        var result = await InventoryApi.GetHistoryAsync(
+            page, PageSize,
+            historyIngredient > 0 ? historyIngredient : null,
+            historyType == "" ? null : historyType,
+            historyFrom, historyTo,
+            pageCts.Token);
+
+        if (version != historyVersion) return;
+
+        history = result.Data;
+        historyTotal = result.Meta.Total;
+        historyPages = result.Meta.TotalPages;
+    }
+
+    private async Task ReloadHistory()
+    {
+        if (historyFrom.HasValue && historyTo.HasValue && historyTo < historyFrom)
+        {
+            loadError = "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.";
+            return;
+        }
+
+        page = 1;
+        await RunLoad(LoadHistory);
+    }
+
+    private async Task RunLoad(Func<Task> action)
+    {
+        loading = true;
+        loadError = null;
+
+        try
+        {
+            await action();
+        }
+        catch (ApiException ex)
+        {
+            loadError = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task SwitchTab(bool isTransaction)
     {
         transactionTab = isTransaction;
         search = "";
         page = 1;
         selected = null;
+        message = null;
+
+        if (isTransaction)
+        {
+            await RunLoad(LoadHistory);
+        }
     }
 
-    private void Filter() { page = 1; }
+    private void Filter() => page = 1;
 
-    private void Reset()
+    private async Task Reset()
     {
         search = "";
+        stockFilter = "";
         page = 1;
+
+        if (transactionTab)
+        {
+            historyIngredient = 0;
+            historyType = "";
+            historyFrom = null;
+            historyTo = null;
+            await RunLoad(LoadHistory);
+        }
     }
 
-    private void Move(int direction)
+    private async Task Move(int direction)
     {
         int next = page + direction;
-        if (next >= 1 && next <= Pages) page = next;
+        if (next < 1 || next > Pages) return;
+
+        page = next;
+
+        if (transactionTab)
+        {
+            await RunLoad(LoadHistory);
+        }
+    }
+
+    private void SelectKey(KeyboardEventArgs e, int id)
+    {
+        if (e.Key is "Enter" or " ") selected = id;
     }
 
     private void Add()
     {
         error = null;
+        message = null;
 
         if (transactionTab)
         {
-            transactionModel = new InventoryTransaction();
+            transactionModel = new GiaoDichKhoForm();
             dialog = "transaction";
         }
         else
         {
             editingIngredient = false;
-            ingredientModel = new Ingredient();
+            ingredientModel = new NguyenLieuForm();
             dialog = "ingredient";
         }
     }
 
-    private void Edit()
+    private void Transact()
     {
-        if (selected is null) return;
+        if (Selected is not { } source) return;
 
         error = null;
+        message = null;
+        transactionModel = new GiaoDichKhoForm { MaNguyenLieu = source.MaNguyenLieu };
+        dialog = "transaction";
+    }
+
+    private void Edit()
+    {
+        if (Selected is not { } source) return;
+
+        error = null;
+        message = null;
         editingIngredient = true;
-
-        var source = ingredients.FirstOrDefault(
-            i => i.Code == selected
-        );
-
-        ingredientModel = source is not null
-            ? new Ingredient
-              {
-                  Code = source.Code,
-                  Name = source.Name,
-                  Unit = source.Unit
-              }
-            : new Ingredient();
-
+        ingredientModel = new NguyenLieuForm
+        {
+            MaNguyenLieu = source.MaNguyenLieu,
+            TenNguyenLieu = source.TenNguyenLieu,
+            DonViTinh = source.DonViTinh,
+            SoLuongTon = source.SoLuongTon,
+            MucCanhBaoToiThieu = source.MucCanhBaoToiThieu,
+            DangSuDung = source.DangSuDung
+        };
         dialog = "ingredient";
     }
 
     private void AskDelete()
     {
-        if (selected is null) return;
+        if (Selected is null) return;
+
         error = null;
+        message = null;
         dialog = "delete";
     }
 
     private void Close()
     {
+        if (saving) return;
+
         dialog = "";
         error = null;
     }
 
-    private async Task SaveIngredient()
+    /// <summary>Gọi API ghi dữ liệu: khóa nút, báo lỗi trong hộp thoại, tải lại danh sách khi xong.</summary>
+    private async Task Save(Func<Task<string>> action)
     {
         if (saving) return;
 
+        saving = true;
+        error = null;
+
         try
         {
-            saving = true;
-            error = null;
-
-            if (editingIngredient)
-            {
-                var existing = ingredients.FirstOrDefault(
-                    i => i.Code == selected
-                );
-
-                if (existing is not null)
-                {
-                    existing.Name = ingredientModel.Name;
-                    existing.Unit = ingredientModel.Unit;
-                }
-
-                message = $"Đã cập nhật nguyên liệu {ingredientModel.Name}.";
-            }
-            else
-            {
-                ingredientModel.Code = $"NL{ingredients.Count + 1:D4}";
-                ingredients.Add(new Ingredient
-                {
-                    Code = ingredientModel.Code,
-                    Name = ingredientModel.Name,
-                    Unit = ingredientModel.Unit
-                });
-
-                message = $"Đã thêm nguyên liệu {ingredientModel.Name}.";
-            }
-
+            message = await action();
             dialog = "";
-            await Task.CompletedTask;
+            await Load();
         }
-        catch (Exception ex) { error = ex.Message; }
-        finally { saving = false; }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            saving = false;
+        }
     }
 
-    private async Task SaveTransaction()
+    private Task SaveIngredient() => Save(async () =>
     {
-        if (saving) return;
-
-        try
+        if (editingIngredient)
         {
-            saving = true;
-            error = null;
-
-            var ingredient = ingredients.FirstOrDefault(
-                i => i.Code == transactionModel.IngredientId
-            );
-
-            transactionModel.Code = $"GD{transactions.Count + 1:D4}";
-            transactionModel.IngredientName = ingredient?.Name ?? "";
-            transactionModel.Unit = ingredient?.Unit ?? "";
-            transactionModel.CreatedAt = DateTime.Now;
-
-            transactions.Add(new InventoryTransaction
+            var saved = await InventoryApi.UpdateAsync(ingredientModel.MaNguyenLieu, new NguyenLieuCapNhatRequest
             {
-                Code = transactionModel.Code,
-                IngredientId = transactionModel.IngredientId,
-                IngredientName = transactionModel.IngredientName,
-                Type = transactionModel.Type,
-                Quantity = transactionModel.Quantity,
-                Unit = transactionModel.Unit,
-                UnitCost = transactionModel.UnitCost,
-                CreatedAt = transactionModel.CreatedAt,
-                Note = transactionModel.Note
-            });
+                TenNguyenLieu = ingredientModel.TenNguyenLieu.Trim(),
+                DonViTinh = ingredientModel.DonViTinh.Trim(),
+                MucCanhBaoToiThieu = ingredientModel.MucCanhBaoToiThieu,
+                DangSuDung = ingredientModel.DangSuDung
+            }, pageCts.Token);
 
-            message = $"Đã tạo phiếu {transactionModel.Code}.";
-            dialog = "";
-            await Task.CompletedTask;
+            return $"Đã cập nhật nguyên liệu {saved.TenNguyenLieu}.";
         }
-        catch (Exception ex) { error = ex.Message; }
-        finally { saving = false; }
-    }
 
-    private async Task Delete()
-    {
-        if (saving || selected is null) return;
-
-        try
+        var created = await InventoryApi.CreateAsync(new NguyenLieuRequest
         {
-            saving = true;
-            error = null;
+            TenNguyenLieu = ingredientModel.TenNguyenLieu.Trim(),
+            DonViTinh = ingredientModel.DonViTinh.Trim(),
+            SoLuongTon = ingredientModel.SoLuongTon,
+            MucCanhBaoToiThieu = ingredientModel.MucCanhBaoToiThieu,
+            DangSuDung = true
+        }, pageCts.Token);
 
-            ingredients.RemoveAll(i => i.Code == selected);
-            message = "Đã xóa nguyên liệu.";
-            selected = null;
-            dialog = "";
-            await Task.CompletedTask;
-        }
-        catch (Exception ex) { error = ex.Message; }
-        finally { saving = false; }
+        selected = created.MaNguyenLieu;
+        return $"Đã thêm nguyên liệu {created.TenNguyenLieu}.";
+    });
+
+    private Task SaveTransaction() => Save(async () =>
+    {
+        var saved = await InventoryApi.TransactAsync(
+            transactionModel.MaNguyenLieu,
+            transactionModel.Loai,
+            new GiaoDichKhoRequest
+            {
+                SoLuong = transactionModel.SoLuong,
+                GhiChu = string.IsNullOrWhiteSpace(transactionModel.GhiChu) ? null : transactionModel.GhiChu.Trim()
+            },
+            pageCts.Token);
+
+        string verb = transactionModel.Loai == LoaiGiaoDichKho.XuatHuy ? "xuất hủy" : "nhập";
+        return $"Đã {verb} {Number(transactionModel.SoLuong ?? 0)} {saved.DonViTinh} {saved.TenNguyenLieu}. Tồn kho: {Number(saved.SoLuongTon)} {saved.DonViTinh}.";
+    });
+
+    private Task Delete() => Save(async () =>
+    {
+        var target = Selected!;
+        await InventoryApi.DeleteAsync(target.MaNguyenLieu, pageCts.Token);
+        selected = null;
+        return $"Đã ngừng sử dụng nguyên liệu {target.TenNguyenLieu}.";
+    });
+
+    public void Dispose()
+    {
+        pageCts.Cancel();
+        pageCts.Dispose();
     }
 }
-

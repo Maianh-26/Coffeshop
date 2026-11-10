@@ -1,68 +1,40 @@
-using System.Net.Http.Json;
 using CoffeeShop.Admin.Models;
 
 namespace CoffeeShop.Admin.Services;
 
 /// <summary>
-/// Service gọi API quản lý Topping và Kích cỡ size nước.
+/// Topping — api/v1/topping.
 /// </summary>
 public class ToppingService
 {
-    private readonly HttpClient _http;
+    private readonly ApiClient _api;
 
-    public ToppingService(HttpClient http)
+    public ToppingService(ApiClient api)
     {
-        _http = http;
+        _api = api;
     }
 
-    public async Task<List<Topping>> GetAllAsync()
-    {
-        return await _http.GetFromJsonAsync<List<Topping>>("api/toppings")
-               ?? [];
-    }
+    /// <param name="includeStopped">true = lấy cả topping đã ngừng bán (trang quản lý).</param>
+    /// <param name="ct">Hủy khi rời trang.</param>
+    public Task<List<Topping>> GetAllAsync(bool includeStopped = false, CancellationToken ct = default) =>
+        _api.GetAsync<List<Topping>>(Query.Build("api/v1/topping", ("baoGomNgungBan", includeStopped ? true : null)), ct);
 
-    public async Task<Topping?> GetByCodeAsync(string code)
-    {
-        return await _http.GetFromJsonAsync<Topping>(
-            $"api/toppings/{code}"
-        );
-    }
+    public Task<Topping> CreateAsync(ToppingRequest request, CancellationToken ct = default) =>
+        _api.PostAsync<Topping>("api/v1/topping", request, ct);
 
-    public async Task<Topping> CreateAsync(Topping topping)
-    {
-        var response = await _http.PostAsJsonAsync("api/toppings", topping);
-        response.EnsureSuccessStatusCode();
+    public Task<Topping> UpdateAsync(int id, ToppingRequest request, CancellationToken ct = default) =>
+        _api.PutAsync<Topping>($"api/v1/topping/{id}", request, ct);
 
-        return (await response.Content.ReadFromJsonAsync<Topping>())!;
-    }
+    public Task<Topping> SetAvailableAsync(int id, bool conHang, CancellationToken ct = default) =>
+        _api.PatchAsync<Topping>($"api/v1/topping/{id}/con-hang", new ConHangRequest { ConHang = conHang }, ct);
 
-    public async Task UpdateAsync(Topping topping)
-    {
-        var response = await _http.PutAsJsonAsync(
-            $"api/toppings/{topping.Code}",
-            topping
-        );
+    /// <summary>Xóa mềm: topping chuyển sang "Ngừng bán".</summary>
+    public Task DeleteAsync(int id, CancellationToken ct = default) =>
+        _api.DeleteAsync($"api/v1/topping/{id}", ct);
 
-        response.EnsureSuccessStatusCode();
-    }
+    public Task<List<CongThucDong>> GetRecipeAsync(int id, CancellationToken ct = default) =>
+        _api.GetAsync<List<CongThucDong>>($"api/v1/topping/{id}/cong-thuc", ct);
 
-    public async Task DeleteAsync(string code)
-    {
-        var response = await _http.DeleteAsync($"api/toppings/{code}");
-        response.EnsureSuccessStatusCode();
-    }
-
-    public async Task SaveRecipeAsync(
-        string toppingCode,
-        List<RecipeLine> recipe
-    )
-    {
-        var response = await _http.PutAsJsonAsync(
-            $"api/toppings/{toppingCode}/recipe",
-            recipe
-        );
-
-        response.EnsureSuccessStatusCode();
-    }
+    public Task<List<CongThucDong>> SaveRecipeAsync(int id, List<CongThucDongRequest> lines, CancellationToken ct = default) =>
+        _api.PutAsync<List<CongThucDong>>($"api/v1/topping/{id}/cong-thuc", lines, ct);
 }
-

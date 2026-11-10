@@ -1,16 +1,13 @@
 @page "/login"
 @layout AuthLayout
 @attribute [AllowAnonymous]
+@inject IConfiguration Configuration
 
 <PageTitle>Đăng nhập - Coffee Shop</PageTitle>
 
 <div class="auth-card">
 
     <h1>Đăng nhập</h1>
-
-    <p class="preview-note">
-        Hệ thống quản lý nội bộ dành cho nhân viên và quản lý quán cà phê.
-    </p>
 
     @if (error is not null)
     {
@@ -75,9 +72,17 @@
 
         </button>
 
-        <p class="auth-link">
-            <a href="forgot-password">Quên mật khẩu?</a>
-        </p>
+        @* Quên mật khẩu: backend chưa có API — tạm chỉ dùng được ở chế độ giả lập *@
+        @if (Configuration.GetValue("Api:UseMock", true))
+        {
+            <p class="auth-link">
+                <a href="forgot-password">Quên mật khẩu?</a>
+            </p>
+        }
+        else
+        {
+            <p class="auth-link form-note">Quên mật khẩu? Liên hệ chủ quán để được đặt lại.</p>
+        }
 
     </EditForm>
 

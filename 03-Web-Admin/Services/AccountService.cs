@@ -1,57 +1,26 @@
-using System.Net.Http.Json;
 using CoffeeShop.Admin.Models;
 
 namespace CoffeeShop.Admin.Services;
 
 /// <summary>
-/// Service gọi API tài khoản.
+/// Quản lý tài khoản (chỉ Quản lý) — api/v1/nguoi-dung. Không có xóa: khóa tài khoản bằng TrangThai = false.
 /// </summary>
 public class AccountService
 {
-    private readonly HttpClient _http;
+    private readonly ApiClient _api;
 
-    public AccountService(HttpClient http)
+    public AccountService(ApiClient api)
     {
-        _http = http;
+        _api = api;
     }
 
-    public async Task<List<Account>> GetAllAsync()
-    {
-        return await _http.GetFromJsonAsync<List<Account>>(
-            "api/accounts"
-        ) ?? [];
-    }
+    public Task<List<NguoiDung>> GetAllAsync(CancellationToken ct = default) =>
+        _api.GetAsync<List<NguoiDung>>("api/v1/nguoi-dung", ct);
 
-    public async Task<Account> CreateAsync(Account account)
-    {
-        var response = await _http.PostAsJsonAsync(
-            "api/accounts",
-            account
-        );
+    public Task<NguoiDung> CreateAsync(NguoiDungTaoRequest request, CancellationToken ct = default) =>
+        _api.PostAsync<NguoiDung>("api/v1/nguoi-dung", request, ct);
 
-        response.EnsureSuccessStatusCode();
-
-        return (await response.Content
-            .ReadFromJsonAsync<Account>())!;
-    }
-
-    public async Task UpdateAsync(Account account)
-    {
-        var response = await _http.PutAsJsonAsync(
-            $"api/accounts/{account.Code}",
-            account
-        );
-
-        response.EnsureSuccessStatusCode();
-    }
-
-    public async Task DeleteAsync(string code)
-    {
-        var response = await _http.DeleteAsync(
-            $"api/accounts/{code}"
-        );
-
-        response.EnsureSuccessStatusCode();
-    }
+    /// <summary>Sửa thông tin, đổi vai trò, khóa/mở khóa, đặt lại mật khẩu (trường null = giữ nguyên).</summary>
+    public Task<NguoiDung> UpdateAsync(int id, NguoiDungCapNhatRequest request, CancellationToken ct = default) =>
+        _api.PatchAsync<NguoiDung>($"api/v1/nguoi-dung/{id}", request, ct);
 }
-

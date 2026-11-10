@@ -1,57 +1,30 @@
-using System.Net.Http.Json;
 using CoffeeShop.Admin.Models;
 
 namespace CoffeeShop.Admin.Services;
 
 /// <summary>
-/// Service gọi API khuyến mãi.
+/// Khuyến mãi — api/v1/khuyen-mai.
 /// </summary>
 public class PromotionService
 {
-    private readonly HttpClient _http;
+    private readonly ApiClient _api;
 
-    public PromotionService(HttpClient http)
+    public PromotionService(ApiClient api)
     {
-        _http = http;
+        _api = api;
     }
 
-    public async Task<List<Promotion>> GetAllAsync()
-    {
-        return await _http.GetFromJsonAsync<List<Promotion>>(
-            "api/promotions"
-        ) ?? [];
-    }
+    public Task<List<KhuyenMai>> GetAllAsync(CancellationToken ct = default) =>
+        _api.GetAsync<List<KhuyenMai>>("api/v1/khuyen-mai", ct);
 
-    public async Task<Promotion> CreateAsync(Promotion promotion)
-    {
-        var response = await _http.PostAsJsonAsync(
-            "api/promotions",
-            promotion
-        );
+    public Task<KhuyenMai> CreateAsync(KhuyenMaiRequest request, CancellationToken ct = default) =>
+        _api.PostAsync<KhuyenMai>("api/v1/khuyen-mai", request, ct);
 
-        response.EnsureSuccessStatusCode();
+    /// <summary>Sửa toàn bộ; MaTenMons khác null thì thay danh sách món áp dụng.</summary>
+    public Task<KhuyenMai> UpdateAsync(int id, KhuyenMaiRequest request, CancellationToken ct = default) =>
+        _api.PutAsync<KhuyenMai>($"api/v1/khuyen-mai/{id}", request, ct);
 
-        return (await response.Content
-            .ReadFromJsonAsync<Promotion>())!;
-    }
-
-    public async Task UpdateAsync(Promotion promotion)
-    {
-        var response = await _http.PutAsJsonAsync(
-            $"api/promotions/{promotion.Code}",
-            promotion
-        );
-
-        response.EnsureSuccessStatusCode();
-    }
-
-    public async Task DeleteAsync(string code)
-    {
-        var response = await _http.DeleteAsync(
-            $"api/promotions/{code}"
-        );
-
-        response.EnsureSuccessStatusCode();
-    }
+    /// <summary>Xóa khuyến mãi: backend tự gỡ khỏi các món đang gắn.</summary>
+    public Task DeleteAsync(int id, CancellationToken ct = default) =>
+        _api.DeleteAsync($"api/v1/khuyen-mai/{id}", ct);
 }
-

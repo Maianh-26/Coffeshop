@@ -59,8 +59,6 @@
     --action-success-hover: #236326;
     --action-warning: #d97706;
     --action-warning-hover: #b45309;
-    --auth-from: #f0dfc8;
-    --auth-to: #dfbf9e;
 
     /* Bo góc */
     --r-sm: 6px;
@@ -72,7 +70,6 @@
     --shadow-sm: 0 1px 2px rgba(43, 33, 28, 0.05);
     --shadow-md: 0 6px 20px rgba(43, 33, 28, 0.08);
     --shadow-lg: 0 24px 64px rgba(43, 33, 28, 0.22);
-    --shadow-brand: 0 4px 12px rgba(137, 84, 58, 0.25);
 
     /* Viền focus khi dùng bàn phím */
     --focus-ring: 0 0 0 3px rgba(137, 84, 58, 0.28);
@@ -140,7 +137,8 @@ svg {
     height: 100dvh;
     position: sticky;
     top: 0;
-    padding: 18px 14px;
+    /* padding-top 14px + logo 48px → tâm logo (38px) thẳng tâm thanh tiêu đề cao 76px */
+    padding: 14px 14px 18px;
     background: var(--cream);
     z-index: 30;
     overflow-y: auto;
@@ -155,23 +153,19 @@ svg {
 }
 
 .brand-mark {
-    width: 68px;
-    height: 68px;
+    display: block;
+    width: 48px;
+    height: 48px;
     flex-shrink: 0;
+    border-radius: 50%;
+    /* Viền mảnh tách đĩa kem của logo khỏi nền kem của sidebar */
+    box-shadow: 0 0 0 1px var(--coffee-300);
 }
 
 .brand-name strong {
     display: block;
     font-size: 17px;
     white-space: nowrap;
-}
-
-.brand-name small {
-    display: block;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.8px;
-    margin-top: 7px;
 }
 
 .sidebar nav {
@@ -1003,37 +997,14 @@ tfoot td {
 }
 
 .auth-brand {
-    position: relative;
-    overflow: hidden;
     display: grid;
     place-items: center;
     padding: 40px;
-    background: linear-gradient( 135deg, var(--auth-from), var(--auth-to) );
+    background: var(--cream);
+    border-right: 1px solid var(--coffee-200);
 }
 
-    .auth-brand::before,
-    .auth-brand::after {
-        content: "";
-        position: absolute;
-        width: 150%;
-        height: 240px;
-        border-radius: 50%;
-        background: #fff4e333;
-        transform: rotate(-15deg);
-        bottom: -80px;
-        left: -30%;
-    }
-
-    .auth-brand::after {
-        bottom: 25%;
-        left: 30%;
-        transform: rotate(35deg);
-        background: #b9875420;
-    }
-
 .brand.large {
-    position: relative;
-    z-index: 1;
     flex-direction: column;
     text-align: center;
     margin: 0;
@@ -1041,20 +1012,17 @@ tfoot td {
 }
 
     .brand.large .brand-mark {
-        width: 250px;
-        height: 250px;
+        width: 260px;
+        height: 260px;
+        box-shadow: 0 0 0 1px var(--coffee-300), 0 0 0 10px var(--coffee-50);
     }
 
-    .brand.large .brand-name strong {
-        font-size: 34px;
-        color: var(--ink);
-    }
-
-    .brand.large .brand-name small {
-        font-size: 23px;
-        font-weight: 400;
-        letter-spacing: 0;
-    }
+.brand-caption {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--coffee-700);
+}
 
 .auth-main {
     display: grid;
@@ -1077,16 +1045,6 @@ tfoot td {
         margin: 0 0 24px;
         outline: none;
     }
-
-.preview-note {
-    padding: 8px 10px;
-    margin: 0 0 20px;
-    background: var(--coffee-50);
-    color: var(--coffee-700);
-    font-size: var(--fs-xs);
-    border-radius: var(--r-sm);
-    line-height: 1.6;
-}
 
 .auth-card .field label {
     font-size: 14px;
@@ -1168,11 +1126,6 @@ tfoot td {
         flex-basis: 195px;
     }
 
-    .brand-mark {
-        width: 56px;
-        height: 56px;
-    }
-
     .brand-name strong {
         font-size: 15px;
     }
@@ -1195,16 +1148,8 @@ tfoot td {
     }
 
     .brand.large .brand-mark {
-        width: 210px;
-        height: 210px;
-    }
-
-    .brand.large .brand-name strong {
-        font-size: 28px;
-    }
-
-    .brand.large .brand-name small {
-        font-size: 18px;
+        width: 220px;
+        height: 220px;
     }
 }
 
@@ -1354,7 +1299,9 @@ tfoot td {
 
     .auth-brand {
         padding: 18px;
-        min-height: 150px;
+        min-height: 0;
+        border-right: 0;
+        border-bottom: 1px solid var(--coffee-200);
     }
 
     .brand.large {
@@ -1364,17 +1311,14 @@ tfoot td {
     }
 
         .brand.large .brand-mark {
-            width: 90px;
-            height: 90px;
+            width: 84px;
+            height: 84px;
+            box-shadow: 0 0 0 1px var(--coffee-300);
         }
 
-        .brand.large .brand-name strong {
-            font-size: 24px;
-        }
-
-        .brand.large .brand-name small {
-            font-size: 15px;
-        }
+    .brand-caption {
+        font-size: 16px;
+    }
 
     .auth-main {
         padding: 18px;
@@ -2245,11 +2189,6 @@ textarea {
         background: var(--coffee-50);
     }
 
-/* Logo giữ font gốc: chữ chạy theo vòng tròn được canh cho Segoe UI, font rộng hơn sẽ bị cắt */
-.brand-mark text {
-    font-family: "Segoe UI", Arial, sans-serif;
-}
-
 .sidebar {
     border-right: 1px solid var(--coffee-200);
 }
@@ -2266,11 +2205,6 @@ textarea {
     font-weight: 500;
     transition: background-color var(--ease), color var(--ease);
 }
-
-    .nav-item.active {
-        color: white;
-        box-shadow: var(--shadow-brand);
-    }
 
     .nav-item:hover:not(.active) {
         background: var(--coffee-200);
@@ -2421,17 +2355,13 @@ tbody tr {
 
 /* Đăng nhập */
 .auth-card {
-    box-shadow: var(--shadow-md);
+    /* Thẻ phẳng, chỉ viền + bóng rất nhẹ — hợp với panel logo nền đặc bên trái */
+    box-shadow: var(--shadow-sm);
 }
 
     .auth-card h1 {
         font-weight: 700;
     }
-
-.preview-note {
-    font-size: var(--fs-xs);
-    color: var(--coffee-700);
-}
 
 /* Lỗi hệ thống của Blazor */
 #blazor-error-ui {
@@ -2498,11 +2428,34 @@ tbody tr {
     max-width: 500px;
 }
 
+/* Edge tự chèn nút "hiện mật khẩu" (mắt đen) và nút xóa vào ô nhập → trùng với nút mắt nâu của app.
+   Ẩn đi để mọi ô mật khẩu chỉ còn một nút ẩn/hiện. */
+input::-ms-reveal,
+input::-ms-clear {
+    display: none;
+}
+
+/* Trình duyệt tự điền (Chrome/Edge) tô nền xanh nhạt cho ô nhập → giữ nền và màu chữ của giao diện.
+   Dùng transition thay vì box-shadow inset để không làm mất viền focus. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--ink);
+    caret-color: var(--ink);
+    transition: background-color 600000s 0s, color 600000s 0s;
+}
+
 /* Nút ẩn/hiện mật khẩu luôn nằm giữa ô theo chiều dọc, kể cả khi vùng bấm được nới lên 44px */
 .password-field button {
     top: 50%;
     transform: translateY(-50%);
+    color: var(--coffee-600);
 }
+
+    .password-field button:hover {
+        color: var(--coffee-800);
+        background: var(--coffee-50);
+    }
 
 /* Khi tự cuộn tới khung chi tiết, chừa chỗ cho header đang dính trên đầu trang */
 .detail-panel {
@@ -2585,6 +2538,14 @@ tbody tr {
 @media (max-width: 650px) {
     .auth-shell {
         grid-template-columns: minmax(0, 1fr);
+        /* Dải logo chỉ cao vừa nội dung, phần còn lại cho form */
+        grid-template-rows: auto 1fr;
+        align-content: start;
+    }
+
+    /* Form nằm ngay dưới dải logo, không căn giữa dọc (tránh khoảng trống và bị bàn phím ảo đẩy) */
+    .auth-main {
+        align-items: start;
     }
 
     /* Menu đang ẩn thì không nhận focus bàn phím và không đọc bởi trình đọc màn hình */
@@ -2723,6 +2684,10 @@ tbody tr {
 .auth-back {
     text-align: center;
 }
+
+    .auth-back a {
+        gap: 4px;
+    }
 
 .dev-hint {
     margin: 0 0 16px;
@@ -2995,4 +2960,189 @@ a.sidebar-user {
     .orders-table td:nth-child(5) {
         display: none;
     }
+}
+
+/* =====================================================================
+   NỐI API BACKEND (api/v1): thành phần mới của các trang
+   ===================================================================== */
+
+/* Chỉ cho trình đọc màn hình */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Nhóm ô chọn trong form (giá theo size, món áp dụng, topping) */
+fieldset.field {
+    margin: 0 0 12px;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+    fieldset.field legend {
+        margin-bottom: 6px;
+        padding: 0;
+        font-size: var(--fs-sm);
+        font-weight: 600;
+        color: var(--ink-soft);
+    }
+
+.checkbox-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+}
+
+/* Thông báo có nút đóng và danh sách chi tiết (cảnh báo kho, thiếu nguyên liệu) */
+.alert-dismissible {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.alert-list {
+    margin: 6px 0 0;
+    padding-left: 18px;
+}
+
+/* Thanh thao tác chia hai đầu (trang Đơn hàng) */
+.action-bar-split {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.action-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.order-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+/* Khối thu tiền mặt */
+.cash-payment-box {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--warning-bg);
+    border-radius: var(--r-sm);
+    background: var(--surface-warm);
+}
+
+.cash-payment-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+    .cash-payment-head strong {
+        color: var(--warning);
+        font-size: var(--fs-sm);
+    }
+
+.qr-payment-box > strong {
+    color: var(--orange);
+    font-size: var(--fs-sm);
+}
+
+/* Hộp thoại tạo đơn tại quầy */
+.builder-title {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--ink);
+    font-size: var(--fs-sm);
+}
+
+.item-builder-card .builder-title {
+    color: var(--coffee-700);
+}
+
+.builder-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 6px;
+}
+
+/* Trang Món: giá theo từng size */
+.size-prices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+}
+
+.size-price {
+    white-space: nowrap;
+    font-size: var(--fs-sm);
+}
+
+    .size-price strong {
+        margin-right: 4px;
+        color: var(--coffee-700);
+    }
+
+    .size-price s {
+        margin-right: 4px;
+        color: var(--muted);
+    }
+
+    .size-price.is-short {
+        color: var(--danger);
+    }
+
+.size-price-editor {
+    display: grid;
+    gap: 6px;
+}
+
+.size-price-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(120px, 180px);
+    align-items: center;
+    gap: 10px;
+}
+
+@media (max-width: 480px) {
+    .size-price-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+}
+
+/* Ô tick / ô chọn trong form: không bị quy tắc ".field input { width: 100% }" kéo giãn
+   (lỗi làm vỡ hàng giá theo size, danh sách topping và món áp dụng) */
+.field input[type="checkbox"],
+.field input[type="radio"],
+.coffee-modal-body .field input[type="checkbox"],
+.coffee-modal-body .field input[type="radio"] {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.topping-checkbox-item span {
+    min-width: 0;
 }

@@ -15,14 +15,14 @@
 
     <aside class="sidebar @(menuOpen ? "open" : "")">
 
-        <a href="@Roles.HomeUrl(auth.User)">
+        <a href="@Roles.HomeUrl(auth.User)" aria-label="Coffee Shop – về trang chính">
             <Brand />
         </a>
 
         <nav aria-label="Điều hướng chính"
              @onclick="() => menuOpen = false">
 
-            @if (auth.User.IsInRole("Admin"))
+            @if (auth.User.IsInRole(Roles.Admin))
             {
                 @* Chủ quán: đầy đủ chức năng quản lý *@
                 <NavLink class="nav-item" href="" Match="NavLinkMatch.All">

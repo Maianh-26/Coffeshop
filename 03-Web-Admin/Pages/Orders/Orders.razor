@@ -1,22 +1,41 @@
 @page "/orders"
 @implements IDisposable
+@using Microsoft.Extensions.DependencyInjection
+@inject OrderService OrderApi
+@inject ProductService ProductApi
+@inject ToppingService ToppingApi
 @inject IJSRuntime JS
 @inject IConfiguration Configuration
+@inject IServiceProvider Services
+@inject ILogger<Orders> Logger
 
 <PageTitle>Đơn hàng - Coffee Shop</PageTitle>
 
 <!-- Banner thông báo kết quả thao tác / đơn mới -->
 @if (!string.IsNullOrEmpty(alertMessage))
 {
-    <div class="alert @alertType" role="status" style="margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
-        <span>@alertMessage</span>
-        <button type="button" class="icon-button" aria-label="Đóng thông báo" @onclick="() => alertMessage = null">
+    <div class="alert @alertType alert-dismissible" role="status">
+        <div>
+            <span>@alertMessage</span>
+
+            @if (stockWarnings.Count > 0)
+            {
+                <ul class="alert-list">
+                    @foreach (var w in stockWarnings)
+                    {
+                        <li>@w.TenNguyenLieu chỉ còn @Number(w.SoLuongTon) @w.DonViTinh (mức cảnh báo @Number(w.MucCanhBaoToiThieu))</li>
+                    }
+                </ul>
+            }
+        </div>
+
+        <button type="button" class="icon-button" aria-label="Đóng thông báo" @onclick="ClearAlert">
             <Icon Name="close" Size="14" />
         </button>
     </div>
 }
 
-<div class="orders-page master-detail-layout @(selected != null ? "has-detail" : "")">
+<div class="orders-page master-detail-layout @(SelectedOrder != null ? "has-detail" : "")">
 
     <!-- Cột trái: Bộ lọc, Thanh tác vụ và Danh sách đơn hàng -->
     <div class="master-panel">
@@ -31,8 +50,8 @@
 
                     <input @bind="search"
                            @bind:event="oninput"
-                           placeholder="Tìm mã đơn, bàn, món…"
-                           aria-label="Tìm đơn hàng theo mã đơn, bàn, thu ngân hoặc món" />
+                           placeholder="Tìm mã đơn, món, nhân viên…"
+                           aria-label="Tìm trong trang hiện tại theo mã đơn, món hoặc nhân viên" />
 
                 </div>
 
@@ -40,37 +59,24 @@
 
                     <input type="date"
                            aria-label="Từ ngày"
-                           @bind="fromDate" />
+                           @bind="fromDate"
+                           @bind:after="ApplyFilter" />
 
                     <span>–</span>
 
                     <input type="date"
                            aria-label="Đến ngày"
-                           @bind="toDate" />
+                           @bind="toDate"
+                           @bind:after="ApplyFilter" />
 
                 </div>
 
-                <select aria-label="Lọc trạng thái đơn" @bind="statusFilter">
-                    <option value="">Tất cả trạng thái đơn</option>
-                    <option>Chờ tiếp nhận</option>
-                    <option>Đang pha chế</option>
-                    <option>Hoàn thành</option>
-                    <option>Đã hủy</option>
+                <select aria-label="Lọc trạng thái đơn" @bind="statusFilter" @bind:after="ApplyFilter">
+                    <option value="">Tất cả trạng thái</option>
+                    <option value="@TrangThaiDon.Pending">@TrangThaiDon.Label(TrangThaiDon.Pending)</option>
+                    <option value="@TrangThaiDon.Paid">@TrangThaiDon.Label(TrangThaiDon.Paid)</option>
+                    <option value="@TrangThaiDon.Cancelled">@TrangThaiDon.Label(TrangThaiDon.Cancelled)</option>
                 </select>
-
-                <select aria-label="Lọc trạng thái thanh toán" @bind="paymentFilter">
-                    <option value="">Tất cả thanh toán</option>
-                    <option>Chưa thanh toán</option>
-                    <option>Đã thanh toán</option>
-                </select>
-
-                <button class="btn primary"
-                        @onclick="Filter">
-
-                    <Icon Name="filter" />
-                    Lọc
-
-                </button>
 
                 <button class="btn outline"
                         @onclick="Reset">
@@ -84,10 +90,10 @@
 
         </section>
 
-        <!-- Thanh thao tác: Tạo đơn, Sửa, Xóa và Realtime Tablet -->
-        <section class="panel action-bar" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+        <!-- Thanh thao tác: Tạo đơn tại quầy và tự động làm mới -->
+        <section class="panel action-bar action-bar-split">
 
-            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <div class="action-group">
 
                 <button class="btn primary"
                         @onclick="OpenCreateOrder">
@@ -97,48 +103,44 @@
 
                 </button>
 
-                <button class="btn outline"
-                        disabled="@(selected == null)"
-                        @onclick="OpenEditOrder">
+                @if (IsAdmin)
+                {
+                    <button class="btn danger-outline"
+                            disabled="@(SelectedOrder is not { TrangThaiThanhToan: not TrangThaiDon.Cancelled })"
+                            @onclick="OpenCancelOrder">
 
-                    <Icon Name="edit" />
-                    Sửa đơn
+                        <Icon Name="trash" />
+                        Hủy đơn
 
-                </button>
-
-                <button class="btn danger-outline"
-                        disabled="@(selected == null)"
-                        @onclick="OpenDeleteOrder">
-
-                    <Icon Name="trash" />
-                    Hủy đơn
-
-                </button>
+                    </button>
+                }
 
             </div>
 
-            <!-- Cơ chế Tự động làm mới từ Tablet -->
+            <!-- Tự động tải lại danh sách để thấy đơn mới từ Tablet -->
             <div class="realtime-controls">
 
                 <button type="button"
                         class="realtime-pill @(!autoRefreshEnabled ? "paused" : "")"
                         @onclick="ToggleAutoRefresh"
-                        title="Bật/Tắt tự động đồng bộ đơn mới từ Tablet">
+                        aria-pressed="@autoRefreshEnabled"
+                        title="Bật/Tắt tự động tải đơn mới từ Tablet (mỗi @RefreshSeconds giây)">
 
                     <span class="live-indicator" aria-hidden="true"></span>
-                    <span>@(autoRefreshEnabled ? "Tablet Realtime: Đang bật" : "Tablet Realtime: Tạm dừng")</span>
+                    <span>@(autoRefreshEnabled ? "Tự động cập nhật: Bật" : "Tự động cập nhật: Tắt")</span>
 
                 </button>
 
                 @* Công cụ thử nghiệm — chỉ hiện khi chạy với dữ liệu giả *@
-                @if (Configuration.GetValue("Api:UseMock", true))
+                @if (IsMock)
                 {
                     <button class="btn outline btn-compact"
+                            disabled="@loading"
                             @onclick="SimulateTabletOrder"
-                            title="Mô phỏng khách từ Tablet ở bàn bấm gửi đơn về thu ngân">
+                            title="Mô phỏng khách bấm gửi đơn trên Tablet">
 
                         <Icon Name="cup" Size="14" />
-                        Mô phỏng gửi đơn từ Tablet
+                        Mô phỏng đơn từ Tablet
 
                     </button>
                 }
@@ -146,6 +148,14 @@
             </div>
 
         </section>
+
+        @if (loadError is not null)
+        {
+            <p class="alert error" role="alert">
+                @loadError
+                <button type="button" class="text-button" @onclick="() => LoadOrders()">Thử lại</button>
+            </p>
+        }
 
         <!-- Danh sách đơn hàng -->
         <section class="panel list-panel">
@@ -160,11 +170,11 @@
                             <th>Mã đơn</th>
                             <th>Nguồn</th>
                             <th>Thời gian</th>
-                            <th>Bàn / Vị trí</th>
+                            <th>Nhân viên</th>
                             <th>Số món</th>
                             <th>Tổng tiền</th>
                             <th>Thanh toán</th>
-                            <th>Trạng thái đơn</th>
+                            <th>Trạng thái</th>
                         </tr>
 
                     </thead>
@@ -173,46 +183,40 @@
 
                         @foreach (var order in VisibleOrders)
                         {
-                            <tr class="selectable @(selected == order.Code ? "selected" : "")"
+                            <tr class="selectable @(selectedId == order.MaDonHang ? "selected" : "")"
                                 tabindex="0"
-                                @onclick="() => SelectOrder(order.Code)"
-                                @onclick:stopPropagation="true">
+                                @onclick="() => SelectOrder(order.MaDonHang)"
+                                @onkeydown="e => SelectKey(e, order.MaDonHang)">
 
                                 <td>
-                                    <strong>@order.Code</strong>
+                                    <strong>#@order.MaDonHang</strong>
                                 </td>
 
                                 <td>
-                                    <span class="badge @(order.Source == "Tablet" ? "purple" : "gray")">
-                                        @order.Source
+                                    <span class="badge @(order.MaNguoiDung is null ? "purple" : "gray")">
+                                        @order.Nguon
                                     </span>
                                 </td>
 
                                 <td>
-                                    @order.CreatedAt.ToString("HH:mm · dd/MM")
+                                    @order.ThoiGianTao.ToString("HH:mm · dd/MM")
+                                </td>
+
+                                <td>@(order.TenNhanVien ?? "—")</td>
+
+                                <td>
+                                    @order.SoPhan phần
                                 </td>
 
                                 <td>
-                                    <strong>@order.TableOrArea</strong>
+                                    <strong class="text-accent">@Money(order.TongTien)</strong>
                                 </td>
 
-                                <td>
-                                    @order.Items.Sum(i => i.Quantity) phần
-                                </td>
+                                <td>@PhuongThucThanhToans.Label(order.PhuongThucThanhToan)</td>
 
                                 <td>
-                                    <strong class="text-accent">@Money(order.Total)</strong>
-                                </td>
-
-                                <td>
-                                    <span class="badge @(order.PaymentStatus == "Đã thanh toán" ? "green" : "yellow")">
-                                        @order.PaymentStatus
-                                    </span>
-                                </td>
-
-                                <td>
-                                    <span class="badge @StatusBadgeColor(order.Status)">
-                                        @order.Status
+                                    <span class="badge @TrangThaiDon.Color(order.TrangThaiThanhToan)">
+                                        @TrangThaiDon.Label(order.TrangThaiThanhToan)
                                     </span>
                                 </td>
 
@@ -228,7 +232,9 @@
                                     <Icon Name="orders" Size="32" />
 
                                     <p>
-                                        Không tìm thấy đơn hàng nào phù hợp với bộ lọc.
+                                        @(loading && orders.Count == 0
+                                            ? "Đang tải đơn hàng…"
+                                            : "Không tìm thấy đơn hàng nào phù hợp với bộ lọc.")
                                     </p>
 
                                 </td>
@@ -245,15 +251,16 @@
             <div class="list-footer">
 
                 <span>
-                    @FilteredOrders.Count() đơn hàng
-                    @(selected == null ? "· Nhấp vào đơn hàng để xem chi tiết" : "")
-                    · Trang @(page)/@Pages
+                    @totalOrders đơn hàng
+                    @(SelectedOrder == null ? "· Nhấp vào đơn hàng để xem chi tiết" : "")
+                    · Trang @(page)/@totalPages
                 </span>
 
                 <div class="pagination">
 
                     <button class="page-button"
                             aria-label="Trang trước"
+                            disabled="@(page <= 1 || loading)"
                             @onclick="() => Move(-1)">
 
                         <Icon Name="left" Size="16" />
@@ -266,6 +273,7 @@
 
                     <button class="page-button"
                             aria-label="Trang sau"
+                            disabled="@(page >= totalPages || loading)"
                             @onclick="() => Move(1)">
 
                         <Icon Name="right" Size="16" />
@@ -280,34 +288,33 @@
 
     </div>
 
-    <!-- Cột phải: Ô CHỨC NĂNG CHI TIẾT ĐƠN HÀNG (Chỉ hiển thị khi đã chọn 1 đơn hàng) -->
-    @if (SelectedOrderDetail != null)
+    <!-- Cột phải: chi tiết đơn hàng (chỉ hiển thị khi đã chọn 1 đơn) -->
+    @if (SelectedOrder is { } detail)
     {
-        var detail = SelectedOrderDetail;
-
         <aside class="detail-panel panel">
 
             <div class="order-detail-header">
                 <div>
-                    <h3>Đơn hàng #@detail.Code</h3>
-                    <div style="display: flex; gap: 6px; align-items: center; margin-top: 4px;">
-                        <span class="badge @StatusBadgeColor(detail.Status)">
-                            @detail.Status
+                    <h3>Đơn hàng #@detail.MaDonHang</h3>
+                    <div class="order-badges">
+                        <span class="badge @TrangThaiDon.Color(detail.TrangThaiThanhToan)">
+                            @TrangThaiDon.Label(detail.TrangThaiThanhToan)
                         </span>
-                        <span class="badge @(detail.PaymentStatus == "Đã thanh toán" ? "green" : "yellow")">
-                            @detail.PaymentStatus
+                        <span class="badge @(detail.MaNguoiDung is null ? "purple" : "gray")">
+                            @detail.Nguon
                         </span>
-                        <span class="badge @(detail.Source == "Tablet" ? "purple" : "gray")">
-                            @detail.Source
-                        </span>
+                        @if (detail.DaHoanTien)
+                        {
+                            <span class="badge yellow">Đã hoàn tiền</span>
+                        }
                     </div>
                 </div>
 
                 <button type="button"
                         class="icon-button"
                         aria-label="Đóng chi tiết"
-                        title="Đóng khung chi tiết (trở về toàn màn hình)"
-                        @onclick="() => selected = null">
+                        title="Đóng khung chi tiết"
+                        @onclick="CloseDetail">
                     <Icon Name="close" Size="20" />
                 </button>
             </div>
@@ -316,99 +323,84 @@
             <div class="order-meta-info">
                 <div class="meta-item">
                     <span class="meta-label">Thời gian tạo:</span>
-                    <span class="meta-val">@detail.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                    <span class="meta-val">@detail.ThoiGianTao.ToString("dd/MM/yyyy HH:mm")</span>
                 </div>
                 <div class="meta-item">
-                    <span class="meta-label">Bàn / Vị trí:</span>
-                    <span class="meta-val">@detail.TableOrArea</span>
-                </div>
-                <div class="meta-item">
-                    <span class="meta-label">Thu ngân / Phụ trách:</span>
-                    <span class="meta-val">@detail.CashierName</span>
+                    <span class="meta-label">Người tạo đơn:</span>
+                    <span class="meta-val">@(detail.TenNhanVien ?? "Khách tự đặt trên Tablet")</span>
                 </div>
                 <div class="meta-item">
                     <span class="meta-label">Hình thức thanh toán:</span>
-                    <span class="meta-val">@detail.PaymentMethod</span>
+                    <span class="meta-val">@PhuongThucThanhToans.Label(detail.PhuongThucThanhToan)</span>
                 </div>
 
-                @if (detail.AcceptedAt.HasValue)
+                @if (detail.LyDoHuy is not null)
                 {
                     <div class="meta-item">
-                        <span class="meta-label">Thời gian tiếp nhận:</span>
-                        <span class="meta-val">@detail.AcceptedAt.Value.ToString("HH:mm:ss")</span>
+                        <span class="meta-label">Lý do hủy:</span>
+                        <span class="meta-val text-danger">@detail.LyDoHuy</span>
                     </div>
                 }
 
-                @if (detail.PaidAt.HasValue)
+                @if (detail.GioHoanTien.HasValue)
                 {
                     <div class="meta-item">
-                        <span class="meta-label">Thời gian thanh toán:</span>
-                        <span class="meta-val">@detail.PaidAt.Value.ToString("HH:mm:ss")</span>
+                        <span class="meta-label">Hoàn tiền lúc:</span>
+                        <span class="meta-val">@detail.GioHoanTien.Value.ToString("dd/MM/yyyy HH:mm")</span>
                     </div>
                 }
             </div>
 
-            <!-- Danh sách món đã đặt chi tiết gồm món, size, topping, giá -->
+            <!-- Danh sách món: tên + size, topping, ghi chú, giá -->
             <div class="order-items-section">
-                <h4>Chi tiết món đã đặt (@detail.Items.Sum(i => i.Quantity) phần)</h4>
+                <h4>Chi tiết món đã đặt (@detail.SoPhan phần)</h4>
 
                 <div class="order-items-list">
-                    @foreach (var item in detail.Items)
+                    @foreach (var item in detail.ChiTiet ?? [])
                     {
                         <div class="order-item-card">
                             <div class="item-main-row">
-                                <span class="item-name">@item.ProductName</span>
-                                <span class="item-qty">x@(item.Quantity)</span>
-                                <span class="item-total">@Money(item.TotalPrice)</span>
+                                <span class="item-name">@item.TenMonLuu</span>
+                                <span class="item-qty">x@(item.SoLuong)</span>
+                                <span class="item-total">@Money(item.ThanhTien)</span>
                             </div>
 
                             <div class="item-options">
                                 <div class="option-row">
-                                    <span class="opt-label">Kích cỡ:</span>
-                                    <span class="opt-val">@item.SizeName</span>
-                                    @if (item.SizeExtraPrice > 0)
+                                    <span class="opt-label">Topping:</span>
+                                    @if (item.Toppings.Count > 0)
                                     {
-                                        <span class="opt-price">(+@Money(item.SizeExtraPrice))</span>
-                                    }
-                                </div>
-
-                                @if (item.Toppings != null && item.Toppings.Count > 0)
-                                {
-                                    <div class="option-row">
-                                        <span class="opt-label">Topping:</span>
                                         <div class="toppings-tags">
                                             @foreach (var top in item.Toppings)
                                             {
                                                 <span class="topping-pill">
-                                                    + @top.ToppingName
-                                                    <strong>(+@Money(top.Price))</strong>
+                                                    + @top.TenToppingLuu
+                                                    <strong>(+@Money(top.DonGiaTopping))</strong>
                                                 </span>
                                             }
                                         </div>
-                                    </div>
-                                }
-                                else
-                                {
-                                    <div class="option-row">
-                                        <span class="opt-label">Topping:</span>
+                                    }
+                                    else
+                                    {
                                         <span class="opt-muted">Không chọn thêm</span>
-                                    </div>
-                                }
+                                    }
+                                </div>
 
-                                @if (!string.IsNullOrWhiteSpace(item.Note))
+                                @if (!string.IsNullOrWhiteSpace(item.GhiChu))
                                 {
                                     <div class="option-row">
                                         <span class="opt-label">Ghi chú:</span>
-                                        <span class="opt-note-text">@item.Note</span>
+                                        <span class="opt-note-text">@item.GhiChu</span>
                                     </div>
                                 }
 
                                 <div class="item-unit-calc">
-                                    Đơn giá: @Money(item.UnitPrice) / phần
-                                    @if (item.BasePrice > 0)
+                                    Đơn giá: @Money(item.DonGiaBan)
+                                    @if (item.Toppings.Count > 0)
                                     {
-                                        <span> · (Gốc @Money(item.BasePrice) + Phụ thu @Money(item.SizeExtraPrice + (item.Toppings?.Sum(t => t.Price) ?? 0)))</span>
+                                        <span> + topping @Money(item.Toppings.Sum(t => t.DonGiaTopping))</span>
                                     }
+                                    <span> / phần</span>
                                 </div>
                             </div>
                         </div>
@@ -416,89 +408,83 @@
                 </div>
             </div>
 
-            <!-- Bảng kê tổng tiền -->
+            <!-- Tổng tiền -->
             <div class="order-summary-box">
-                <div class="summary-line">
-                    <span>Tạm tính (tiền món gốc):</span>
-                    <span>@Money(detail.SubTotal)</span>
-                </div>
-
-                <div class="summary-line">
-                    <span>Phụ thu Size & Topping:</span>
-                    <span class="text-accent">+@Money(detail.ToppingTotal)</span>
-                </div>
-
-                @if (detail.DiscountAmount > 0)
-                {
-                    <div class="summary-line">
-                        <span>Giảm giá khuyến mãi:</span>
-                        <span class="text-danger">-@Money(detail.DiscountAmount)</span>
-                    </div>
-                }
-
                 <div class="summary-line total-line">
                     <strong>Tổng tiền hóa đơn</strong>
-                    <strong class="grand-total">@Money(detail.Total)</strong>
+                    <strong class="grand-total">@Money(detail.TongTien)</strong>
                 </div>
+                <p class="form-note">Giá đã gồm khuyến mãi của món tại thời điểm đặt.</p>
             </div>
 
-            <!-- KHỐI NGHIỆP VỤ: XÁC NHẬN THANH TOÁN & TIẾP NHẬN ĐƠN HÀNG -->
+            <!-- NGHIỆP VỤ: THANH TOÁN -->
             <div class="order-action-group">
 
-                <!-- 1. Tác vụ Tiếp nhận đơn hàng (nếu đang Chờ tiếp nhận) -->
-                @if (detail.Status == "Chờ tiếp nhận")
+                @if (detail.TrangThaiThanhToan == TrangThaiDon.Pending)
                 {
-                    <button type="button"
-                            class="btn primary btn-large"
-                            @onclick="() => AcceptOrder(detail)">
-                        <Icon Name="check" Size="18" />
-                        Tiếp nhận đơn hàng (Bắt đầu pha chế)
-                    </button>
-                }
+                    <div class="field">
+                        <label for="pay-method">Khách thanh toán bằng</label>
+                        <select id="pay-method" @bind="payMethod" disabled="@paying">
+                            <option value="@PhuongThucThanhToans.Cash">@PhuongThucThanhToans.Label(PhuongThucThanhToans.Cash)</option>
+                            <option value="@PhuongThucThanhToans.QrTransfer">@PhuongThucThanhToans.Label(PhuongThucThanhToans.QrTransfer)</option>
+                        </select>
+                    </div>
 
-                <!-- 2. Tác vụ Thanh toán (nếu Chưa thanh toán) -->
-                @if (detail.PaymentStatus != "Đã thanh toán" && detail.Status != "Đã hủy")
-                {
-                    @if (detail.PaymentMethod == "Tiền mặt")
+                    @if (payMethod == PhuongThucThanhToans.Cash)
                     {
-                        <!-- Khách thanh toán Tiền mặt -->
-                        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 12px; margin-top: 4px;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                                <strong style="color: #92400e; font-size: 13px;">Thu tiền mặt: @Money(detail.Total)</strong>
-                                <span class="badge yellow">Chưa thanh toán</span>
+                        <div class="cash-payment-box">
+                            <div class="cash-payment-head">
+                                <strong>Thu tiền mặt: @Money(detail.TongTien)</strong>
+                                <span class="badge orange">@TrangThaiDon.Label(TrangThaiDon.Pending)</span>
                             </div>
+
+                            <div class="field">
+                                <label for="cash-given">Tiền khách đưa (đ)</label>
+                                <input id="cash-given"
+                                       type="number"
+                                       min="0"
+                                       step="1000"
+                                       @bind="cashGiven"
+                                       @bind:event="oninput"
+                                       disabled="@paying" />
+                            </div>
+
+                            @if (cashGiven is { } given)
+                            {
+                                <p class="@(given < detail.TongTien ? "text-danger" : "form-note")">
+                                    @(given < detail.TongTien
+                                        ? $"Còn thiếu {Money(detail.TongTien - given)}."
+                                        : $"Tiền thừa trả khách: {Money(given - detail.TongTien)}.")
+                                </p>
+                            }
+
                             <button type="button"
                                     class="btn btn-success btn-large"
-                                    @onclick="() => ConfirmCashPayment(detail)">
+                                    disabled="@(paying || cashGiven < detail.TongTien)"
+                                    @onclick="() => Pay(detail)">
                                 <Icon Name="coins" Size="18" />
-                                Xác nhận đã thu đủ tiền mặt
+                                @(paying ? "Đang xác nhận…" : "Xác nhận đã thu tiền mặt")
                             </button>
                         </div>
                     }
                     else
                     {
-                        <!-- Khách thanh toán Quét mã QR -->
                         <div class="qr-payment-box">
-                            <strong style="color: #9a3412; font-size: 13px;">Mã QR chuyển khoản VietQR (@Money(detail.Total))</strong>
+                            <strong>Chuyển khoản VietQR (@Money(detail.TongTien))</strong>
 
-                            <div class="qr-code-canvas">
-                                <!-- SVG Mô phỏng mã QR tiêu chuẩn thanh toán ngân hàng -->
+                            <div class="qr-code-canvas" aria-hidden="true">
+                                <!-- Hình minh họa mã QR (chưa có cổng thanh toán thật) -->
                                 <svg class="qr-code-svg" viewBox="0 0 100 100">
                                     <rect width="100" height="100" fill="#ffffff" />
-                                    <!-- 3 góc QR định vị -->
                                     <rect x="5" y="5" width="28" height="28" fill="#1e293b" />
                                     <rect x="9" y="9" width="20" height="20" fill="#ffffff" />
                                     <rect x="13" y="13" width="12" height="12" fill="#89543a" />
-
                                     <rect x="67" y="5" width="28" height="28" fill="#1e293b" />
                                     <rect x="71" y="9" width="20" height="20" fill="#ffffff" />
                                     <rect x="75" y="13" width="12" height="12" fill="#89543a" />
-
                                     <rect x="5" y="67" width="28" height="28" fill="#1e293b" />
                                     <rect x="9" y="71" width="20" height="20" fill="#ffffff" />
                                     <rect x="13" y="75" width="12" height="12" fill="#89543a" />
-
-                                    <!-- Dữ liệu pixel QR ngẫu nhiên biểu trưng -->
                                     <rect x="38" y="10" width="6" height="6" fill="#1e293b" />
                                     <rect x="48" y="15" width="8" height="6" fill="#1e293b" />
                                     <rect x="38" y="25" width="18" height="6" fill="#89543a" />
@@ -520,40 +506,30 @@
                             </div>
 
                             <div class="qr-payment-info">
-                                <div>Nội dung: <strong>COFFEE @detail.Code</strong></div>
-                                <div>Số tiền: <strong>@Money(detail.Total)</strong></div>
+                                <div>Nội dung: <strong>COFFEE @detail.MaDonHang</strong></div>
+                                <div>Số tiền: <strong>@Money(detail.TongTien)</strong></div>
                             </div>
 
-                            <div class="qr-listening-pulse">
-                                <span class="live-indicator"></span>
-                                <span>Đang tự động lắng nghe quét mã từ khách...</span>
-                            </div>
+                            <p class="form-note">Kiểm tra tài khoản đã nhận tiền rồi bấm xác nhận.</p>
 
-                            <!-- Nút mô phỏng khách quét QR thành công (hệ thống tự động tiếp nhận & cập nhật đã thanh toán) -->
                             <button type="button"
-                                    class="btn btn-warning"
-                                    style="width: 100%; font-size: 13px;"
-                                    @onclick="() => SimulateQrSuccess(detail)">
-                                <Icon Name="check" Size="16" />
-                                Mô phỏng khách quét QR thành công
+                                    class="btn btn-success btn-large"
+                                    disabled="@paying"
+                                    @onclick="() => Pay(detail)">
+                                <Icon Name="check" Size="18" />
+                                @(paying ? "Đang xác nhận…" : "Xác nhận đã nhận chuyển khoản")
                             </button>
                         </div>
                     }
-                }
 
-                <!-- 3. Nút Hoàn thành đơn (khi đang pha chế và đã thanh toán) -->
-                @if (detail.Status == "Đang pha chế" && detail.PaymentStatus == "Đã thanh toán")
-                {
-                    <button type="button"
-                            class="btn btn-success btn-large"
-                            @onclick="() => CompleteOrder(detail)">
-                        <Icon Name="check" Size="18" />
-                        Hoàn thành đơn (Đã giao khách)
-                    </button>
+                    @if (payError is not null)
+                    {
+                        <p class="alert error" role="alert">@payError</p>
+                    }
                 }
 
                 <!-- Các nút hành động phụ -->
-                <div class="detail-actions" style="margin-top: 6px;">
+                <div class="detail-actions">
                     <button type="button"
                             class="btn primary"
                             @onclick="PrintReceipt">
@@ -563,7 +539,7 @@
 
                     <button type="button"
                             class="btn outline"
-                            @onclick="() => selected = null">
+                            @onclick="CloseDetail">
                         Đóng chi tiết
                     </button>
                 </div>
@@ -576,190 +552,180 @@
 </div>
 
 <!-- ========================================================================= -->
-<!-- MODAL THÊM / SỬA ĐƠN HÀNG (CRUD) -->
+<!-- MODAL TẠO ĐƠN TẠI QUẦY -->
 <!-- ========================================================================= -->
 @if (isOrderModalOpen)
 {
-    <Modal Title="@(isEditing ? $"Sửa đơn hàng #{draftOrder.Code}" : "Tạo đơn hàng mới tại quầy")"
-           OnClose="CloseOrderModal">
+    <Modal Title="Tạo đơn hàng tại quầy"
+           OnClose="CloseOrderModal"
+           Busy="@creating">
 
         <div class="order-modal-builder">
 
-            <!-- Thông tin đơn -->
+            @if (menuError is not null)
+            {
+                <p class="alert error" role="alert">@menuError</p>
+            }
+
             <div class="form-grid">
                 <div class="field">
-                    <label for="order-table">Bàn / Vị trí phục vụ *</label>
-                    <select id="order-table" @bind="draftOrder.TableOrArea">
-                        <option>Mang đi</option>
-                        <option>Bàn 01</option>
-                        <option>Bàn 02</option>
-                        <option>Bàn 03</option>
-                        <option>Bàn 04</option>
-                        <option>Bàn 05</option>
-                        <option>Bàn 06 (Sân vườn)</option>
-                        <option>Bàn 07 (Tầng 2)</option>
+                    <label for="order-payment">Hình thức thanh toán dự kiến</label>
+                    <select id="order-payment" @bind="draftPaymentMethod">
+                        <option value="@PhuongThucThanhToans.Cash">@PhuongThucThanhToans.Label(PhuongThucThanhToans.Cash)</option>
+                        <option value="@PhuongThucThanhToans.QrTransfer">@PhuongThucThanhToans.Label(PhuongThucThanhToans.QrTransfer)</option>
                     </select>
-                </div>
-
-                <div class="field">
-                    <label for="order-payment">Hình thức thanh toán *</label>
-                    <select id="order-payment" @bind="draftOrder.PaymentMethod">
-                        <option>Tiền mặt</option>
-                        <option>Chuyển khoản QR</option>
-                    </select>
-                </div>
-
-                <div class="field">
-                    <label for="order-cashier">Thu ngân phụ trách</label>
-                    <input id="order-cashier" @bind="draftOrder.CashierName" placeholder="Tên thu ngân" />
-                </div>
-
-                <div class="field">
-                    <label for="order-discount">Giảm giá / Ưu đãi (đ)</label>
-                    <input id="order-discount" type="number" min="0" step="1000" @bind="draftOrder.DiscountAmount" placeholder="0" />
-                </div>
-
-                <div class="field" style="grid-column: 1 / -1;">
-                    <label for="order-note">Ghi chú đơn hàng</label>
-                    <input id="order-note" @bind="draftOrder.Note" placeholder="Ví dụ: Khách vội, ít đá..." />
                 </div>
             </div>
 
-            <!-- Bộ công cụ thêm món vào đơn (Item Builder) -->
+            <!-- Bộ công cụ thêm món vào đơn -->
             <div class="item-builder-card">
-                <strong style="color: var(--brown); font-size: 13px;">Thêm món & Topping vào đơn</strong>
+                <strong class="builder-title">Thêm món & topping vào đơn</strong>
 
-                <div class="form-grid" style="margin-bottom: 8px;">
+                <div class="form-grid">
                     <div class="field">
                         <label for="builder-product">Chọn món</label>
-                        <select id="builder-product" @bind="builderProductCode" @bind:after="OnBuilderProductChanged">
-                            @foreach (var prod in availableProducts)
+                        <select id="builder-product" @bind="builderProductId" @bind:after="OnBuilderProductChanged">
+                            @if (menuLoading)
                             {
-                                <option value="@prod.Code">@prod.Name (@Money(prod.Price ?? 0))</option>
+                                <option value="0">Đang tải thực đơn…</option>
+                            }
+                            @foreach (var prod in menu)
+                            {
+                                <option value="@prod.MaTenMon">@prod.TenMon</option>
                             }
                         </select>
                     </div>
 
                     <div class="field">
                         <label for="builder-size">Kích cỡ</label>
-                        <select id="builder-size" @bind="builderSizeCode" @bind:after="OnBuilderSizeChanged">
-                            @foreach (var s in availableSizes)
+                        <select id="builder-size" @bind="builderSizeId">
+                            @foreach (var s in BuilderSizes)
                             {
-                                <option value="@s.Code">@s.Name (+@Money(s.ExtraPrice))</option>
+                                <option value="@s.MaChiTietMon">
+                                    @s.TenKichThuoc — @Money(s.GiaSauGiam)@(s.GiaSauGiam < s.GiaBan ? $" (gốc {Money(s.GiaBan)})" : "")
+                                </option>
                             }
                         </select>
                     </div>
 
                     <div class="field">
                         <label for="builder-quantity">Số lượng</label>
-                        <input id="builder-quantity" type="number" min="1" max="99" @bind="builderQuantity" />
+                        <input id="builder-quantity" type="number" min="1" max="50" @bind="builderQuantity" />
                     </div>
 
                     <div class="field">
                         <label for="builder-note">Ghi chú món</label>
-                        <input id="builder-note" @bind="builderNote" placeholder="70% đường, ít đá..." />
+                        <input id="builder-note" maxlength="255" @bind="builderNote" placeholder="70% đường, ít đá…" />
                     </div>
                 </div>
 
-                <!-- Chọn Topping -->
-                <div>
-                    <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 6px;">Chọn Topping thêm kèm món này:</label>
-                    <div class="toppings-picker-grid">
-                        @foreach (var top in availableToppings)
-                        {
-                            <label class="topping-checkbox-item">
-                                <input type="checkbox"
-                                       checked="@selectedToppingCodes.Contains(top.Code)"
-                                       @onchange="e => ToggleToppingInBuilder(top.Code, e)" />
-                                <span>@top.Name (+@Money(top.ExtraPrice))</span>
-                            </label>
-                        }
-                    </div>
-                </div>
+                @if (availableToppings.Count > 0)
+                {
+                    <fieldset class="field">
+                        <legend>Topping thêm (mỗi loại 1 phần/ly)</legend>
+                        <div class="toppings-picker-grid">
+                            @foreach (var top in availableToppings)
+                            {
+                                <label class="topping-checkbox-item">
+                                    <input type="checkbox"
+                                           checked="@selectedToppingIds.Contains(top.MaTopping)"
+                                           @onchange="e => ToggleTopping(top.MaTopping, e)" />
+                                    <span>@top.TenTopping (+@Money(top.GiaThem))</span>
+                                </label>
+                            }
+                        </div>
+                    </fieldset>
+                }
 
-                <div style="display: flex; justify-content: flex-end; margin-top: 6px;">
-                    <button type="button" class="btn outline" @onclick="AddItemToDraftOrder">
+                <div class="builder-actions">
+                    <button type="button" class="btn outline" disabled="@(BuilderSize is null)" @onclick="AddItemToDraft">
                         <Icon Name="plus" Size="14" />
-                        Thêm món này vào danh sách
+                        Thêm món này vào đơn
                     </button>
                 </div>
             </div>
 
-            <!-- Bảng danh sách món trong đơn đang tạo/sửa -->
+            <!-- Bảng các món trong đơn đang tạo -->
             <div>
-                <strong style="font-size: 13px; color: var(--ink);">Các món trong đơn (@draftOrder.Items.Count món):</strong>
+                <strong class="builder-title">Các món trong đơn (@draftLines.Count):</strong>
 
                 <div class="table-wrap builder-items-table">
                     <table>
                         <thead>
                             <tr>
-                                <th>Tên món & Size</th>
-                                <th>Topping thêm</th>
+                                <th>Món & size</th>
+                                <th>Topping</th>
                                 <th>Đơn giá</th>
                                 <th>SL</th>
                                 <th>Thành tiền</th>
-                                <th></th>
+                                <th><span class="sr-only">Bỏ món</span></th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var item in draftOrder.Items)
+                            @foreach (var line in draftLines)
                             {
                                 <tr>
                                     <td>
-                                        <strong>@item.ProductName</strong>
-                                        <div style="font-size: 11px; color: var(--muted);">@item.SizeName</div>
+                                        <strong>@line.TenMon</strong>
+                                        <div class="muted">@line.TenKichThuoc@(string.IsNullOrWhiteSpace(line.GhiChu) ? "" : $" · {line.GhiChu}")</div>
                                     </td>
                                     <td>
-                                        @if (item.Toppings != null && item.Toppings.Count > 0)
-                                        {
-                                            @string.Join(", ", item.Toppings.Select(t => t.ToppingName))
-                                        }
-                                        else
-                                        {
-                                            <span style="color: #999; font-style: italic;">Không</span>
-                                        }
+                                        @(line.Toppings.Count > 0 ? string.Join(", ", line.Toppings.Select(t => t.TenTopping)) : "Không")
                                     </td>
-                                    <td>@Money(item.UnitPrice)</td>
-                                    <td><strong>@item.Quantity</strong></td>
-                                    <td><strong class="text-accent">@Money(item.TotalPrice)</strong></td>
+                                    <td>@Money(line.DonGia)</td>
+                                    <td><strong>@line.SoLuong</strong></td>
+                                    <td><strong class="text-accent">@Money(line.ThanhTien)</strong></td>
                                     <td>
-                                        <button type="button" class="icon-button" aria-label="Bỏ @item.ProductName khỏi đơn" @onclick="() => draftOrder.Items.Remove(item)">
+                                        <button type="button" class="icon-button" aria-label="Bỏ @line.TenMon khỏi đơn" @onclick="() => draftLines.Remove(line)">
                                             <Icon Name="close" Size="14" />
                                         </button>
                                     </td>
                                 </tr>
                             }
 
-                            @if (draftOrder.Items.Count == 0)
+                            @if (draftLines.Count == 0)
                             {
                                 <tr>
-                                    <td colspan="6" style="text-align: center; color: #999; padding: 18px;">
-                                        Chưa có món nào. Vui lòng chọn món và bấm 'Thêm món này vào danh sách'.
+                                    <td colspan="6" class="empty-cell">
+                                        Chưa có món nào. Chọn món rồi bấm "Thêm món này vào đơn".
                                     </td>
                                 </tr>
                             }
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colspan="4" style="text-align: right; font-weight: 700;">Tổng cộng đơn hàng:</td>
-                                <td colspan="2"><strong class="grand-total small">@Money(draftOrder.Total)</strong></td>
+                                <td colspan="4">Tạm tính:</td>
+                                <td colspan="2"><strong class="grand-total small">@Money(draftLines.Sum(l => l.ThanhTien))</strong></td>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
+
+                <p class="form-note">Tổng tiền chính thức do máy chủ tính khi tạo đơn (áp khuyến mãi theo giờ hiện tại).</p>
             </div>
 
         </div>
 
         @if (orderModalError is not null)
         {
-            <p class="alert error modal-error" role="alert">@orderModalError</p>
+            <div class="alert error modal-error" role="alert">
+                <span>@orderModalError</span>
+                @if (shortages.Count > 0)
+                {
+                    <ul class="alert-list">
+                        @foreach (var s in shortages)
+                        {
+                            <li>@s.TenNguyenLieu: cần @Number(s.CanDung) @s.DonViTinh, còn @Number(s.ConTon) @s.DonViTinh</li>
+                        }
+                    </ul>
+                }
+            </div>
         }
 
         <div class="modal-footer">
-            <button type="button" class="btn outline" @onclick="CloseOrderModal">Hủy</button>
-            <button type="button" class="btn primary" @onclick="SaveDraftOrder">
-                @(isEditing ? "Lưu thay đổi" : "Tạo đơn hàng")
+            <button type="button" class="btn outline" disabled="@creating" @onclick="CloseOrderModal">Hủy</button>
+            <button type="button" class="btn primary" disabled="@(creating || draftLines.Count == 0)" @onclick="SaveDraftOrder">
+                @(creating ? "Đang tạo đơn…" : "Tạo đơn hàng")
             </button>
         </div>
 
@@ -767,608 +733,685 @@
 }
 
 <!-- ========================================================================= -->
-<!-- MODAL XÁC NHẬN HỦY / XÓA ĐƠN HÀNG -->
+<!-- MODAL HỦY ĐƠN (chỉ Quản lý) -->
 <!-- ========================================================================= -->
-@if (isDeleteModalOpen && SelectedOrderDetail != null)
+@if (isCancelModalOpen && SelectedOrder is { } toCancel)
 {
-    <Modal Title="Xác nhận hủy đơn hàng" OnClose="() => isDeleteModalOpen = false">
+    <Modal Title="Hủy đơn hàng" OnClose="CloseCancelModal" Busy="@cancelling">
         <p>
-            Bạn có chắc chắn muốn hủy đơn hàng <strong>#@SelectedOrderDetail.Code</strong> (@SelectedOrderDetail.TableOrArea - Tổng tiền @Money(SelectedOrderDetail.Total))?
-        </p>
-        <p class="form-note">
-            Thao tác này sẽ chuyển trạng thái đơn hàng sang 'Đã hủy'. Lịch sử đơn hàng vẫn được lưu trữ phục vụ đối soát.
+            Hủy đơn hàng <strong>#@toCancel.MaDonHang</strong> (tổng tiền @Money(toCancel.TongTien))?
         </p>
 
+        @if (toCancel.TrangThaiThanhToan == TrangThaiDon.Paid)
+        {
+            <p class="alert error">Đơn đã thanh toán — hệ thống sẽ đánh dấu <strong>hoàn tiền</strong> cho khách. Nguyên liệu đã dùng không được cộng lại kho.</p>
+        }
+
+        <div class="field">
+            <label for="cancel-reason">Lý do hủy *</label>
+            <textarea id="cancel-reason"
+                      rows="2"
+                      maxlength="255"
+                      @bind="cancelReason"
+                      @bind:event="oninput"
+                      placeholder="Ví dụ: Khách đổi ý, hết món…"></textarea>
+        </div>
+
+        @if (cancelError is not null)
+        {
+            <p class="alert error" role="alert">@cancelError</p>
+        }
+
         <div class="modal-footer">
-            <button type="button" class="btn outline" @onclick="() => isDeleteModalOpen = false">Đóng</button>
-            <button type="button" class="btn danger" @onclick="ConfirmCancelOrder">Xác nhận hủy đơn</button>
+            <button type="button" class="btn outline" disabled="@cancelling" @onclick="CloseCancelModal">Đóng</button>
+            <button type="button" class="btn danger" disabled="@(cancelling || string.IsNullOrWhiteSpace(cancelReason))" @onclick="ConfirmCancelOrder">
+                @(cancelling ? "Đang hủy…" : "Xác nhận hủy đơn")
+            </button>
         </div>
     </Modal>
 }
 
 @code {
-    private List<Order> orders = [];
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
 
+    private const int PageSize = 20;
+    private const int RefreshSeconds = 10;
+
+    private static readonly System.Globalization.CultureInfo Vi = new("vi-VN");
+
+    private readonly CancellationTokenSource pageCts = new();
+
+    // Danh sách (phân trang ở máy chủ)
+    private List<DonHang> orders = [];
+    private int totalOrders;
+    private int totalPages = 1;
+    private int page = 1;
+    private int lastSeenOrderId;
+    private bool loading;
+    private string? loadError;
+
+    // Bộ lọc
     private string search = "";
     private DateTime? fromDate;
     private DateTime? toDate;
     private string statusFilter = "";
-    private string paymentFilter = "";
 
-    private string? selected;
-    private int page = 1;
-    private const int PageSize = 10;
+    private int? selectedId;
 
+    // Đơn đang xem chi tiết — giữ riêng để không mất khi đơn trôi sang trang khác lúc tự làm mới
+    private DonHang? selectedOrder;
+
+    // Mỗi lần tải danh sách có token riêng: thao tác của người dùng hủy lần tải cũ (kể cả lượt làm mới nền)
+    private CancellationTokenSource? loadCts;
+    private bool isAdmin;
+
+    // Thông báo
     private string? alertMessage;
-
-    // Lỗi hiển thị bên trong hộp thoại tạo/sửa đơn
-    private string? orderModalError;
     private string alertType = "success";
+    private List<CanhBaoKho> stockWarnings = [];
 
-    // Quản lý cơ chế Realtime Auto-refresh
+    // Thanh toán
+    private string payMethod = PhuongThucThanhToans.Cash;
+    private decimal? cashGiven;
+    private bool paying;
+    private string? payError;
+
+    // Tự động làm mới
     private bool autoRefreshEnabled = true;
-    private System.Threading.Timer? autoRefreshTimer;
-    private int simulationCounter = 1;
+    private Timer? autoRefreshTimer;
 
-    // Quản lý Modal Tạo/Sửa đơn hàng
+    // Tạo đơn tại quầy
     private bool isOrderModalOpen;
-    private bool isEditing;
-    private bool isDeleteModalOpen;
-    private Order draftOrder = new();
-
-    // Dữ liệu dùng cho Item Builder
-    private List<Product> availableProducts = [];
-    private List<Topping> availableSizes = [];
+    private bool creating;
+    private bool menuLoading;
+    private string? menuError;
+    private string? orderModalError;
+    private List<ThieuNguyenLieu> shortages = [];
+    private List<Mon> menu = [];
     private List<Topping> availableToppings = [];
-
-    private string builderProductCode = "";
-    private string builderSizeCode = "";
+    private List<DraftLine> draftLines = [];
+    private string draftPaymentMethod = PhuongThucThanhToans.Cash;
+    private int builderProductId;
+    private int builderSizeId;
     private int builderQuantity = 1;
     private string builderNote = "";
-    private HashSet<string> selectedToppingCodes = new();
+    private HashSet<int> selectedToppingIds = [];
 
-    private static readonly System.Globalization.CultureInfo Vi = new("vi-VN");
+    // Hủy đơn
+    private bool isCancelModalOpen;
+    private bool cancelling;
+    private string cancelReason = "";
+    private string? cancelError;
 
-    private static string Money(decimal value)
+    /// <summary>Một dòng món trong đơn đang tạo (hiển thị tạm tính; giá chính thức do backend tính).</summary>
+    private sealed record DraftLine(
+        int MaChiTietMon,
+        string TenMon,
+        string TenKichThuoc,
+        decimal GiaSize,
+        int SoLuong,
+        string? GhiChu,
+        List<Topping> Toppings)
     {
-        return value.ToString("N0", Vi) + " đ";
+        public decimal DonGia => GiaSize + Toppings.Sum(t => t.GiaThem);
+        public decimal ThanhTien => DonGia * SoLuong;
     }
 
-    private Order? SelectedOrderDetail =>
-        orders.FirstOrDefault(o => o.Code == selected);
+    private bool IsAdmin => isAdmin;
 
-    private static string StatusBadgeColor(string status) => status switch
+    private bool IsMock => Configuration.GetValue("Api:UseMock", true);
+
+    private static string Money(decimal value) => value.ToString("N0", Vi) + " đ";
+
+    private static string Number(decimal value) => value.ToString("#,##0.##", Vi);
+
+    private DonHang? SelectedOrder => selectedOrder;
+
+    /// <summary>Tìm nhanh trong trang đang hiển thị (máy chủ chưa hỗ trợ tìm theo từ khóa).</summary>
+    private List<DonHang> VisibleOrders =>
+        string.IsNullOrWhiteSpace(search)
+            ? orders
+            : orders.Where(o =>
+                    o.MaDonHang.ToString().Contains(search.Trim().TrimStart('#'), StringComparison.OrdinalIgnoreCase)
+                    || (o.TenNhanVien?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (o.ChiTiet?.Any(c => c.TenMonLuu.Contains(search, StringComparison.OrdinalIgnoreCase)) ?? false))
+                .ToList();
+
+    private Mon? BuilderProduct => menu.FirstOrDefault(m => m.MaTenMon == builderProductId);
+
+    private List<GiaTheoSize> BuilderSizes =>
+        BuilderProduct?.KichThuoc.Where(s => s.DangApDung && s.DuNguyenLieu).ToList() ?? [];
+
+    private GiaTheoSize? BuilderSize => BuilderSizes.FirstOrDefault(s => s.MaChiTietMon == builderSizeId);
+
+    protected override async Task OnInitializedAsync()
     {
-        "Chờ tiếp nhận" => "orange",
-        "Đang pha chế" => "blue",
-        "Hoàn thành" => "green",
-        "Đã hủy" => "red",
-        _ => "gray"
-    };
-
-    protected override void OnInitialized()
-    {
-        InitCatalog();
-        InitSampleOrders();
-
-        // Khởi động Timer tự động làm mới mỗi 4 giây
-        autoRefreshTimer = new System.Threading.Timer(_ =>
+        if (AuthState is not null)
         {
-            if (autoRefreshEnabled)
+            isAdmin = (await AuthState).User.IsInRole(Roles.Admin);
+        }
+
+        await LoadOrders();
+
+        // Rời trang khi lần tải đầu chưa xong → Dispose đã chạy, không tạo timer nữa
+        if (pageCts.IsCancellationRequested) return;
+
+        autoRefreshTimer = new Timer(_ => _ = InvokeAsync(AutoRefresh), null,
+            TimeSpan.FromSeconds(RefreshSeconds), TimeSpan.FromSeconds(RefreshSeconds));
+    }
+
+    // =========================================================================
+    // TẢI DANH SÁCH
+    // =========================================================================
+
+    /// <param name="quiet">
+    /// true = lượt làm mới nền: bỏ qua nếu đang tải, không xóa lỗi đang hiện.
+    /// false = thao tác của người dùng: hủy lần tải đang chạy và tải theo bộ lọc / trang mới nhất.
+    /// </param>
+    private async Task LoadOrders(bool quiet = false)
+    {
+        if (quiet && loading) return;
+
+        loadCts?.Cancel();
+        loadCts?.Dispose();
+
+        CancellationTokenSource cts;
+
+        try
+        {
+            cts = CancellationTokenSource.CreateLinkedTokenSource(pageCts.Token);
+        }
+        catch (ObjectDisposedException)
+        {
+            return; // trang đã đóng
+        }
+
+        loadCts = cts;
+        loading = true;
+
+        if (!quiet)
+        {
+            loadError = null;
+        }
+
+        try
+        {
+            var result = await OrderApi.GetPageAsync(
+                page, PageSize,
+                statusFilter == "" ? null : statusFilter,
+                fromDate, toDate,
+                cts.Token);
+
+            orders = result.Data;
+            totalOrders = result.Meta.Total;
+            totalPages = Math.Max(1, result.Meta.TotalPages);
+            loadError = null;
+
+            await RefreshSelected(cts.Token);
+
+            // Báo đơn mới từ Tablet (so với mã đơn lớn nhất đã thấy)
+            int maxId = orders.Count == 0 ? 0 : orders.Max(o => o.MaDonHang);
+            int newTablet = orders.Count(o => o.MaDonHang > lastSeenOrderId && o.MaNguoiDung is null);
+
+            // Không đè thông báo thanh toán đang kèm cảnh báo kho
+            if (lastSeenOrderId > 0 && newTablet > 0 && stockWarnings.Count == 0)
             {
-                InvokeAsync(StateHasChanged);
+                ShowAlert($"Có {newTablet} đơn mới từ Tablet!", "success");
             }
-        }, null, 4000, 4000);
-    }
 
-    private void InitCatalog()
-    {
-        availableProducts = new List<Product>
+            lastSeenOrderId = Math.Max(lastSeenOrderId, maxId);
+        }
+        catch (ApiException ex)
         {
-            new Product { Code = "SP0001", Name = "Cà phê sữa đá", Price = 29000 },
-            new Product { Code = "SP0002", Name = "Bạc xỉu", Price = 32000 },
-            new Product { Code = "SP0003", Name = "Trà sữa Oolong nướng", Price = 42000 },
-            new Product { Code = "SP0004", Name = "Trà đào cam sả", Price = 39000 },
-            new Product { Code = "SP0005", Name = "Trà sữa Matcha Nhật", Price = 45000 },
-            new Product { Code = "SP0006", Name = "Cà phê đen đá", Price = 25000 }
-        };
-
-        availableSizes = new List<Topping>
-        {
-            new Topping { Code = "SZ-M", Name = "Size M (Vừa 500ml)", Type = "Size", ExtraPrice = 0 },
-            new Topping { Code = "SZ-L", Name = "Size L (Lớn 700ml)", Type = "Size", ExtraPrice = 6000 },
-            new Topping { Code = "SZ-XL", Name = "Size XL (Khổng lồ 1000ml)", Type = "Size", ExtraPrice = 12000 }
-        };
-
-        availableToppings = new List<Topping>
-        {
-            new Topping { Code = "TP-TC", Name = "Trân châu đen", Type = "Topping", ExtraPrice = 8000 },
-            new Topping { Code = "TP-TCTRANG", Name = "Trân châu trắng", Type = "Topping", ExtraPrice = 8000 },
-            new Topping { Code = "TP-KEM", Name = "Kem Cheese", Type = "Topping", ExtraPrice = 10000 },
-            new Topping { Code = "TP-FLAN", Name = "Pudding trứng", Type = "Topping", ExtraPrice = 10000 },
-            new Topping { Code = "TP-THACH", Name = "Thạch nha đam", Type = "Topping", ExtraPrice = 6000 }
-        };
-    }
-
-    private void InitSampleOrders()
-    {
-        orders = new List<Order>
-        {
-            new Order
+            if (!cts.IsCancellationRequested)
             {
-                Code = "DH00125",
-                CreatedAt = DateTime.Now.AddMinutes(-5),
-                Status = "Chờ tiếp nhận",
-                PaymentStatus = "Chưa thanh toán",
-                CashierName = "Tablet (Khách gọi)",
-                TableOrArea = "Bàn 04 (Tầng 1)",
-                PaymentMethod = "Tiền mặt",
-                Source = "Tablet",
-                Items = new List<OrderItem>
-                {
-                    new OrderItem
-                    {
-                        ProductCode = "SP0003",
-                        ProductName = "Trà sữa Oolong nướng",
-                        BasePrice = 42000,
-                        Quantity = 1,
-                        SizeName = "Size L (Lớn 700ml)",
-                        SizeExtraPrice = 6000,
-                        Note = "50% đường, ít đá",
-                        Toppings = new List<OrderItemTopping>
-                        {
-                            new OrderItemTopping { ToppingCode = "TP-TC", ToppingName = "Trân châu đen", Price = 8000 },
-                            new OrderItemTopping { ToppingCode = "TP-KEM", ToppingName = "Kem Cheese", Price = 10000 }
-                        }
-                    },
-                    new OrderItem
-                    {
-                        ProductCode = "SP0001",
-                        ProductName = "Cà phê sữa đá",
-                        BasePrice = 29000,
-                        Quantity = 1,
-                        SizeName = "Size M (Vừa 500ml)",
-                        SizeExtraPrice = 0,
-                        Note = "Nhiều sữa ít ngọt",
-                        Toppings = new List<OrderItemTopping>
-                        {
-                            new OrderItemTopping { ToppingCode = "TP-THACH", ToppingName = "Thạch nha đam", Price = 6000 }
-                        }
-                    }
-                }
-            },
-            new Order
-            {
-                Code = "DH00124",
-                CreatedAt = DateTime.Now.AddMinutes(-20),
-                AcceptedAt = DateTime.Now.AddMinutes(-18),
-                Status = "Đang pha chế",
-                PaymentStatus = "Chưa thanh toán",
-                CashierName = "Tablet (Khách gọi)",
-                TableOrArea = "Bàn 02 (Sân vườn)",
-                PaymentMethod = "Chuyển khoản QR",
-                Source = "Tablet",
-                Items = new List<OrderItem>
-                {
-                    new OrderItem
-                    {
-                        ProductCode = "SP0004",
-                        ProductName = "Trà đào cam sả",
-                        BasePrice = 39000,
-                        Quantity = 2,
-                        SizeName = "Size L (Lớn 700ml)",
-                        SizeExtraPrice = 6000,
-                        Note = "Đậm vị đào",
-                        Toppings = new List<OrderItemTopping>
-                        {
-                            new OrderItemTopping { ToppingCode = "TP-THACH", ToppingName = "Thạch nha đam", Price = 6000 },
-                            new OrderItemTopping { ToppingCode = "TP-TCTRANG", ToppingName = "Trân châu trắng", Price = 8000 }
-                        }
-                    }
-                }
-            },
-            new Order
-            {
-                Code = "DH00123",
-                CreatedAt = DateTime.Now.AddHours(-1),
-                AcceptedAt = DateTime.Now.AddHours(-1).AddMinutes(2),
-                PaidAt = DateTime.Now.AddHours(-1).AddMinutes(5),
-                Status = "Hoàn thành",
-                PaymentStatus = "Đã thanh toán",
-                CashierName = "Nguyễn Thu Hà",
-                TableOrArea = "Mang đi",
-                PaymentMethod = "Tiền mặt",
-                Source = "Tại quầy",
-                Items = new List<OrderItem>
-                {
-                    new OrderItem
-                    {
-                        ProductCode = "SP0001",
-                        ProductName = "Cà phê sữa đá",
-                        BasePrice = 29000,
-                        Quantity = 2,
-                        SizeName = "Size M (Vừa 500ml)",
-                        SizeExtraPrice = 0,
-                        Toppings = new List<OrderItemTopping>()
-                    }
-                }
+                loadError = ex.Message;
             }
-        };
-
-        // Mặc định không chọn đơn hàng nào để hiển thị danh sách 100% toàn màn hình theo đúng yêu cầu!
-        selected = null;
-    }
-
-    private IEnumerable<Order> FilteredOrders =>
-        orders.Where(o =>
-            (search == ""
-             || o.Code.Contains(search, StringComparison.OrdinalIgnoreCase)
-             || (o.CashierName != null && o.CashierName.Contains(search, StringComparison.OrdinalIgnoreCase))
-             || (o.TableOrArea != null && o.TableOrArea.Contains(search, StringComparison.OrdinalIgnoreCase))
-             || o.Items.Any(i => i.ProductName.Contains(search, StringComparison.OrdinalIgnoreCase)))
-            && (!fromDate.HasValue || o.CreatedAt.Date >= fromDate.Value.Date)
-            && (!toDate.HasValue || o.CreatedAt.Date <= toDate.Value.Date)
-            && (statusFilter == "" || o.Status == statusFilter)
-            && (paymentFilter == "" || o.PaymentStatus == paymentFilter)
-        ).OrderByDescending(o => o.CreatedAt);
-
-    private List<Order> VisibleOrders =>
-        FilteredOrders
-            .Skip((page - 1) * PageSize)
-            .Take(PageSize)
-            .ToList();
-
-    private int Pages =>
-        Math.Max(1, (int)Math.Ceiling(FilteredOrders.Count() / (double)PageSize));
-
-    // Cờ yêu cầu cuộn tới khung chi tiết sau khi vẽ lại (màn hình hẹp)
-    private bool scrollToDetail;
-
-    private void SelectOrder(string code)
-    {
-        // Nhấp vào đơn hàng: hiển thị khung chi tiết bên phải
-        // (trên màn hình hẹp khung chi tiết nằm dưới danh sách → cuộn tới đó)
-        selected = code;
-        scrollToDetail = true;
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (scrollToDetail)
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
-            scrollToDetail = false;
-
-            try
+            // Bị thay bởi lần tải mới hơn, hoặc rời trang
+        }
+        finally
+        {
+            // Chỉ lần tải mới nhất mới được tắt cờ "đang tải"
+            if (loadCts == cts)
             {
-                await JS.InvokeVoidAsync("appHelpers.scrollIntoViewOnNarrow", ".detail-panel", 1000);
-            }
-            catch (JSException)
-            {
-                // Cuộn chỉ là tiện ích: nếu trình duyệt còn app.js cũ thì bỏ qua, không làm sập trang
+                loading = false;
             }
         }
     }
 
-    private void Filter()
+    /// <summary>
+    /// Cập nhật đơn đang xem: lấy từ trang vừa tải, nếu đơn không còn trong trang thì hỏi riêng máy chủ.
+    /// </summary>
+    private async Task RefreshSelected(CancellationToken ct)
     {
-        page = 1;
+        if (selectedId is not { } id) return;
+
+        var inPage = orders.FirstOrDefault(o => o.MaDonHang == id);
+
+        if (inPage is not null)
+        {
+            selectedOrder = inPage;
+            return;
+        }
+
+        try
+        {
+            selectedOrder = await OrderApi.GetAsync(id, ct);
+        }
+        catch (ApiException)
+        {
+            // Giữ bản đang hiển thị; lần làm mới sau sẽ thử lại
+        }
     }
 
-    private void Reset()
+    private async Task AutoRefresh()
+    {
+        // Không làm mới khi đang thao tác (tránh danh sách nhảy dưới tay người dùng)
+        if (!autoRefreshEnabled || loading || paying || creating || cancelling
+            || isOrderModalOpen || isCancelModalOpen || pageCts.IsCancellationRequested)
+        {
+            return;
+        }
+
+        await LoadOrders(quiet: true);
+        StateHasChanged();
+    }
+
+    private async Task ApplyFilter()
+    {
+        if (fromDate.HasValue && toDate.HasValue && toDate < fromDate)
+        {
+            loadError = "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.";
+            return;
+        }
+
+        page = 1;
+        await LoadOrders();
+    }
+
+    private async Task Reset()
     {
         search = "";
         fromDate = null;
         toDate = null;
         statusFilter = "";
-        paymentFilter = "";
         page = 1;
+        await LoadOrders();
     }
 
-    private void Move(int direction)
+    private async Task Move(int direction)
     {
         int next = page + direction;
-        if (next >= 1 && next <= Pages) page = next;
+        if (next < 1 || next > totalPages) return;
+
+        page = next;
+        await LoadOrders();
     }
-
-    // =========================================================================
-    // NGHIỆP VỤ: TIẾP NHẬN ĐƠN HÀNG & XÁC NHẬN THANH TOÁN
-    // =========================================================================
-
-    private void AcceptOrder(Order order)
-    {
-        order.Status = "Đang pha chế";
-        order.AcceptedAt = DateTime.Now;
-        ShowAlert($"Đã tiếp nhận đơn hàng #{order.Code}! Bộ phận pha chế đã bắt đầu làm món.", "success");
-    }
-
-    private void ConfirmCashPayment(Order order)
-    {
-        order.PaymentStatus = "Đã thanh toán";
-        order.PaidAt = DateTime.Now;
-
-        // Nếu đơn đang chờ tiếp nhận, tự động chuyển sang Đang pha chế
-        if (order.Status == "Chờ tiếp nhận")
-        {
-            order.Status = "Đang pha chế";
-            order.AcceptedAt = DateTime.Now;
-        }
-
-        ShowAlert($"Đã xác nhận thu đủ tiền mặt {Money(order.Total)} cho đơn hàng #{order.Code}!", "success");
-    }
-
-    private void SimulateQrSuccess(Order order)
-    {
-        order.PaymentStatus = "Đã thanh toán";
-        order.PaidAt = DateTime.Now;
-
-        // Tự động tiếp nhận đơn hàng đúng như yêu cầu nghiệp vụ
-        if (order.Status == "Chờ tiếp nhận")
-        {
-            order.Status = "Đang pha chế";
-            order.AcceptedAt = DateTime.Now;
-        }
-
-        ShowAlert($"Khách đã quét mã QR thành công! Đơn #{order.Code} đã chuyển sang 'Đã thanh toán' và tự động tiếp nhận pha chế.", "success");
-    }
-
-    private void CompleteOrder(Order order)
-    {
-        order.Status = "Hoàn thành";
-        ShowAlert($"Đơn hàng #{order.Code} đã hoàn tất và giao thành công cho khách!", "success");
-    }
-
-    // =========================================================================
-    // TỰ ĐỘNG LÀM MỚI & MÔ PHỎNG TABLET GỬI ĐƠN VỀ
-    // =========================================================================
 
     private void ToggleAutoRefresh()
     {
         autoRefreshEnabled = !autoRefreshEnabled;
-        ShowAlert(autoRefreshEnabled ? "Đã bật chế độ tự động đồng bộ đơn từ Tablet (Realtime)." : "Đã tạm dừng tự động đồng bộ đơn từ Tablet.", "success");
+        ShowAlert(autoRefreshEnabled
+            ? $"Đã bật tự động cập nhật đơn mới (mỗi {RefreshSeconds} giây)."
+            : "Đã tắt tự động cập nhật. Bấm Đặt lại hoặc đổi trang để tải lại danh sách.", "success");
     }
 
-    private void SimulateTabletOrder()
+    /// <summary>Chế độ giả lập: yêu cầu API giả sinh một đơn tablet rồi tải lại danh sách.</summary>
+    private async Task SimulateTabletOrder()
     {
-        string newCode = $"DH{125 + simulationCounter:D5}";
-        simulationCounter++;
-
-        var random = new Random();
-        int tableNum = random.Next(1, 9);
-
-        var newOrder = new Order
+        if (Services.GetService<CoffeeShop.Admin.Services.Mock.MockDatabase>() is { } mock)
         {
-            Code = newCode,
-            CreatedAt = DateTime.Now,
-            Status = "Chờ tiếp nhận",
-            PaymentStatus = "Chưa thanh toán",
-            CashierName = "Tablet (Khách gọi)",
-            TableOrArea = $"Bàn 0{tableNum}",
-            PaymentMethod = random.Next(0, 2) == 0 ? "Tiền mặt" : "Chuyển khoản QR",
-            Source = "Tablet",
-            Note = "Đơn mới chuyển từ Tablet",
-            Items = new List<OrderItem>
+            mock.TabletOrderRequested = true;
+            page = 1;
+            await LoadOrders();
+        }
+    }
+
+    // =========================================================================
+    // CHỌN ĐƠN & THANH TOÁN
+    // =========================================================================
+
+    // Cờ yêu cầu cuộn tới khung chi tiết sau khi vẽ lại (màn hình hẹp)
+    private bool scrollToDetail;
+
+    private void SelectOrder(int id)
+    {
+        if (selectedId != id)
+        {
+            var order = orders.FirstOrDefault(o => o.MaDonHang == id);
+            payMethod = order?.PhuongThucThanhToan ?? PhuongThucThanhToans.Cash;
+            cashGiven = null;
+            payError = null;
+        }
+
+        selectedId = id;
+        selectedOrder = orders.FirstOrDefault(o => o.MaDonHang == id) ?? (selectedOrder?.MaDonHang == id ? selectedOrder : null);
+        scrollToDetail = true;
+    }
+
+    private void SelectKey(KeyboardEventArgs e, int id)
+    {
+        if (e.Key is "Enter" or " ") SelectOrder(id);
+    }
+
+    private void CloseDetail()
+    {
+        selectedId = null;
+        selectedOrder = null;
+        payError = null;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!scrollToDetail) return;
+
+        scrollToDetail = false;
+
+        try
+        {
+            await JS.InvokeVoidAsync("appHelpers.scrollIntoViewOnNarrow", ".detail-panel", 1000);
+        }
+        catch (JSException)
+        {
+            // Cuộn chỉ là tiện ích: nếu trình duyệt còn app.js cũ thì bỏ qua, không làm sập trang
+        }
+    }
+
+    private async Task Pay(DonHang order)
+    {
+        if (paying) return;
+
+        paying = true;
+        payError = null;
+
+        try
+        {
+            var result = await OrderApi.PayAsync(order.MaDonHang, new ThanhToanRequest
             {
-                new OrderItem
-                {
-                    ProductCode = "SP0003",
-                    ProductName = "Trà sữa Oolong nướng",
-                    BasePrice = 42000,
-                    Quantity = 1,
-                    SizeName = "Size L (Lớn 700ml)",
-                    SizeExtraPrice = 6000,
-                    Toppings = new List<OrderItemTopping>
-                    {
-                        new OrderItemTopping { ToppingCode = "TP-TC", ToppingName = "Trân châu đen", Price = 8000 }
-                    }
-                }
+                PhuongThucThanhToan = payMethod,
+                TienKhachDua = payMethod == PhuongThucThanhToans.Cash ? cashGiven : null
+            }, pageCts.Token);
+
+            Replace(result.DonHang);
+
+            string change = result.TienThua > 0 ? $" Tiền thừa trả khách: {Money(result.TienThua)}." : "";
+            ShowAlert($"Đơn #{order.MaDonHang} đã thanh toán {Money(result.DonHang.TongTien)}.{change}", "success",
+                result.CanhBaoKho);
+            cashGiven = null;
+        }
+        catch (ApiException ex)
+        {
+            payError = ex.Message;
+
+            // Đơn đã đổi trạng thái ở nơi khác (409) → tải lại cho đúng
+            if (ex.Status == 409) await LoadOrders(quiet: true);
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            paying = false;
+        }
+    }
+
+    private void Replace(DonHang updated)
+    {
+        int index = orders.FindIndex(o => o.MaDonHang == updated.MaDonHang);
+        if (index >= 0) orders[index] = updated;
+        if (selectedId == updated.MaDonHang) selectedOrder = updated;
+    }
+
+    // =========================================================================
+    // HỦY ĐƠN (chỉ Quản lý)
+    // =========================================================================
+
+    private void OpenCancelOrder()
+    {
+        if (SelectedOrder is null) return;
+
+        cancelReason = "";
+        cancelError = null;
+        isCancelModalOpen = true;
+    }
+
+    private void CloseCancelModal()
+    {
+        if (cancelling) return;
+        isCancelModalOpen = false;
+    }
+
+    private async Task ConfirmCancelOrder()
+    {
+        if (cancelling || SelectedOrder is not { } order || string.IsNullOrWhiteSpace(cancelReason)) return;
+
+        cancelling = true;
+        cancelError = null;
+
+        try
+        {
+            var updated = await OrderApi.CancelAsync(order.MaDonHang, cancelReason.Trim(), pageCts.Token);
+            Replace(updated);
+            isCancelModalOpen = false;
+            ShowAlert(updated.DaHoanTien
+                ? $"Đã hủy đơn #{updated.MaDonHang} và đánh dấu hoàn tiền {Money(updated.TongTien)} cho khách."
+                : $"Đã hủy đơn #{updated.MaDonHang}.", "success");
+        }
+        catch (ApiException ex)
+        {
+            cancelError = ex.Message;
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            cancelling = false;
+        }
+    }
+
+    // =========================================================================
+    // TẠO ĐƠN TẠI QUẦY
+    // =========================================================================
+
+    private async Task OpenCreateOrder()
+    {
+        draftLines = [];
+        draftPaymentMethod = PhuongThucThanhToans.Cash;
+        orderModalError = null;
+        shortages = [];
+        ResetBuilder();
+        isOrderModalOpen = true;
+
+        // Tải thực đơn mỗi lần mở: món hết nguyên liệu / tạm hết sẽ không xuất hiện
+        menuLoading = true;
+        menuError = null;
+
+        try
+        {
+            var menuTask = ProductApi.GetSellableAsync(pageCts.Token);
+            var toppingTask = ToppingApi.GetAllAsync(ct: pageCts.Token);
+
+            menu = (await menuTask).OrderBy(m => m.TenDanhMuc).ThenBy(m => m.TenMon).ToList();
+            availableToppings = (await toppingTask).Where(t => t.ConHang && !t.NgungBan && t.DuNguyenLieu).ToList();
+
+            if (menu.Count == 0)
+            {
+                menuError = "Hiện không có món nào bán được (hết hàng hoặc thiếu nguyên liệu).";
             }
-        };
 
-        orders.Insert(0, newOrder);
-        ShowAlert($"Có đơn mới #{newOrder.Code} vừa gửi về từ Tablet ({newOrder.TableOrArea})!", "success");
-    }
-
-    // =========================================================================
-    // CRUD: THÊM / SỬA / HỦY ĐƠN HÀNG
-    // =========================================================================
-
-    private void OpenCreateOrder()
-    {
-        isEditing = false;
-        draftOrder = new Order
-        {
-            Code = $"DH{orders.Count + 126:D5}",
-            CreatedAt = DateTime.Now,
-            Status = "Chờ tiếp nhận",
-            PaymentStatus = "Chưa thanh toán",
-            CashierName = "Thu ngân quầy",
-            TableOrArea = "Mang đi",
-            PaymentMethod = "Tiền mặt",
-            Source = "Tại quầy",
-            Items = new List<OrderItem>()
-        };
-
-        // Reset Item Builder
-        ResetItemBuilder();
-        isOrderModalOpen = true;
-    }
-
-    private void OpenEditOrder()
-    {
-        if (SelectedOrderDetail == null) return;
-
-        isEditing = true;
-        var src = SelectedOrderDetail;
-
-        // Clone order sang draftOrder
-        draftOrder = new Order
-        {
-            Code = src.Code,
-            CreatedAt = src.CreatedAt,
-            AcceptedAt = src.AcceptedAt,
-            PaidAt = src.PaidAt,
-            Status = src.Status,
-            PaymentStatus = src.PaymentStatus,
-            CashierName = src.CashierName,
-            TableOrArea = src.TableOrArea,
-            PaymentMethod = src.PaymentMethod,
-            Source = src.Source,
-            Note = src.Note,
-            DiscountAmount = src.DiscountAmount,
-            Items = src.Items.Select(i => new OrderItem
-            {
-                ProductCode = i.ProductCode,
-                ProductName = i.ProductName,
-                BasePrice = i.BasePrice,
-                Quantity = i.Quantity,
-                SizeName = i.SizeName,
-                SizeExtraPrice = i.SizeExtraPrice,
-                Note = i.Note,
-                Toppings = i.Toppings.Select(t => new OrderItemTopping
-                {
-                    ToppingCode = t.ToppingCode,
-                    ToppingName = t.ToppingName,
-                    Price = t.Price
-                }).ToList()
-            }).ToList()
-        };
-
-        ResetItemBuilder();
-        isOrderModalOpen = true;
-    }
-
-    private void ResetItemBuilder()
-    {
-        if (availableProducts.Count > 0)
-        {
-            builderProductCode = availableProducts[0].Code;
+            ResetBuilder();
         }
-        if (availableSizes.Count > 0)
+        catch (ApiException ex)
         {
-            builderSizeCode = availableSizes[0].Code;
+            menuError = ex.Message;
         }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            menuLoading = false;
+        }
+    }
+
+    private void ResetBuilder()
+    {
+        builderProductId = menu.FirstOrDefault()?.MaTenMon ?? 0;
+        OnBuilderProductChanged();
         builderQuantity = 1;
         builderNote = "";
-        selectedToppingCodes.Clear();
+        selectedToppingIds.Clear();
     }
 
-    private void OnBuilderProductChanged() { }
-    private void OnBuilderSizeChanged() { }
-
-    private void ToggleToppingInBuilder(string code, ChangeEventArgs e)
+    private void OnBuilderProductChanged()
     {
-        bool isChecked = (bool)(e.Value ?? false);
-        if (isChecked)
-            selectedToppingCodes.Add(code);
-        else
-            selectedToppingCodes.Remove(code);
+        builderSizeId = BuilderSizes.FirstOrDefault()?.MaChiTietMon ?? 0;
     }
 
-    private void AddItemToDraftOrder()
+    private void ToggleTopping(int id, ChangeEventArgs e)
     {
-        var product = availableProducts.FirstOrDefault(p => p.Code == builderProductCode);
-        if (product == null) return;
+        if (e.Value is true) selectedToppingIds.Add(id);
+        else selectedToppingIds.Remove(id);
+    }
 
-        var size = availableSizes.FirstOrDefault(s => s.Code == builderSizeCode);
-        string sizeName = size?.Name ?? "Size M";
-        decimal sizePrice = size?.ExtraPrice ?? 0;
+    private void AddItemToDraft()
+    {
+        if (BuilderProduct is not { } product || BuilderSize is not { } size) return;
 
-        var toppings = availableToppings
-            .Where(t => selectedToppingCodes.Contains(t.Code))
-            .Select(t => new OrderItemTopping
-            {
-                ToppingCode = t.Code,
-                ToppingName = t.Name,
-                Price = t.ExtraPrice
-            }).ToList();
+        draftLines.Add(new DraftLine(
+            size.MaChiTietMon,
+            product.TenMon,
+            size.TenKichThuoc,
+            size.GiaSauGiam,
+            Math.Clamp(builderQuantity, 1, 50),
+            string.IsNullOrWhiteSpace(builderNote) ? null : builderNote.Trim(),
+            availableToppings.Where(t => selectedToppingIds.Contains(t.MaTopping)).ToList()));
 
-        var newItem = new OrderItem
-        {
-            ProductCode = product.Code,
-            ProductName = product.Name,
-            BasePrice = product.Price ?? 0,
-            Quantity = Math.Max(1, builderQuantity),
-            SizeName = sizeName,
-            SizeExtraPrice = sizePrice,
-            Note = builderNote,
-            Toppings = toppings
-        };
-
-        draftOrder.Items.Add(newItem);
         orderModalError = null;
-        ResetItemBuilder();
+        shortages = [];
+
+        // Giữ món đang chọn (hay gọi nhiều ly cùng món), chỉ xóa phần tùy chọn
+        builderQuantity = 1;
+        builderNote = "";
+        selectedToppingIds.Clear();
     }
 
-    private void SaveDraftOrder()
+    private async Task SaveDraftOrder()
     {
-        if (draftOrder.Items.Count == 0)
+        if (creating) return;
+
+        if (draftLines.Count == 0)
         {
-            // Báo lỗi ngay trong hộp thoại — banner của trang nằm sau lớp phủ nên người dùng không thấy
             orderModalError = "Vui lòng thêm ít nhất một món vào đơn hàng trước khi lưu.";
             return;
         }
 
+        creating = true;
         orderModalError = null;
+        shortages = [];
 
-        if (isEditing)
+        try
         {
-            var existing = orders.FirstOrDefault(o => o.Code == draftOrder.Code);
-            if (existing != null)
+            var created = await OrderApi.CreateAsync(new DatMonRequest
             {
-                existing.TableOrArea = draftOrder.TableOrArea;
-                existing.PaymentMethod = draftOrder.PaymentMethod;
-                existing.CashierName = draftOrder.CashierName;
-                existing.DiscountAmount = draftOrder.DiscountAmount;
-                existing.Note = draftOrder.Note;
-                existing.Items = draftOrder.Items;
-            }
-            ShowAlert($"Đã cập nhật đơn hàng #{draftOrder.Code}!", "success");
-        }
-        else
-        {
-            orders.Insert(0, draftOrder);
-            selected = draftOrder.Code;
-            ShowAlert($"Đã tạo thành công đơn hàng #{draftOrder.Code} tại quầy!", "success");
-        }
+                PhuongThucThanhToan = draftPaymentMethod,
+                ChiTiet = draftLines.Select(l => new DongDatMonRequest
+                {
+                    MaChiTietMon = l.MaChiTietMon,
+                    SoLuong = l.SoLuong,
+                    GhiChu = l.GhiChu,
+                    Toppings = l.Toppings.Count == 0 ? null : l.Toppings.Select(t => t.MaTopping).ToList()
+                }).ToList()
+            }, pageCts.Token);
 
-        isOrderModalOpen = false;
+            isOrderModalOpen = false;
+            lastSeenOrderId = Math.Max(lastSeenOrderId, created.MaDonHang);
+            ShowAlert($"Đã tạo đơn #{created.MaDonHang} — tổng {Money(created.TongTien)}. Chọn đơn để thu tiền.", "success");
+
+            page = 1;
+            await LoadOrders();
+            SelectOrder(created.MaDonHang);
+        }
+        catch (ApiException ex)
+        {
+            orderModalError = ex.Message;
+
+            if (ex.Code == ApiErrorCodes.OutOfIngredients && ex.Details is { ValueKind: System.Text.Json.JsonValueKind.Array } details)
+            {
+                try
+                {
+                    shortages = System.Text.Json.JsonSerializer.Deserialize<List<ThieuNguyenLieu>>(details,
+                        new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)) ?? [];
+                }
+                catch (System.Text.Json.JsonException jsonEx)
+                {
+                    Logger.LogWarning(jsonEx, "Không đọc được chi tiết thiếu nguyên liệu.");
+                }
+            }
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            creating = false;
+        }
     }
 
     private void CloseOrderModal()
     {
+        if (creating) return;
+
         isOrderModalOpen = false;
         orderModalError = null;
     }
 
-    private void OpenDeleteOrder()
-    {
-        if (SelectedOrderDetail == null) return;
-        isDeleteModalOpen = true;
-    }
+    // =========================================================================
+    // TIỆN ÍCH
+    // =========================================================================
 
-    private void ConfirmCancelOrder()
-    {
-        if (SelectedOrderDetail != null)
-        {
-            SelectedOrderDetail.Status = "Đã hủy";
-            ShowAlert($"Đã chuyển trạng thái đơn hàng #{SelectedOrderDetail.Code} sang 'Đã hủy'.", "success");
-        }
-        isDeleteModalOpen = false;
-    }
-
-    private void ShowAlert(string msg, string type)
+    private void ShowAlert(string msg, string type, List<CanhBaoKho>? warnings = null)
     {
         alertMessage = msg;
         alertType = type;
+        stockWarnings = warnings ?? [];
+
+        if (stockWarnings.Count > 0)
+        {
+            alertMessage += " Cảnh báo kho:";
+        }
+    }
+
+    private void ClearAlert()
+    {
+        alertMessage = null;
+        stockWarnings = [];
     }
 
     private async Task PrintReceipt()
     {
-        await JS.InvokeVoidAsync("appHelpers.printPage");
+        try
+        {
+            await JS.InvokeVoidAsync("appHelpers.printPage");
+        }
+        catch (JSException ex)
+        {
+            Logger.LogError(ex, "Mở hộp thoại in thất bại.");
+            ShowAlert("Không mở được hộp thoại in. Hãy tải lại trang rồi thử lại.", "error");
+        }
     }
 
     public void Dispose()
     {
         autoRefreshTimer?.Dispose();
+        loadCts?.Cancel();
+        loadCts?.Dispose();
+        pageCts.Cancel();
+        pageCts.Dispose();
     }
 }
