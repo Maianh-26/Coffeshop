@@ -28,10 +28,32 @@ public class DonHang
     public DateTime? GioHoanTien { get; set; }
     public List<ChiTietDon>? ChiTiet { get; set; }
 
+    /// <summary>
+    /// [ĐỀ XUẤT — backend chưa có] Số trên bảng gỗ nhân viên đưa cho khách (1–50). null = chưa nhập.
+    /// Số bị khóa khi đơn chưa phục vụ xong; giải phóng khi đơn "Đã phục vụ" hoặc bị hủy (đơn vẫn giữ số để tra cứu).
+    /// </summary>
+    public int? SoNhanMon { get; set; }
+
+    /// <summary>
+    /// [ĐỀ XUẤT — backend chưa có] "WAITING" | "PREPARING" | "SERVED". null (backend cũ) = WAITING.
+    /// </summary>
+    public string? TrangThaiPhucVu { get; set; }
+
     /// <summary>Nguồn đơn suy ra từ người tạo.</summary>
     public string Nguon => MaNguoiDung is null ? "Tablet" : "Tại quầy";
 
     public int SoPhan => ChiTiet?.Sum(c => c.SoLuong) ?? 0;
+
+    public bool DaHuy => TrangThaiThanhToan == TrangThaiDon.Cancelled;
+
+    /// <summary>Trạng thái phục vụ thực tế (backend cũ không trả trường này → coi là chờ phục vụ).</summary>
+    public string PhucVu => TrangThaiPhucVu ?? TrangThaiPhucVus.Waiting;
+
+    /// <summary>Đơn còn đang phục vụ (chưa xong, chưa hủy) → số nhận món đang bị khóa.</summary>
+    public bool DangPhucVu => !DaHuy && PhucVu != TrangThaiPhucVus.Served;
+
+    /// <summary>Chỉ sửa món khi đơn chưa thanh toán, chưa hủy và chưa phục vụ.</summary>
+    public bool CoTheSua => TrangThaiThanhToan == TrangThaiDon.Pending && PhucVu != TrangThaiPhucVus.Served;
 }
 
 public class ChiTietDon
@@ -75,6 +97,18 @@ public class DongDatMonRequest
 
     /// <summary>Mã topping gọi thêm (mỗi topping tối đa 1 phần/ly, tối đa 10).</summary>
     public List<int>? Toppings { get; set; }
+}
+
+/// <summary>[ĐỀ XUẤT] PUT api/v1/don-hang/{id}/so-nhan-mon — null = bỏ số.</summary>
+public class SoNhanMonRequest
+{
+    public int? SoNhanMon { get; set; }
+}
+
+/// <summary>[ĐỀ XUẤT] PUT api/v1/don-hang/{id}/trang-thai-phuc-vu</summary>
+public class TrangThaiPhucVuRequest
+{
+    public string TrangThaiPhucVu { get; set; } = "";
 }
 
 /// <summary>POST api/v1/don-hang/{id}/thanh-toan</summary>
@@ -128,7 +162,7 @@ public static class TrangThaiDon
 
     public static string Label(string? status) => status switch
     {
-        Pending => "Chờ thanh toán",
+        Pending => "Chưa thanh toán",
         Paid => "Đã thanh toán",
         Cancelled => "Đã hủy",
         _ => status ?? ""
@@ -151,7 +185,62 @@ public static class PhuongThucThanhToans
     public static string Label(string? method) => method switch
     {
         Cash => "Tiền mặt",
-        QrTransfer => "Chuyển khoản QR",
+        QrTransfer => "Chuyển khoản",
         _ => method ?? ""
     };
+
+    /// <summary>Cột "Thanh toán": hình thức + tình trạng tiền, ví dụ "Tiền mặt · Đã thanh toán".</summary>
+    public static string Summary(DonHang d) => d.TrangThaiThanhToan switch
+    {
+        TrangThaiDon.Cancelled when d.DaHoanTien => $"{Label(d.PhuongThucThanhToan)} · Đã hoàn tiền",
+        TrangThaiDon.Cancelled => $"{Label(d.PhuongThucThanhToan)} · Không thu",
+        _ => $"{Label(d.PhuongThucThanhToan)} · {TrangThaiDon.Label(d.TrangThaiThanhToan)}"
+    };
+
+    public static string SummaryColor(DonHang d) => d.TrangThaiThanhToan switch
+    {
+        TrangThaiDon.Paid => "green",
+        TrangThaiDon.Cancelled => "gray",
+        _ => "orange"
+    };
+}
+
+/// <summary>
+/// [ĐỀ XUẤT — backend chưa có] Trạng thái phục vụ món — MỘT nơi duy nhất cho các chuỗi này.
+/// "Đã hủy" lấy từ trạng thái thanh toán CANCELLED.
+/// </summary>
+public static class TrangThaiPhucVus
+{
+    public const string Waiting = "WAITING";
+    public const string Preparing = "PREPARING";
+    public const string Served = "SERVED";
+
+    /// <summary>Giá trị lọc "Đã hủy" trên giao diện (gửi đi dưới dạng trangThai=CANCELLED).</summary>
+    public const string CancelledFilter = "CANCELLED";
+
+    public static string Label(string? status) => status switch
+    {
+        Waiting => "Chờ phục vụ",
+        Preparing => "Đang chuẩn bị",
+        Served => "Đã phục vụ",
+        CancelledFilter => "Đã hủy",
+        _ => status ?? ""
+    };
+
+    public static string Label(DonHang d) => d.DaHuy ? "Đã hủy" : Label(d.PhucVu);
+
+    public static string Color(DonHang d) => d.DaHuy ? "red" : d.PhucVu switch
+    {
+        Waiting => "orange",
+        Preparing => "blue",
+        Served => "green",
+        _ => "gray"
+    };
+}
+
+/// <summary>Bảng gỗ số nhận món của quán.</summary>
+public static class SoNhanMons
+{
+    public const int Min = 1;
+    public const int Max = 50;
 }
