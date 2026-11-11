@@ -53,4 +53,7 @@ public static class ApiErrorCodes
     public const string NotFound = "NOT_FOUND";
     public const string Conflict = "CONFLICT";
     public const string OutOfIngredients = "HET_NGUYEN_LIEU";
+
+    /// <summary>[ĐỀ XUẤT] 409 khi số nhận món đang gắn với một đơn chưa phục vụ xong.</summary>
+    public const string PickupNumberInUse = "SO_NHAN_MON_DANG_DUNG";
 }

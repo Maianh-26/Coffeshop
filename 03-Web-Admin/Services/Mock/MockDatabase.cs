@@ -180,7 +180,7 @@ public class MockDatabase
             new() { MaNguyenLieu = 6, TenNguyenLieu = "Đào ngâm", DonViTinh = "gram", SoLuongTon = 3000, MucCanhBaoToiThieu = 300 },
             new() { MaNguyenLieu = 7, TenNguyenLieu = "Trân châu", DonViTinh = "gram", SoLuongTon = 2000, MucCanhBaoToiThieu = 200 },
             new() { MaNguyenLieu = 8, TenNguyenLieu = "Kem cheese", DonViTinh = "gram", SoLuongTon = 1000, MucCanhBaoToiThieu = 100 },
-            new() { MaNguyenLieu = 9, TenNguyenLieu = "Bánh tiramisu", DonViTinh = "mieng", SoLuongTon = 3, MucCanhBaoToiThieu = 5 },
+            new() { MaNguyenLieu = 9, TenNguyenLieu = "Bánh tiramisu", DonViTinh = "miếng", SoLuongTon = 3, MucCanhBaoToiThieu = 5 },
         ]);
 
         int ct = 1;
@@ -248,16 +248,26 @@ public class MockDatabase
                     i % 3 == 0 ? PhuongThucThanhToans.QrTransfer : PhuongThucThanhToans.Cash,
                     (1 + (i + day) % 5, 1 + i % 2, i % 2 == 0 ? [1] : []));
                 order.TrangThaiThanhToan = TrangThaiDon.Paid;
+                order.TrangThaiPhucVu = TrangThaiPhucVus.Served;
+                order.SoNhanMon = 1 + (id * 7) % SoNhanMons.Max;
                 DonHangs.Add(order);
             }
         }
 
-        // Đơn hôm nay
-        var paid = NewOrder(id++, 2, now.AddHours(-1), PhuongThucThanhToans.Cash, (1, 2, []));
-        paid.TrangThaiThanhToan = TrangThaiDon.Paid;
-        DonHangs.Add(paid);
+        // Đơn hôm nay: 1 đơn đã phục vụ (số 18 đã giải phóng), 1 đơn chuyển khoản đang chuẩn bị (giữ số 18),
+        // 1 đơn tiền mặt chờ phục vụ chưa nhập số
+        var served = NewOrder(id++, 2, now.AddHours(-1), PhuongThucThanhToans.Cash, (1, 2, []));
+        served.TrangThaiThanhToan = TrangThaiDon.Paid;
+        served.TrangThaiPhucVu = TrangThaiPhucVus.Served;
+        served.SoNhanMon = 18;
+        DonHangs.Add(served);
 
-        DonHangs.Add(NewOrder(id++, null, now.AddMinutes(-20), PhuongThucThanhToans.QrTransfer, (4, 2, [1])));
+        var preparing = NewOrder(id++, null, now.AddMinutes(-20), PhuongThucThanhToans.QrTransfer, (4, 2, [1]));
+        preparing.TrangThaiThanhToan = TrangThaiDon.Paid;
+        preparing.TrangThaiPhucVu = TrangThaiPhucVus.Preparing;
+        preparing.SoNhanMon = 18;
+        DonHangs.Add(preparing);
+
         DonHangs.Add(NewOrder(id, null, now.AddMinutes(-5), PhuongThucThanhToans.Cash, (5, 1, [1, 2]), (1, 1, [])));
     }
 
@@ -274,6 +284,7 @@ public class MockDatabase
             TenNhanVien = NguoiDungs.FirstOrDefault(u => u.MaNguoiDung == maNhanVien)?.HoTen,
             PhuongThucThanhToan = method,
             TrangThaiThanhToan = TrangThaiDon.Pending,
+            TrangThaiPhucVu = TrangThaiPhucVus.Waiting,
             ThoiGianTao = created,
             ChiTiet = []
         };

@@ -196,10 +196,21 @@ public class MockApiHandler : HttpMessageHandler
                 return Ok(FindDonHang(Id(id)));
             case ["don-hang", var id, "thanh-toan"] when post:
                 RequireUser(user);
-                return Ok(Pay(FindDonHang(Id(id)), Read<ThanhToanRequest>(body), user!));
+                return Ok(Pay(FindDonHang(Id(id)), Read<ThanhToanRequest>(body)));
             case ["don-hang", var id, "huy"] when post:
                 RequireAdmin(user);
                 return Ok(Cancel(FindDonHang(Id(id)), Read<HuyDonRequest>(body)));
+
+            // [ĐỀ XUẤT — backend chưa có] sửa đơn, số nhận món, trạng thái phục vụ
+            case ["don-hang", var id] when put:
+                RequireUser(user);
+                return Ok(UpdateOrder(FindDonHang(Id(id)), Read<DatMonRequest>(body)));
+            case ["don-hang", var id, "so-nhan-mon"] when put:
+                RequireUser(user);
+                return Ok(SetPickupNumber(FindDonHang(Id(id)), Read<SoNhanMonRequest>(body)));
+            case ["don-hang", var id, "trang-thai-phuc-vu"] when put:
+                RequireUser(user);
+                return Ok(SetServingStatus(FindDonHang(Id(id)), Read<TrangThaiPhucVuRequest>(body)));
 
             // ------------------------------------------------ Kho (QuanLy)
             case ["nguyen-lieu", ..]:
@@ -800,6 +811,13 @@ public class MockApiHandler : HttpMessageHandler
             list = list.Where(d => d.TrangThaiThanhToan == status);
         }
 
+        // [ĐỀ XUẤT] lọc theo trạng thái phục vụ — không tính đơn đã hủy
+        if (q.TryGetValue("trangThaiPhucVu", out var serving) && serving != "")
+        {
+            if (serving is not (TrangThaiPhucVus.Waiting or TrangThaiPhucVus.Preparing or TrangThaiPhucVus.Served)) throw Invalid();
+            list = list.Where(d => !d.DaHuy && d.PhucVu == serving);
+        }
+
         if (Date(q, "tuNgay") is { } from) list = list.Where(d => d.ThoiGianTao >= from);
         if (Date(q, "denNgay") is { } to) list = list.Where(d => d.ThoiGianTao <= to);
 
@@ -807,6 +825,79 @@ public class MockApiHandler : HttpMessageHandler
     }
 
     private DonHang PlaceOrder(DatMonRequest req, int? maNhanVien)
+    {
+        var now = DateTime.Now;
+        var order = new DonHang
+        {
+            MaDonHang = NextId(_db.DonHangs, d => d.MaDonHang),
+            MaNguoiDung = maNhanVien,
+            TenNhanVien = _db.NguoiDungs.FirstOrDefault(u => u.MaNguoiDung == maNhanVien)?.HoTen,
+            PhuongThucThanhToan = req.PhuongThucThanhToan ?? PhuongThucThanhToans.Cash,
+            TrangThaiThanhToan = TrangThaiDon.Pending,
+            TrangThaiPhucVu = TrangThaiPhucVus.Waiting,
+            ThoiGianTao = now
+        };
+
+        order.ChiTiet = BuildLines(req, now);
+        order.TongTien = order.ChiTiet.Sum(c => c.ThanhTien);
+        _db.DonHangs.Add(order);
+        return order;
+    }
+
+    /// <summary>[ĐỀ XUẤT] PUT don-hang/{id}: thay toàn bộ món, tính lại tổng. Chỉ khi chưa thanh toán và chưa phục vụ.</summary>
+    private DonHang UpdateOrder(DonHang order, DatMonRequest req)
+    {
+        if (!order.CoTheSua)
+            throw Conflict("Chỉ sửa được đơn chưa thanh toán, chưa hủy và chưa phục vụ");
+
+        var lines = BuildLines(req, order.ThoiGianTao);
+        order.ChiTiet = lines;
+        order.TongTien = lines.Sum(c => c.ThanhTien);
+        if (req.PhuongThucThanhToan is { } method) order.PhuongThucThanhToan = method;
+        return order;
+    }
+
+    /// <summary>[ĐỀ XUẤT] PUT don-hang/{id}/so-nhan-mon: số 1–50, không trùng với đơn khác đang phục vụ.</summary>
+    private DonHang SetPickupNumber(DonHang order, SoNhanMonRequest req)
+    {
+        if (req.SoNhanMon is { } n && (n < SoNhanMons.Min || n > SoNhanMons.Max))
+            throw BadRequest($"Số nhận món phải từ {SoNhanMons.Min} đến {SoNhanMons.Max}");
+        if (!order.DangPhucVu)
+            throw Conflict("Đơn đã phục vụ hoặc đã hủy, không đổi được số nhận món");
+
+        if (req.SoNhanMon is { } so
+            && _db.DonHangs.FirstOrDefault(d => d.MaDonHang != order.MaDonHang && d.DangPhucVu && d.SoNhanMon == so) is { } other)
+        {
+            throw new MockError(409, ApiErrorCodes.PickupNumberInUse,
+                $"Số {so} đang được dùng cho đơn #{other.MaDonHang} (chưa phục vụ xong). Hãy chọn số khác.");
+        }
+
+        order.SoNhanMon = req.SoNhanMon;
+        return order;
+    }
+
+    /// <summary>[ĐỀ XUẤT] PUT don-hang/{id}/trang-thai-phuc-vu: chỉ đi tới (WAITING → PREPARING → SERVED).</summary>
+    private static DonHang SetServingStatus(DonHang order, TrangThaiPhucVuRequest req)
+    {
+        int Rank(string s) => s switch
+        {
+            TrangThaiPhucVus.Waiting => 0,
+            TrangThaiPhucVus.Preparing => 1,
+            TrangThaiPhucVus.Served => 2,
+            _ => -1
+        };
+
+        if (Rank(req.TrangThaiPhucVu) < 0) throw Invalid();
+        if (order.DaHuy) throw Conflict("Đơn đã bị hủy");
+        if (Rank(req.TrangThaiPhucVu) <= Rank(order.PhucVu))
+            throw Conflict($"Đơn đang ở trạng thái {TrangThaiPhucVus.Label(order.PhucVu)}, không chuyển ngược được");
+
+        order.TrangThaiPhucVu = req.TrangThaiPhucVu;
+        return order;
+    }
+
+    /// <summary>Kiểm tra yêu cầu đặt món, tạo các dòng chi tiết (giá theo khuyến mãi tại <paramref name="now"/>) và kiểm tra đủ nguyên liệu.</summary>
+    private List<ChiTietDon> BuildLines(DatMonRequest req, DateTime now)
     {
         if (req.ChiTiet.Count is < 1 or > 50
             || req.PhuongThucThanhToan is not (null or PhuongThucThanhToans.Cash or PhuongThucThanhToans.QrTransfer)
@@ -816,8 +907,8 @@ public class MockApiHandler : HttpMessageHandler
             throw Invalid();
         }
 
-        var now = DateTime.Now;
         var need = new Dictionary<int, decimal>();
+        var lines = new List<ChiTietDon>();
 
         void Add(int? maChiTietMon, int? maTopping, int soLuong)
         {
@@ -828,16 +919,6 @@ public class MockApiHandler : HttpMessageHandler
         }
 
         int lineId = NextId(_db.DonHangs.SelectMany(d => d.ChiTiet ?? []), c => c.MaChiTietDon);
-        var order = new DonHang
-        {
-            MaDonHang = NextId(_db.DonHangs, d => d.MaDonHang),
-            MaNguoiDung = maNhanVien,
-            TenNhanVien = _db.NguoiDungs.FirstOrDefault(u => u.MaNguoiDung == maNhanVien)?.HoTen,
-            PhuongThucThanhToan = req.PhuongThucThanhToan ?? PhuongThucThanhToans.Cash,
-            TrangThaiThanhToan = TrangThaiDon.Pending,
-            ThoiGianTao = now,
-            ChiTiet = []
-        };
 
         foreach (var line in req.ChiTiet)
         {
@@ -874,7 +955,7 @@ public class MockApiHandler : HttpMessageHandler
             }
 
             detail.ThanhTien = (detail.DonGiaBan + detail.Toppings.Sum(t => t.DonGiaTopping)) * qty;
-            order.ChiTiet.Add(detail);
+            lines.Add(detail);
         }
 
         var shortages = need
@@ -888,15 +969,13 @@ public class MockApiHandler : HttpMessageHandler
             throw new MockError(422, ApiErrorCodes.OutOfIngredients, "Không đủ nguyên liệu để pha chế đơn này", shortages);
         }
 
-        order.TongTien = order.ChiTiet.Sum(c => c.ThanhTien);
-        _db.DonHangs.Add(order);
-        return order;
+        return lines;
     }
 
     /// <summary>
     /// Mô phỏng sp_ThanhToanVaTruKho: PAID + trừ kho theo công thức + ghi LichSuKho (TieuHaoTheoDon).
     /// </summary>
-    private ThanhToanResponse Pay(DonHang order, ThanhToanRequest req, NguoiDung me)
+    private ThanhToanResponse Pay(DonHang order, ThanhToanRequest req)
     {
         if (req.PhuongThucThanhToan is not (PhuongThucThanhToans.Cash or PhuongThucThanhToans.QrTransfer)
             || req.TienKhachDua is < 0) throw Invalid();
@@ -989,11 +1068,18 @@ public class MockApiHandler : HttpMessageHandler
 
         try
         {
-            PlaceOrder(new DatMonRequest
+            string method = Random.Shared.Next(2) == 0 ? PhuongThucThanhToans.Cash : PhuongThucThanhToans.QrTransfer;
+            var order = PlaceOrder(new DatMonRequest
             {
-                PhuongThucThanhToan = Random.Shared.Next(2) == 0 ? PhuongThucThanhToans.Cash : PhuongThucThanhToans.QrTransfer,
+                PhuongThucThanhToan = method,
                 ChiTiet = [new() { MaChiTietMon = sellable[Random.Shared.Next(sellable.Count)].MaChiTietMon, SoLuong = Random.Shared.Next(1, 3) }]
             }, null);
+
+            // Khách chuyển khoản ngay trên tablet → cổng thanh toán báo về, đơn tự sang "Đã thanh toán"
+            if (method == PhuongThucThanhToans.QrTransfer)
+            {
+                Pay(order, new ThanhToanRequest { PhuongThucThanhToan = method });
+            }
         }
         catch (MockError)
         {

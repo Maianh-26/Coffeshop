@@ -48,10 +48,13 @@
 
                     <Icon Name="search" />
 
-                    <input @bind="search"
-                           @bind:event="oninput"
-                           placeholder="Tìm mã đơn, món, nhân viên…"
-                           aria-label="Tìm trong trang hiện tại theo mã đơn, món hoặc nhân viên" />
+                    @* Chỉ tìm theo cột đang hiển thị: mã đơn hoặc số nhận món (chỉ nhận chữ số) *@
+                    <input value="@search"
+                           @oninput="OnSearchInput"
+                           inputmode="numeric"
+                           maxlength="10"
+                           placeholder="Tìm mã đơn hoặc số nhận món…"
+                           aria-label="Tìm trong trang hiện tại theo mã đơn hoặc số nhận món (chỉ nhập số)" />
 
                 </div>
 
@@ -71,11 +74,22 @@
 
                 </div>
 
-                <select aria-label="Lọc trạng thái đơn" @bind="statusFilter" @bind:after="ApplyFilter">
+                <select aria-label="Lọc trạng thái phục vụ" @bind="statusFilter" @bind:after="ApplyFilter">
                     <option value="">Tất cả trạng thái</option>
+                    @foreach (var s in ServingFilters)
+                    {
+                        <option value="@s" disabled="@(!servingSupported && s != TrangThaiPhucVus.CancelledFilter)">@TrangThaiPhucVus.Label(s)</option>
+                    }
+                </select>
+
+                <select aria-label="Lọc thanh toán"
+                        @bind="paymentFilter"
+                        @bind:after="ApplyFilter"
+                        disabled="@(statusFilter == TrangThaiPhucVus.CancelledFilter)"
+                        title="@(statusFilter == TrangThaiPhucVus.CancelledFilter ? "Đơn đã hủy không lọc theo thanh toán" : null)">
+                    <option value="">Tất cả thanh toán</option>
                     <option value="@TrangThaiDon.Pending">@TrangThaiDon.Label(TrangThaiDon.Pending)</option>
                     <option value="@TrangThaiDon.Paid">@TrangThaiDon.Label(TrangThaiDon.Paid)</option>
-                    <option value="@TrangThaiDon.Cancelled">@TrangThaiDon.Label(TrangThaiDon.Cancelled)</option>
                 </select>
 
                 <button class="btn outline"
@@ -100,6 +114,16 @@
 
                     <Icon Name="plus" />
                     Tạo đơn tại quầy
+
+                </button>
+
+                <button class="btn outline"
+                        disabled="@(SelectedOrder is not { CoTheSua: true })"
+                        title="@(SelectedOrder is { CoTheSua: false } ? "Chỉ sửa được đơn chưa thanh toán và chưa phục vụ" : "Sửa món trong đơn đang chọn")"
+                        @onclick="OpenEditOrder">
+
+                    <Icon Name="edit" />
+                    Sửa đơn
 
                 </button>
 
@@ -169,10 +193,9 @@
                         <tr>
                             <th>Mã đơn</th>
                             <th>Nguồn</th>
-                            <th>Thời gian</th>
-                            <th>Nhân viên</th>
-                            <th>Số món</th>
+                            <th>Thời gian tạo</th>
                             <th>Tổng tiền</th>
+                            <th>Số nhận món</th>
                             <th>Thanh toán</th>
                             <th>Trạng thái</th>
                         </tr>
@@ -202,22 +225,38 @@
                                     @order.ThoiGianTao.ToString("HH:mm · dd/MM")
                                 </td>
 
-                                <td>@(order.TenNhanVien ?? "—")</td>
-
-                                <td>
-                                    @order.SoPhan phần
-                                </td>
-
                                 <td>
                                     <strong class="text-accent">@Money(order.TongTien)</strong>
                                 </td>
 
-                                <td>@PhuongThucThanhToans.Label(order.PhuongThucThanhToan)</td>
+                                <td>
+                                    @if (order.SoNhanMon is { } so)
+                                    {
+                                        <span class="pickup-number">@so</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="muted">Chưa nhập</span>
+                                    }
+                                </td>
 
                                 <td>
-                                    <span class="badge @TrangThaiDon.Color(order.TrangThaiThanhToan)">
-                                        @TrangThaiDon.Label(order.TrangThaiThanhToan)
+                                    <span class="badge @PhuongThucThanhToans.SummaryColor(order)">
+                                        @PhuongThucThanhToans.Summary(order)
                                     </span>
+                                </td>
+
+                                <td>
+                                    @if (servingSupported || order.DaHuy)
+                                    {
+                                        <span class="badge @TrangThaiPhucVus.Color(order)">
+                                            @TrangThaiPhucVus.Label(order)
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="muted" title="Máy chủ chưa có trạng thái phục vụ">—</span>
+                                    }
                                 </td>
 
                             </tr>
@@ -227,7 +266,7 @@
                         {
                             <tr>
 
-                                <td class="empty-cell" colspan="8">
+                                <td class="empty-cell" colspan="7">
 
                                     <Icon Name="orders" Size="32" />
 
@@ -297,8 +336,11 @@
                 <div>
                     <h3>Đơn hàng #@detail.MaDonHang</h3>
                     <div class="order-badges">
-                        <span class="badge @TrangThaiDon.Color(detail.TrangThaiThanhToan)">
-                            @TrangThaiDon.Label(detail.TrangThaiThanhToan)
+                        <span class="badge @TrangThaiPhucVus.Color(detail)">
+                            @TrangThaiPhucVus.Label(detail)
+                        </span>
+                        <span class="badge @PhuongThucThanhToans.SummaryColor(detail)">
+                            @PhuongThucThanhToans.Summary(detail)
                         </span>
                         <span class="badge @(detail.MaNguoiDung is null ? "purple" : "gray")">
                             @detail.Nguon
@@ -329,11 +371,6 @@
                     <span class="meta-label">Người tạo đơn:</span>
                     <span class="meta-val">@(detail.TenNhanVien ?? "Khách tự đặt trên Tablet")</span>
                 </div>
-                <div class="meta-item">
-                    <span class="meta-label">Hình thức thanh toán:</span>
-                    <span class="meta-val">@PhuongThucThanhToans.Label(detail.PhuongThucThanhToan)</span>
-                </div>
-
                 @if (detail.LyDoHuy is not null)
                 {
                     <div class="meta-item">
@@ -350,6 +387,115 @@
                     </div>
                 }
             </div>
+
+            <!-- NGHIỆP VỤ: SỐ NHẬN MÓN & PHỤC VỤ -->
+            @if (!servingSupported)
+            {
+                <p class="form-note serving-box">
+                    Số nhận món và trạng thái phục vụ chưa dùng được: máy chủ chưa hỗ trợ (đã đề xuất với nhóm backend).
+                </p>
+            }
+            else
+            {
+            <div class="serving-box">
+                <div class="field">
+                    <label for="pickup-number">Số nhận món (bảng gỗ @SoNhanMons.Min–@SoNhanMons.Max)</label>
+
+                    @if (detail.DangPhucVu)
+                    {
+                        <div class="pickup-input-row">
+                            <input id="pickup-number"
+                                   type="number"
+                                   inputmode="numeric"
+                                   min="@SoNhanMons.Min"
+                                   max="@SoNhanMons.Max"
+                                   placeholder="1–50"
+                                   aria-describedby="pickup-hint@(servingError is null ? "" : " serving-error")"
+                                   value="@pickupInput"
+                                   @oninput="OnPickupInput"
+                                   @onkeydown="PickupKeyDown"
+                                   disabled="@servingBusy" />
+
+                            <button type="button"
+                                    class="btn outline"
+                                    disabled="@(servingBusy || pickupInput == detail.SoNhanMon)"
+                                    @onclick="() => SavePickupNumber(detail)">
+                                @(detail.SoNhanMon is null ? "Lưu số" : "Đổi số")
+                            </button>
+                        </div>
+
+                        @if (servingError is not null)
+                        {
+                            <p id="serving-error" class="alert error" role="alert">@servingError</p>
+                        }
+
+                        <p id="pickup-hint" class="form-note">Số đang gắn với đơn chưa phục vụ xong sẽ bị khóa, chỉ giải phóng khi xác nhận đã phục vụ.</p>
+                    }
+                    else
+                    {
+                        <p class="pickup-readonly">
+                            @if (detail.SoNhanMon is { } so)
+                            {
+                                <span class="pickup-number">@so</span>
+                                <span class="muted">@(detail.DaHuy ? "Đơn đã hủy — số đã được giải phóng." : "Đã phục vụ — số đã được giải phóng.")</span>
+                            }
+                            else
+                            {
+                                <span class="muted">Không nhập số nhận món.</span>
+                            }
+                        </p>
+                    }
+                </div>
+
+                @if (detail.DangPhucVu && confirmServeUnpaidId == detail.MaDonHang)
+                {
+                    @* Phục vụ khi chưa thu tiền là thao tác không hoàn tác (giải phóng số) → hỏi lại *@
+                    <div class="confirm-inline" role="alertdialog" aria-labelledby="serve-unpaid-msg">
+                        <p id="serve-unpaid-msg">
+                            Đơn <strong>#@detail.MaDonHang</strong> <strong>chưa thanh toán</strong>. Vẫn xác nhận đã phục vụ?
+                            @(detail.SoNhanMon is { } holding ? $" Số {holding} sẽ được giải phóng." : "")
+                        </p>
+                        <div class="serving-actions">
+                            <button type="button" class="btn outline" disabled="@servingBusy" @onclick="() => confirmServeUnpaidId = null">
+                                Quay lại
+                            </button>
+                            <button type="button" class="btn btn-success" disabled="@servingBusy"
+                                    @onclick="() => SetServing(detail, TrangThaiPhucVus.Served, confirmed: true)">
+                                Vẫn xác nhận đã phục vụ
+                            </button>
+                        </div>
+                    </div>
+                }
+                else if (detail.DangPhucVu)
+                {
+                    <div class="serving-actions">
+                        @if (detail.PhucVu == TrangThaiPhucVus.Waiting)
+                        {
+                            <button type="button"
+                                    class="btn outline"
+                                    disabled="@servingBusy"
+                                    @onclick="() => SetServing(detail, TrangThaiPhucVus.Preparing)">
+                                <Icon Name="cup" Size="16" />
+                                Bắt đầu chuẩn bị
+                            </button>
+                        }
+
+                        <button type="button"
+                                class="btn btn-success"
+                                disabled="@servingBusy"
+                                @onclick="() => SetServing(detail, TrangThaiPhucVus.Served)">
+                            <Icon Name="check" Size="16" />
+                            Xác nhận đã phục vụ
+                        </button>
+                    </div>
+                }
+
+                @if (servingError is not null && !detail.DangPhucVu)
+                {
+                    <p class="alert error" role="alert">@servingError</p>
+                }
+            </div>
+            }
 
             <!-- Danh sách món: tên + size, topping, ghi chú, giá -->
             <div class="order-items-section">
@@ -422,105 +568,41 @@
 
                 @if (detail.TrangThaiThanhToan == TrangThaiDon.Pending)
                 {
-                    <div class="field">
-                        <label for="pay-method">Khách thanh toán bằng</label>
-                        <select id="pay-method" @bind="payMethod" disabled="@paying">
-                            <option value="@PhuongThucThanhToans.Cash">@PhuongThucThanhToans.Label(PhuongThucThanhToans.Cash)</option>
-                            <option value="@PhuongThucThanhToans.QrTransfer">@PhuongThucThanhToans.Label(PhuongThucThanhToans.QrTransfer)</option>
-                        </select>
+                    @* Đơn giản hóa: không nhập "tiền khách đưa" — nhân viên chỉ xác nhận đã thu đủ.
+                       Khách chuyển khoản trên tablet → cổng thanh toán báo về, đơn tự sang "Đã thanh toán". *@
+                    <div class="pay-box">
+                        <div class="pay-box-head">
+                            <span>Cần thu (@PhuongThucThanhToans.Label(payMethod))</span>
+                            <strong class="grand-total small">@Money(detail.TongTien)</strong>
+                        </div>
+
+                        @if (payMethod == PhuongThucThanhToans.QrTransfer)
+                        {
+                            <p class="form-note">
+                                Khách chuyển khoản trên tablet: hệ thống tự cập nhật "Đã thanh toán" khi nhận được tiền.
+                                Chỉ bấm xác nhận khi đã kiểm tra tài khoản nhận được tiền (nội dung: <strong>COFFEE @detail.MaDonHang</strong>).
+                            </p>
+                        }
+
+                        <button type="button"
+                                class="btn btn-success btn-large"
+                                disabled="@paying"
+                                @onclick="() => Pay(detail)">
+                            <Icon Name="@(payMethod == PhuongThucThanhToans.Cash ? "coins" : "check")" Size="18" />
+                            @(paying
+                                ? "Đang xác nhận…"
+                                : payMethod == PhuongThucThanhToans.Cash ? "Xác nhận đã thu tiền mặt" : "Xác nhận đã nhận chuyển khoản")
+                        </button>
+
+                        <button type="button"
+                                class="text-button"
+                                disabled="@paying"
+                                @onclick="SwitchPayMethod">
+                            Khách đổi sang @(payMethod == PhuongThucThanhToans.Cash
+                                ? PhuongThucThanhToans.Label(PhuongThucThanhToans.QrTransfer).ToLowerInvariant()
+                                : PhuongThucThanhToans.Label(PhuongThucThanhToans.Cash).ToLowerInvariant())
+                        </button>
                     </div>
-
-                    @if (payMethod == PhuongThucThanhToans.Cash)
-                    {
-                        <div class="cash-payment-box">
-                            <div class="cash-payment-head">
-                                <strong>Thu tiền mặt: @Money(detail.TongTien)</strong>
-                                <span class="badge orange">@TrangThaiDon.Label(TrangThaiDon.Pending)</span>
-                            </div>
-
-                            <div class="field">
-                                <label for="cash-given">Tiền khách đưa (đ)</label>
-                                <input id="cash-given"
-                                       type="number"
-                                       min="0"
-                                       step="1000"
-                                       @bind="cashGiven"
-                                       @bind:event="oninput"
-                                       disabled="@paying" />
-                            </div>
-
-                            @if (cashGiven is { } given)
-                            {
-                                <p class="@(given < detail.TongTien ? "text-danger" : "form-note")">
-                                    @(given < detail.TongTien
-                                        ? $"Còn thiếu {Money(detail.TongTien - given)}."
-                                        : $"Tiền thừa trả khách: {Money(given - detail.TongTien)}.")
-                                </p>
-                            }
-
-                            <button type="button"
-                                    class="btn btn-success btn-large"
-                                    disabled="@(paying || cashGiven < detail.TongTien)"
-                                    @onclick="() => Pay(detail)">
-                                <Icon Name="coins" Size="18" />
-                                @(paying ? "Đang xác nhận…" : "Xác nhận đã thu tiền mặt")
-                            </button>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="qr-payment-box">
-                            <strong>Chuyển khoản VietQR (@Money(detail.TongTien))</strong>
-
-                            <div class="qr-code-canvas" aria-hidden="true">
-                                <!-- Hình minh họa mã QR (chưa có cổng thanh toán thật) -->
-                                <svg class="qr-code-svg" viewBox="0 0 100 100">
-                                    <rect width="100" height="100" fill="#ffffff" />
-                                    <rect x="5" y="5" width="28" height="28" fill="#1e293b" />
-                                    <rect x="9" y="9" width="20" height="20" fill="#ffffff" />
-                                    <rect x="13" y="13" width="12" height="12" fill="#89543a" />
-                                    <rect x="67" y="5" width="28" height="28" fill="#1e293b" />
-                                    <rect x="71" y="9" width="20" height="20" fill="#ffffff" />
-                                    <rect x="75" y="13" width="12" height="12" fill="#89543a" />
-                                    <rect x="5" y="67" width="28" height="28" fill="#1e293b" />
-                                    <rect x="9" y="71" width="20" height="20" fill="#ffffff" />
-                                    <rect x="13" y="75" width="12" height="12" fill="#89543a" />
-                                    <rect x="38" y="10" width="6" height="6" fill="#1e293b" />
-                                    <rect x="48" y="15" width="8" height="6" fill="#1e293b" />
-                                    <rect x="38" y="25" width="18" height="6" fill="#89543a" />
-                                    <rect x="10" y="38" width="6" height="8" fill="#1e293b" />
-                                    <rect x="22" y="42" width="10" height="6" fill="#1e293b" />
-                                    <rect x="38" y="38" width="24" height="24" fill="#89543a" />
-                                    <rect x="44" y="44" width="12" height="12" fill="#ffffff" />
-                                    <circle cx="50" cy="50" r="4" fill="#89543a" />
-                                    <rect x="68" y="38" width="10" height="8" fill="#1e293b" />
-                                    <rect x="82" y="42" width="12" height="6" fill="#1e293b" />
-                                    <rect x="10" y="52" width="12" height="6" fill="#1e293b" />
-                                    <rect x="70" y="52" width="18" height="6" fill="#1e293b" />
-                                    <rect x="38" y="68" width="8" height="6" fill="#1e293b" />
-                                    <rect x="52" y="68" width="6" height="12" fill="#1e293b" />
-                                    <rect x="42" y="78" width="14" height="6" fill="#89543a" />
-                                    <rect x="68" y="68" width="24" height="6" fill="#1e293b" />
-                                    <rect x="74" y="80" width="16" height="12" fill="#1e293b" />
-                                </svg>
-                            </div>
-
-                            <div class="qr-payment-info">
-                                <div>Nội dung: <strong>COFFEE @detail.MaDonHang</strong></div>
-                                <div>Số tiền: <strong>@Money(detail.TongTien)</strong></div>
-                            </div>
-
-                            <p class="form-note">Kiểm tra tài khoản đã nhận tiền rồi bấm xác nhận.</p>
-
-                            <button type="button"
-                                    class="btn btn-success btn-large"
-                                    disabled="@paying"
-                                    @onclick="() => Pay(detail)">
-                                <Icon Name="check" Size="18" />
-                                @(paying ? "Đang xác nhận…" : "Xác nhận đã nhận chuyển khoản")
-                            </button>
-                        </div>
-                    }
 
                     @if (payError is not null)
                     {
@@ -532,8 +614,10 @@
                 <div class="detail-actions">
                     <button type="button"
                             class="btn primary"
+                            disabled="@detail.DaHuy"
+                            title="@(detail.DaHuy ? "Đơn đã hủy, không in hóa đơn" : "In hóa đơn cho khách")"
                             @onclick="PrintReceipt">
-                        <Icon Name="download" Size="16" />
+                        <Icon Name="printer" Size="16" />
                         In hóa đơn
                     </button>
 
@@ -556,7 +640,7 @@
 <!-- ========================================================================= -->
 @if (isOrderModalOpen)
 {
-    <Modal Title="Tạo đơn hàng tại quầy"
+    <Modal Title="@(editingOrderId is { } editId ? $"Sửa đơn hàng #{editId}" : "Tạo đơn hàng tại quầy")"
            OnClose="CloseOrderModal"
            Busy="@creating">
 
@@ -569,7 +653,7 @@
 
             <div class="form-grid">
                 <div class="field">
-                    <label for="order-payment">Hình thức thanh toán dự kiến</label>
+                    <label for="order-payment">Hình thức thanh toán</label>
                     <select id="order-payment" @bind="draftPaymentMethod">
                         <option value="@PhuongThucThanhToans.Cash">@PhuongThucThanhToans.Label(PhuongThucThanhToans.Cash)</option>
                         <option value="@PhuongThucThanhToans.QrTransfer">@PhuongThucThanhToans.Label(PhuongThucThanhToans.QrTransfer)</option>
@@ -701,7 +785,11 @@
                     </table>
                 </div>
 
-                <p class="form-note">Tổng tiền chính thức do máy chủ tính khi tạo đơn (áp khuyến mãi theo giờ hiện tại).</p>
+                <p class="form-note">
+                    @(editingOrderId is null
+                        ? "Tổng tiền chính thức do máy chủ tính khi tạo đơn (áp khuyến mãi theo giờ hiện tại)."
+                        : "Tổng tiền chính thức do máy chủ tính lại khi lưu (áp khuyến mãi theo giờ tạo đơn).")
+                </p>
             </div>
 
         </div>
@@ -725,7 +813,9 @@
         <div class="modal-footer">
             <button type="button" class="btn outline" disabled="@creating" @onclick="CloseOrderModal">Hủy</button>
             <button type="button" class="btn primary" disabled="@(creating || draftLines.Count == 0)" @onclick="SaveDraftOrder">
-                @(creating ? "Đang tạo đơn…" : "Tạo đơn hàng")
+                @(editingOrderId is null
+                    ? (creating ? "Đang tạo đơn…" : "Tạo đơn hàng")
+                    : (creating ? "Đang lưu…" : "Lưu thay đổi"))
             </button>
         </div>
 
@@ -771,6 +861,47 @@
     </Modal>
 }
 
+<!-- ========================================================================= -->
+<!-- MẪU HÓA ĐƠN IN CHO KHÁCH (ẩn; appHelpers.printReceipt chép nội dung này sang khung in riêng) -->
+<!-- ========================================================================= -->
+@if (SelectedOrder is { } receipt)
+{
+    <div id="receipt-source" hidden>
+        <div class="r-center">
+            <div class="r-shop">COFFEE SHOP</div>
+            <div class="r-title">HÓA ĐƠN</div>
+        </div>
+
+        <div class="r-row"><span>Mã đơn:</span><strong>#@receipt.MaDonHang</strong></div>
+        @if (receipt.SoNhanMon is { } receiptNo)
+        {
+            <div class="r-row"><span>Số nhận món:</span><strong>@receiptNo</strong></div>
+        }
+        <div class="r-row"><span>Thời gian:</span><span>@receipt.ThoiGianTao.ToString("dd/MM/yyyy HH:mm")</span></div>
+
+        <hr />
+
+        @foreach (var line in receipt.ChiTiet ?? [])
+        {
+            <div class="r-item">
+                <div class="r-row"><strong>@line.TenMonLuu</strong></div>
+                <div class="r-row r-sub"><span>@line.SoLuong x @Money(line.DonGiaBan)</span><span>@Money(line.DonGiaBan * line.SoLuong)</span></div>
+                @foreach (var top in line.Toppings)
+                {
+                    <div class="r-row r-sub"><span>+ @top.TenToppingLuu (@line.SoLuong x @Money(top.DonGiaTopping))</span><span>@Money(top.DonGiaTopping * line.SoLuong)</span></div>
+                }
+            </div>
+        }
+
+        <hr />
+
+        <div class="r-row r-total"><span>TỔNG TIỀN</span><span>@Money(receipt.TongTien)</span></div>
+        <div class="r-row r-sub"><span>Thanh toán:</span><span>@PhuongThucThanhToans.Summary(receipt)</span></div>
+
+        <div class="r-center r-thanks">Cảm ơn quý khách!</div>
+    </div>
+}
+
 @code {
     [CascadingParameter]
     private Task<AuthenticationState>? AuthState { get; set; }
@@ -795,7 +926,16 @@
     private string search = "";
     private DateTime? fromDate;
     private DateTime? toDate;
-    private string statusFilter = "";
+    private string statusFilter = "";   // trạng thái phục vụ, hoặc "CANCELLED" = đã hủy
+    private string paymentFilter = "";  // PENDING / PAID
+
+    private static readonly string[] ServingFilters =
+    [
+        TrangThaiPhucVus.Waiting,
+        TrangThaiPhucVus.Preparing,
+        TrangThaiPhucVus.Served,
+        TrangThaiPhucVus.CancelledFilter
+    ];
 
     private int? selectedId;
 
@@ -813,15 +953,24 @@
 
     // Thanh toán
     private string payMethod = PhuongThucThanhToans.Cash;
-    private decimal? cashGiven;
     private bool paying;
     private string? payError;
+
+    // Số nhận món & trạng thái phục vụ
+    private int? pickupInput;
+    private bool servingSupported = true;  // false khi máy chủ chưa trả trangThaiPhucVu (backend chưa cập nhật)
+    private bool pickupDirty;         // người dùng đã gõ vào ô số nhận món mà chưa lưu
+    private int? pickupServerValue;    // số nhận món máy chủ trả về lần gần nhất cho đơn đang xem
+    private bool servingBusy;
+    private int? confirmServeUnpaidId;     // đơn đang chờ xác nhận "phục vụ khi chưa thanh toán"
+    private string? servingError;
 
     // Tự động làm mới
     private bool autoRefreshEnabled = true;
     private Timer? autoRefreshTimer;
 
-    // Tạo đơn tại quầy
+    // Tạo đơn tại quầy / sửa đơn (editingOrderId != null = đang sửa đơn đó)
+    private int? editingOrderId;
     private bool isOrderModalOpen;
     private bool creating;
     private bool menuLoading;
@@ -868,15 +1017,36 @@
 
     private DonHang? SelectedOrder => selectedOrder;
 
-    /// <summary>Tìm nhanh trong trang đang hiển thị (máy chủ chưa hỗ trợ tìm theo từ khóa).</summary>
+    /// <summary>
+    /// Tìm nhanh trong trang đang hiển thị (máy chủ chưa hỗ trợ tìm theo từ khóa).
+    /// Chỉ so với dữ liệu nhìn thấy trên bảng: mã đơn bắt đầu bằng số đã nhập, hoặc số nhận món trùng khớp.
+    /// (Trước đây tìm cả tên món / nhân viên vốn không hiện trên bảng → kết quả trông như "lọc sai".)
+    /// </summary>
     private List<DonHang> VisibleOrders =>
-        string.IsNullOrWhiteSpace(search)
+        search.Length == 0
             ? orders
             : orders.Where(o =>
-                    o.MaDonHang.ToString().Contains(search.Trim().TrimStart('#'), StringComparison.OrdinalIgnoreCase)
-                    || (o.TenNhanVien?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
-                    || (o.ChiTiet?.Any(c => c.TenMonLuu.Contains(search, StringComparison.OrdinalIgnoreCase)) ?? false))
+                    o.MaDonHang.ToString(System.Globalization.CultureInfo.InvariantCulture).StartsWith(search, StringComparison.Ordinal)
+                    || o.SoNhanMon?.ToString(System.Globalization.CultureInfo.InvariantCulture) == search)
                 .ToList();
+
+    /// <summary>Ô tìm kiếm chỉ giữ chữ số (bỏ "#", chữ cái, khoảng trắng).</summary>
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        string raw = e.Value?.ToString() ?? "";
+        string digits = new(raw.Where(char.IsAsciiDigit).Take(10).ToArray());
+
+        if (digits != raw)
+        {
+            // Giá trị đã lọc có thể trùng giá trị cũ → Blazor không vẽ lại và chữ cái vẫn nằm trong ô.
+            // Vẽ một nhịp với chuỗi thô rồi mới gán chuỗi đã lọc để ô nhập luôn khớp với bộ lọc.
+            search = raw;
+            StateHasChanged();
+            await Task.Yield();
+        }
+
+        search = digits;
+    }
 
     private Mon? BuilderProduct => menu.FirstOrDefault(m => m.MaTenMon == builderProductId);
 
@@ -937,14 +1107,22 @@
 
         try
         {
+            // "Đã hủy" là trạng thái thanh toán CANCELLED; các trạng thái còn lại là trạng thái phục vụ
+            bool cancelledOnly = statusFilter == TrangThaiPhucVus.CancelledFilter;
+
             var result = await OrderApi.GetPageAsync(
                 page, PageSize,
-                statusFilter == "" ? null : statusFilter,
-                fromDate, toDate,
-                cts.Token);
+                trangThai: cancelledOnly ? TrangThaiDon.Cancelled : (paymentFilter == "" ? null : paymentFilter),
+                trangThaiPhucVu: cancelledOnly || statusFilter == "" ? null : statusFilter,
+                tuNgay: fromDate,
+                denNgay: toDate,
+                ct: cts.Token);
 
             orders = result.Data;
             totalOrders = result.Meta.Total;
+
+            // Backend cũ không trả trangThaiPhucVu → ẩn phần phục vụ thay vì hiện "Chờ phục vụ" cho mọi đơn
+            if (orders.Count > 0) servingSupported = orders.Any(o => o.TrangThaiPhucVu is not null);
             totalPages = Math.Max(1, result.Meta.TotalPages);
             loadError = null;
 
@@ -995,12 +1173,14 @@
         if (inPage is not null)
         {
             selectedOrder = inPage;
+            SyncPickupInput(inPage);
             return;
         }
 
         try
         {
             selectedOrder = await OrderApi.GetAsync(id, ct);
+            SyncPickupInput(selectedOrder);
         }
         catch (ApiException)
         {
@@ -1011,7 +1191,7 @@
     private async Task AutoRefresh()
     {
         // Không làm mới khi đang thao tác (tránh danh sách nhảy dưới tay người dùng)
-        if (!autoRefreshEnabled || loading || paying || creating || cancelling
+        if (!autoRefreshEnabled || loading || paying || creating || cancelling || servingBusy
             || isOrderModalOpen || isCancelModalOpen || pageCts.IsCancellationRequested)
         {
             return;
@@ -1029,6 +1209,9 @@
             return;
         }
 
+        // Lọc "Đã hủy" không đi cùng lọc thanh toán (đơn hủy không còn chưa/đã thanh toán)
+        if (statusFilter == TrangThaiPhucVus.CancelledFilter) paymentFilter = "";
+
         page = 1;
         await LoadOrders();
     }
@@ -1039,6 +1222,7 @@
         fromDate = null;
         toDate = null;
         statusFilter = "";
+        paymentFilter = "";
         page = 1;
         await LoadOrders();
     }
@@ -1084,8 +1268,11 @@
         {
             var order = orders.FirstOrDefault(o => o.MaDonHang == id);
             payMethod = order?.PhuongThucThanhToan ?? PhuongThucThanhToans.Cash;
-            cashGiven = null;
+            pickupInput = order?.SoNhanMon;
+            pickupServerValue = order?.SoNhanMon;
+            pickupDirty = false;
             payError = null;
+            servingError = null;
         }
 
         selectedId = id;
@@ -1103,6 +1290,7 @@
         selectedId = null;
         selectedOrder = null;
         payError = null;
+        servingError = null;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -1130,18 +1318,16 @@
 
         try
         {
+            // Không gửi "tiền khách đưa": nhân viên chỉ xác nhận đã thu đủ tiền
             var result = await OrderApi.PayAsync(order.MaDonHang, new ThanhToanRequest
             {
-                PhuongThucThanhToan = payMethod,
-                TienKhachDua = payMethod == PhuongThucThanhToans.Cash ? cashGiven : null
+                PhuongThucThanhToan = payMethod
             }, pageCts.Token);
 
             Replace(result.DonHang);
 
-            string change = result.TienThua > 0 ? $" Tiền thừa trả khách: {Money(result.TienThua)}." : "";
-            ShowAlert($"Đơn #{order.MaDonHang} đã thanh toán {Money(result.DonHang.TongTien)}.{change}", "success",
-                result.CanhBaoKho);
-            cashGiven = null;
+            ShowAlert($"Đơn #{order.MaDonHang} đã thanh toán {Money(result.DonHang.TongTien)} ({PhuongThucThanhToans.Label(result.DonHang.PhuongThucThanhToan)}).",
+                "success", result.CanhBaoKho);
         }
         catch (ApiException ex)
         {
@@ -1163,7 +1349,139 @@
     {
         int index = orders.FindIndex(o => o.MaDonHang == updated.MaDonHang);
         if (index >= 0) orders[index] = updated;
-        if (selectedId == updated.MaDonHang) selectedOrder = updated;
+
+        if (selectedId == updated.MaDonHang)
+        {
+            selectedOrder = updated;
+            SyncPickupInput(updated);
+        }
+    }
+
+    /// <summary>
+    /// Đồng bộ ô "Số nhận món" với dữ liệu máy chủ. Khi người dùng đang gõ dở thì giữ nguyên chữ họ gõ,
+    /// nhưng nếu máy khác vừa đổi số của chính đơn này thì báo và nạp lại số mới — tránh lưu đè (vd. xóa mất số).
+    /// </summary>
+    private void SyncPickupInput(DonHang order)
+    {
+        if (!pickupDirty)
+        {
+            pickupInput = order.SoNhanMon;
+        }
+        else if (order.SoNhanMon != pickupServerValue)
+        {
+            pickupInput = order.SoNhanMon;
+            pickupDirty = false;
+            servingError = order.SoNhanMon is { } so
+                ? $"Số nhận món của đơn này vừa được đổi ở máy khác thành {so}. Kiểm tra lại trước khi đổi."
+                : "Số nhận món của đơn này vừa được bỏ ở máy khác. Kiểm tra lại trước khi nhập.";
+        }
+
+        pickupServerValue = order.SoNhanMon;
+    }
+
+    private void OnPickupInput(ChangeEventArgs e)
+    {
+        pickupInput = int.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out int n) ? n : null;
+        pickupDirty = true;
+    }
+
+    private void SwitchPayMethod()
+    {
+        payMethod = payMethod == PhuongThucThanhToans.Cash ? PhuongThucThanhToans.QrTransfer : PhuongThucThanhToans.Cash;
+        payError = null;
+    }
+
+    /// <summary>
+    /// Các API số nhận món / trạng thái phục vụ / sửa đơn mới chỉ là đề xuất: backend chưa có thì báo rõ thay vì "không tìm thấy".
+    /// </summary>
+    /// Backend thật trả 404 NOT_FOUND "Không có endpoint ..." (MapFallback) cho route chưa có; đơn hàng thì không bị xóa,
+    /// nên 404/405/501 trên các route đề xuất được coi là "chưa hỗ trợ".
+    private static string ProposedApiError(ApiException ex) =>
+        ex.Status is 404 or 405 or 501
+            ? "Máy chủ chưa hỗ trợ chức năng này (đã đề xuất với nhóm backend)."
+            : ex.Message;
+
+    // =========================================================================
+    // SỐ NHẬN MÓN & TRẠNG THÁI PHỤC VỤ
+    // =========================================================================
+
+    private async Task PickupKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && SelectedOrder is { } order) await SavePickupNumber(order);
+    }
+
+    private async Task SavePickupNumber(DonHang order)
+    {
+        if (servingBusy || pickupInput == order.SoNhanMon) return;
+
+        if (pickupInput is { } n && (n < SoNhanMons.Min || n > SoNhanMons.Max))
+        {
+            servingError = $"Số nhận món phải từ {SoNhanMons.Min} đến {SoNhanMons.Max}.";
+            return;
+        }
+
+        servingBusy = true;
+        servingError = null;
+
+        try
+        {
+            var updated = await OrderApi.SetPickupNumberAsync(order.MaDonHang, pickupInput, pageCts.Token);
+            pickupDirty = false;
+            Replace(updated);
+            ShowAlert(updated.SoNhanMon is { } so
+                ? $"Đã gán số nhận món {so} cho đơn #{updated.MaDonHang}."
+                : $"Đã bỏ số nhận món của đơn #{updated.MaDonHang}.", "success");
+        }
+        catch (ApiException ex)
+        {
+            servingError = ProposedApiError(ex);
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            servingBusy = false;
+        }
+    }
+
+    private async Task SetServing(DonHang order, string status, bool confirmed = false)
+    {
+        if (servingBusy) return;
+
+        // Phục vụ khi chưa thu tiền: hỏi lại trước (thao tác không hoàn tác)
+        if (status == TrangThaiPhucVus.Served && !confirmed && order.TrangThaiThanhToan == TrangThaiDon.Pending)
+        {
+            confirmServeUnpaidId = order.MaDonHang;
+            return;
+        }
+
+        confirmServeUnpaidId = null;
+
+        servingBusy = true;
+        servingError = null;
+
+        try
+        {
+            var updated = await OrderApi.SetServingStatusAsync(order.MaDonHang, status, pageCts.Token);
+            Replace(updated);
+            ShowAlert(status == TrangThaiPhucVus.Served
+                ? $"Đơn #{updated.MaDonHang} đã phục vụ.{(updated.SoNhanMon is { } so ? $" Số {so} đã được giải phóng." : "")}"
+                : $"Đơn #{updated.MaDonHang} đang được chuẩn bị.", "success");
+        }
+        catch (ApiException ex)
+        {
+            servingError = ProposedApiError(ex);
+            if (ex.Status == 409) await LoadOrders(quiet: true);
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            servingBusy = false;
+        }
     }
 
     // =========================================================================
@@ -1220,8 +1538,38 @@
 
     private async Task OpenCreateOrder()
     {
+        editingOrderId = null;
         draftLines = [];
         draftPaymentMethod = PhuongThucThanhToans.Cash;
+        await OpenOrderModal();
+    }
+
+    /// <summary>Sửa đơn: mở lại hộp thoại tạo đơn với các món hiện có (chỉ đơn chưa thanh toán, chưa phục vụ).</summary>
+    private async Task OpenEditOrder()
+    {
+        if (SelectedOrder is not { CoTheSua: true } order) return;
+
+        editingOrderId = order.MaDonHang;
+        draftPaymentMethod = order.PhuongThucThanhToan;
+        draftLines = (order.ChiTiet ?? []).Select(c =>
+        {
+            // TenMonLuu = "Tên món - Size"
+            int cut = c.TenMonLuu.LastIndexOf(" - ", StringComparison.Ordinal);
+            return new DraftLine(
+                c.MaChiTietMon,
+                cut > 0 ? c.TenMonLuu[..cut] : c.TenMonLuu,
+                cut > 0 ? c.TenMonLuu[(cut + 3)..] : "",
+                c.DonGiaBan,
+                c.SoLuong,
+                c.GhiChu,
+                c.Toppings.Select(t => new Topping { MaTopping = t.MaTopping, TenTopping = t.TenToppingLuu, GiaThem = t.DonGiaTopping }).ToList());
+        }).ToList();
+
+        await OpenOrderModal();
+    }
+
+    private async Task OpenOrderModal()
+    {
         orderModalError = null;
         shortages = [];
         ResetBuilder();
@@ -1317,7 +1665,7 @@
 
         try
         {
-            var created = await OrderApi.CreateAsync(new DatMonRequest
+            var request = new DatMonRequest
             {
                 PhuongThucThanhToan = draftPaymentMethod,
                 ChiTiet = draftLines.Select(l => new DongDatMonRequest
@@ -1327,7 +1675,20 @@
                     GhiChu = l.GhiChu,
                     Toppings = l.Toppings.Count == 0 ? null : l.Toppings.Select(t => t.MaTopping).ToList()
                 }).ToList()
-            }, pageCts.Token);
+            };
+
+            if (editingOrderId is { } editId)
+            {
+                var updated = await OrderApi.UpdateAsync(editId, request, pageCts.Token);
+                Replace(updated);
+                if (selectedId == updated.MaDonHang) payMethod = updated.PhuongThucThanhToan;
+                isOrderModalOpen = false;
+                editingOrderId = null;
+                ShowAlert($"Đã cập nhật đơn #{updated.MaDonHang} — tổng mới {Money(updated.TongTien)}.", "success");
+                return;
+            }
+
+            var created = await OrderApi.CreateAsync(request, pageCts.Token);
 
             isOrderModalOpen = false;
             lastSeenOrderId = Math.Max(lastSeenOrderId, created.MaDonHang);
@@ -1339,7 +1700,7 @@
         }
         catch (ApiException ex)
         {
-            orderModalError = ex.Message;
+            orderModalError = editingOrderId is null ? ex.Message : ProposedApiError(ex);
 
             if (ex.Code == ApiErrorCodes.OutOfIngredients && ex.Details is { ValueKind: System.Text.Json.JsonValueKind.Array } details)
             {
@@ -1368,6 +1729,7 @@
         if (creating) return;
 
         isOrderModalOpen = false;
+        editingOrderId = null;
         orderModalError = null;
     }
 
@@ -1393,11 +1755,12 @@
         stockWarnings = [];
     }
 
+    /// <summary>In riêng hóa đơn (mẫu #receipt-source) cho khách — không in cả giao diện trang.</summary>
     private async Task PrintReceipt()
     {
         try
         {
-            await JS.InvokeVoidAsync("appHelpers.printPage");
+            await JS.InvokeVoidAsync("appHelpers.printReceipt", "#receipt-source");
         }
         catch (JSException ex)
         {

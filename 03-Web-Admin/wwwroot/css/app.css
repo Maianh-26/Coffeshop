@@ -2496,14 +2496,12 @@ input:-webkit-autofill:focus {
     white-space: nowrap;
 }
 
-/* Đơn hàng: khi mở khung chi tiết bên cạnh, ẩn cột phụ (Nguồn, Thời gian, Số món — đều có trong khung chi tiết)
-   để cột Tổng tiền / Thanh toán / Trạng thái không bị đẩy khuất */
+/* Đơn hàng: khi mở khung chi tiết bên cạnh, ẩn cột phụ (Nguồn, Thời gian tạo — đều có trong khung chi tiết)
+   để Tổng tiền / Số nhận món / Thanh toán / Trạng thái không bị đẩy khuất */
 .orders-page.has-detail .orders-table th:nth-child(2),
 .orders-page.has-detail .orders-table td:nth-child(2),
 .orders-page.has-detail .orders-table th:nth-child(3),
-.orders-page.has-detail .orders-table td:nth-child(3),
-.orders-page.has-detail .orders-table th:nth-child(5),
-.orders-page.has-detail .orders-table td:nth-child(5) {
+.orders-page.has-detail .orders-table td:nth-child(3) {
     display: none;
 }
 
@@ -2566,12 +2564,18 @@ input:-webkit-autofill:focus {
         font-size: var(--fs-md);
     }
 
-    /* Ẩn cột phụ của bảng đơn hàng trên điện thoại */
+    /* Ẩn cột phụ của bảng đơn hàng trên điện thoại (Nguồn, Thời gian tạo); giữ Số nhận món / Thanh toán / Trạng thái */
     .orders-table th:nth-child(2),
     .orders-table td:nth-child(2),
-    .orders-table th:nth-child(5),
-    .orders-table td:nth-child(5) {
+    .orders-table th:nth-child(3),
+    .orders-table td:nth-child(3) {
         display: none;
+    }
+
+    /* Cho nhãn "Tiền mặt · Chưa thanh toán" xuống dòng để bảng vừa màn hình */
+    .orders-table td .badge {
+        white-space: normal;
+        text-align: center;
     }
 
     /* Bảng rỗng: không ép bề rộng tối thiểu để dòng "Chưa có dữ liệu" nằm gọn trong màn hình */
@@ -2952,12 +2956,12 @@ a.sidebar-user {
         background: var(--coffee-200);
     }
 
-/* Máy tính bảng: ẩn cột phụ của bảng đơn hàng (Nguồn, Số món) để thấy Thanh toán / Trạng thái */
+/* Máy tính bảng: ẩn cột phụ của bảng đơn hàng (Nguồn, Thời gian tạo) để thấy Số nhận món / Thanh toán / Trạng thái */
 @media (max-width: 1000px) {
     .orders-table th:nth-child(2),
     .orders-table td:nth-child(2),
-    .orders-table th:nth-child(5),
-    .orders-table td:nth-child(5) {
+    .orders-table th:nth-child(3),
+    .orders-table td:nth-child(3) {
         display: none;
     }
 }
@@ -3145,4 +3149,109 @@ fieldset.field {
 
 .topping-checkbox-item span {
     min-width: 0;
+}
+
+/* =========================================================
+   ĐƠN HÀNG — số nhận món, trạng thái phục vụ, thu tiền
+   ========================================================= */
+
+/* Số trên bảng gỗ: ô tròn nổi bật để nhân viên dò nhanh */
+.pickup-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: var(--r-pill);
+    background: var(--coffee-100);
+    color: var(--coffee-800);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.serving-box,
+.pay-box {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    margin: 12px 0;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface-warm);
+}
+
+.pickup-input-row {
+    display: flex;
+    gap: 8px;
+}
+
+    .pickup-input-row input {
+        width: 120px;
+        font-size: var(--fs-lg);
+        font-weight: 700;
+        text-align: center;
+    }
+
+.pickup-readonly {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+}
+
+.serving-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+    .serving-actions .btn {
+        flex: 1 1 160px;
+        justify-content: center;
+    }
+
+.pay-box-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.pay-box .text-button {
+    justify-self: center;
+}
+
+.serving-box .form-note,
+.pay-box .form-note {
+    margin: 0;
+}
+
+/* Hỏi lại ngay trong khung chi tiết (vd. phục vụ khi chưa thanh toán) */
+.confirm-inline {
+    display: grid;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--warning);
+    border-radius: var(--r-sm);
+    background: var(--warning-bg);
+    color: var(--ink);
+}
+
+    .confirm-inline p {
+        margin: 0;
+    }
+
+/* Điện thoại: bảng đơn hàng chỉ còn 5 cột → bỏ bề rộng tối thiểu 650px, cho chữ xuống dòng để không phải cuộn ngang */
+@media (max-width: 650px) {
+    .table-wrap .orders-table {
+        min-width: 0;
+    }
+
+    .orders-table th,
+    .orders-table td {
+        white-space: normal;
+        padding-left: 6px;
+        padding-right: 6px;
+    }
 }
