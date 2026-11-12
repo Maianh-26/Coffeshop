@@ -162,8 +162,8 @@ public static class TrangThaiDon
 
     public static string Label(string? status) => status switch
     {
-        Pending => "Chưa thanh toán",
-        Paid => "Đã thanh toán",
+        Pending => "Chưa thu",
+        Paid => "Đã thu",
         Cancelled => "Đã hủy",
         _ => status ?? ""
     };
@@ -189,19 +189,30 @@ public static class PhuongThucThanhToans
         _ => method ?? ""
     };
 
-    /// <summary>Cột "Thanh toán": hình thức + tình trạng tiền, ví dụ "Tiền mặt · Đã thanh toán".</summary>
-    public static string Summary(DonHang d) => d.TrangThaiThanhToan switch
+    /// <summary>Nhãn ngắn trên bảng: Chưa thu / Đã thu / Đã hoàn tiền / Không thu.</summary>
+    public static string ShortLabel(DonHang d) => d.TrangThaiThanhToan switch
     {
-        TrangThaiDon.Cancelled when d.DaHoanTien => $"{Label(d.PhuongThucThanhToan)} · Đã hoàn tiền",
-        TrangThaiDon.Cancelled => $"{Label(d.PhuongThucThanhToan)} · Không thu",
-        _ => $"{Label(d.PhuongThucThanhToan)} · {TrangThaiDon.Label(d.TrangThaiThanhToan)}"
+        TrangThaiDon.Cancelled when d.DaHoanTien => "Đã hoàn tiền",
+        TrangThaiDon.Cancelled => "Không thu",
+        _ => TrangThaiDon.Label(d.TrangThaiThanhToan)
     };
 
-    public static string SummaryColor(DonHang d) => d.TrangThaiThanhToan switch
+    /// <summary>Sắc thái (class CSS <c>status-*</c>): due = vàng, paid = xanh lá, refund = đỏ, void = xám.</summary>
+    public static string Tone(DonHang d) => d.TrangThaiThanhToan switch
     {
-        TrangThaiDon.Paid => "green",
-        TrangThaiDon.Cancelled => "gray",
-        _ => "orange"
+        TrangThaiDon.Paid => "paid",
+        TrangThaiDon.Cancelled when d.DaHoanTien => "refund",
+        TrangThaiDon.Cancelled => "void",
+        _ => "due"
+    };
+
+    /// <summary>Tình trạng tiền của đơn bằng một câu ngắn, ví dụ "Đã thu tiền mặt", "Chưa thu (chuyển khoản)".</summary>
+    public static string Summary(DonHang d) => d.TrangThaiThanhToan switch
+    {
+        TrangThaiDon.Paid when d.PhuongThucThanhToan == QrTransfer => "Đã nhận chuyển khoản",
+        TrangThaiDon.Paid => "Đã thu tiền mặt",
+        TrangThaiDon.Cancelled when !d.DaHoanTien => ShortLabel(d),
+        _ => $"{ShortLabel(d)} ({Label(d.PhuongThucThanhToan).ToLowerInvariant()})"
     };
 }
 
@@ -229,12 +240,16 @@ public static class TrangThaiPhucVus
 
     public static string Label(DonHang d) => d.DaHuy ? "Đã hủy" : Label(d.PhucVu);
 
-    public static string Color(DonHang d) => d.DaHuy ? "red" : d.PhucVu switch
+    /// <summary>
+    /// Sắc thái hiển thị (class CSS <c>status-*</c>), 4 màu: waiting = vàng, preparing = xanh dương,
+    /// served = xanh lá, cancelled = đỏ. Luôn kèm chữ, không chỉ dựa vào màu.
+    /// </summary>
+    public static string Tone(DonHang d) => d.DaHuy ? "cancelled" : d.PhucVu switch
     {
-        Waiting => "orange",
-        Preparing => "blue",
-        Served => "green",
-        _ => "gray"
+        Waiting => "waiting",
+        Preparing => "preparing",
+        Served => "served",
+        _ => "void"
     };
 }
 

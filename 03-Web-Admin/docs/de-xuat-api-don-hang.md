@@ -5,7 +5,7 @@
 | **Gửi** | Nhóm Backend (`CoffeeShop.Api`) |
 | **Từ** | Nhóm Web Admin (`03-Web-Admin`) |
 | **Ngày** | 11/11/2026 |
-| **Phiên bản** | 2.0 |
+| **Phiên bản** | 2.1 (bắt buộc đi lần lượt Chờ phục vụ → Đang chuẩn bị → Đã phục vụ) |
 | **Yêu cầu gốc của chủ quán** | [yeu-cau-quan-ly-don-hang.md](yeu-cau-quan-ly-don-hang.md) |
 | **Trạng thái phía Web Admin** | Đã làm xong giao diện. Chạy đầy đủ ở chế độ giả lập (`Api:UseMock: true`) và đang chờ backend |
 
@@ -76,14 +76,16 @@ Hiện backend chỉ có **trạng thái thanh toán**. Chủ quán cần thêm 
 ### 2.3. Sơ đồ chuyển trạng thái phục vụ
 
 ```
-            PUT trang-thai-phuc-vu        PUT trang-thai-phuc-vu
-  WAITING ─────────────────────▶ PREPARING ─────────────────────▶ SERVED
-     │                                                              ▲
-     └──────────────────────────────────────────────────────────────┘
-                     (được phép bỏ qua PREPARING)
+           "Bắt đầu chuẩn bị"               "Xác nhận đã phục vụ"
+  WAITING ───────────────────▶ PREPARING ───────────────────▶ SERVED
+              PUT {PREPARING}                 PUT {SERVED}
+
+  ✗ WAITING ──▶ SERVED (bỏ qua bước chuẩn bị) bị CHẶN: 409
+  ✗ Đi lùi bị CHẶN: 409
 ```
 
-- **Chỉ đi tới, không đi lùi.** `SERVED` là trạng thái cuối.
+- **Đi lần lượt từng bước, không bỏ qua, không đi lùi.** Chưa bắt đầu chuẩn bị thì không thể xác nhận đã phục vụ (yêu cầu của chủ quán: chưa pha chế thì chưa thể mang món ra). `SERVED` là trạng thái cuối.
+- Trên web admin, mỗi lúc chỉ hiện **một nút** cho bước kế tiếp: đơn "Chờ phục vụ" có nút **Bắt đầu chuẩn bị**, đơn "Đang chuẩn bị" có nút **Xác nhận đã phục vụ**.
 - Đơn đã `CANCELLED` thì **không** đổi trạng thái phục vụ được nữa.
 - **Không** bắt buộc thanh toán trước khi phục vụ, vì quán có cả kiểu "phục vụ trước, thu tiền sau". Web admin đã hỏi xác nhận lại khi phục vụ đơn chưa thanh toán (xem mục 10).
 
@@ -103,7 +105,7 @@ Hủy đơn (`POST huy`) **tự động** giải phóng số, vì đơn rơi kh�
 |---|:-:|:-:|:-:|:-:|
 | Gán / đổi / bỏ số nhận món | ✅ | ✅ | ❌ 409 | ❌ 409 |
 | Chuyển sang `PREPARING` | ✅ | ❌ 409 | ❌ 409 | ❌ 409 |
-| Chuyển sang `SERVED` | ✅ | ✅ | ❌ 409 | ❌ 409 |
+| Chuyển sang `SERVED` | ❌ 409 (phải chuẩn bị trước) | ✅ | ❌ 409 | ❌ 409 |
 | Sửa món (`PUT don-hang/{id}`) | ✅ nếu `PENDING` | ✅ nếu `PENDING` | ❌ 409 | ❌ 409 |
 | Thanh toán (đã có) | ✅ nếu `PENDING` | ✅ nếu `PENDING` | ✅ nếu `PENDING` | ❌ |
 | Hủy (đã có, chỉ QuanLy) | ✅ | ✅ | ✅ | ❌ |
@@ -315,7 +317,10 @@ Giá trị hợp lệ: `PREPARING`, `SERVED`. Không cho gửi `WAITING`, vì kh
 | 400 | `VALIDATION_ERROR` | Giá trị không hợp lệ | |
 | 404 | `NOT_FOUND` | Không có đơn | `Đơn hàng không tồn tại` |
 | 409 | `CONFLICT` | Đơn đã hủy | `Đơn đã bị hủy` |
-| 409 | `CONFLICT` | Chuyển lùi hoặc giữ nguyên (vd. `SERVED` sang `PREPARING`) | `Đơn đang ở trạng thái Đã phục vụ, không chuyển ngược được` |
+| 409 | `CONFLICT` | Bỏ qua bước: `WAITING` sang `SERVED` | `Đơn chưa bắt đầu chuẩn bị, không thể xác nhận đã phục vụ` |
+| 409 | `CONFLICT` | Chuyển lùi hoặc giữ nguyên (vd. `SERVED` sang `PREPARING`) | `Đơn đang ở trạng thái Đã phục vụ, không chuyển sang Đang chuẩn bị được` |
+
+Quy tắc kiểm tra: **chỉ chấp nhận đúng bước kế tiếp**, tức `ThuTu(mới) == ThuTu(hiện tại) + 1`.
 
 Chuyển sang `SERVED` thì số nhận món **tự giải phóng** nhờ điều kiện ở mục 2.4. **Không** đặt `SoNhanMon = NULL`.
 
@@ -437,8 +442,12 @@ public async Task<DonHang> DoiTrangThaiPhucVu(int id, string trangThaiMoi)
 {
     var don = await Tim(id);
     if (don.TrangThaiThanhToan == TrangThais.Cancelled) throw ApiException.Conflict("Đơn đã bị hủy");
-    if (TrangThaiPhucVus.ThuTu(trangThaiMoi) <= TrangThaiPhucVus.ThuTu(don.TrangThaiPhucVu))
-        throw ApiException.Conflict($"Đơn đang ở trạng thái {TenTrangThai(don.TrangThaiPhucVu)}, không chuyển ngược được");
+    // Chỉ cho sang ĐÚNG bước kế tiếp: WAITING → PREPARING → SERVED (không bỏ qua, không lùi)
+    if (TrangThaiPhucVus.ThuTu(trangThaiMoi) != TrangThaiPhucVus.ThuTu(don.TrangThaiPhucVu) + 1)
+        throw ApiException.Conflict(
+            don.TrangThaiPhucVu == TrangThaiPhucVus.Waiting && trangThaiMoi == TrangThaiPhucVus.Served
+                ? "Đơn chưa bắt đầu chuẩn bị, không thể xác nhận đã phục vụ"
+                : $"Đơn đang ở trạng thái {TenTrangThai(don.TrangThaiPhucVu)}, không chuyển sang {TenTrangThai(trangThaiMoi)} được");
 
     don.TrangThaiPhucVu = trangThaiMoi; // SERVED → số nhận món tự hết bị khóa (vẫn giữ giá trị)
     await db.SaveChangesAsync();
@@ -534,11 +543,11 @@ public async Task<DonHang> SuaDon(int id, DatMonRequest req)
   /don-hang/{id}/trang-thai-phuc-vu:
     put:
       tags: [DonHang]
-      summary: Chuyển trạng thái phục vụ (chỉ đi tới)
+      summary: Chuyển trạng thái phục vụ sang đúng bước kế tiếp (WAITING → PREPARING → SERVED)
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TrangThaiPhucVuRequest' } } } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/DonHang' } } } }
-        '409': { description: Đơn đã hủy hoặc chuyển lùi trạng thái }
+        '409': { description: Đơn đã hủy, bỏ qua bước (WAITING → SERVED) hoặc chuyển lùi }
 ```
 
 ---
@@ -554,6 +563,7 @@ Chuẩn bị: đăng nhập `nhanvien` để lấy token. Tạo 3 đơn A, B, C 
 | T3 | `PUT B/so-nhan-mon {18}` | **409 `SO_NHAN_MON_DANG_DUNG`**, message nêu đơn A |
 | T4 | `PUT A/so-nhan-mon {18}` (gửi lại số cũ) | 200, không lỗi |
 | T5 | `PUT A/so-nhan-mon {0}` và `{51}` | 400 |
+| T5b | `PUT A/trang-thai-phuc-vu {SERVED}` khi A còn `WAITING` | **409**, `Đơn chưa bắt đầu chuẩn bị…` (không bỏ qua bước) |
 | T6 | `PUT A/trang-thai-phuc-vu {PREPARING}` | 200 |
 | T7 | `PUT A/trang-thai-phuc-vu {PREPARING}` (lần 2) | 409 (không chuyển lùi hoặc giữ nguyên) |
 | T8 | `PUT A/trang-thai-phuc-vu {SERVED}` | 200, `soNhanMon` **vẫn = 18** |
@@ -602,7 +612,7 @@ Chuẩn bị: đăng nhập `nhanvien` để lấy token. Tạo 3 đơn A, B, C 
 - [ ] Bắt lỗi trùng index (2601/2627), trả 409 `SO_NHAN_MON_DANG_DUNG`
 - [ ] Tách `DungChiTiet` dùng chung cho `DatMon` và `SuaDon`
 - [ ] Cập nhật `openapi.yaml` và `CoffeeShop.Api.http`
-- [ ] Chạy hết T1–T18
+- [ ] Chạy hết T1–T18 (kể cả T5b)
 - [ ] Báo nhóm Web Admin để test chung với `Api:UseMock: false`
 
 **Liên hệ:** nhóm Web Admin. Có thể chạy web admin ở chế độ giả lập (`03-Web-Admin/wwwroot/appsettings.json` → `"UseMock": true`) để xem đúng hành vi mong muốn. Logic giả lập nằm trong `Services/Mock/MockApiHandler.cs` (các hàm `SetPickupNumber`, `SetServingStatus`, `UpdateOrder`).

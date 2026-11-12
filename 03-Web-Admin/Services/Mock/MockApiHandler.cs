@@ -876,7 +876,7 @@ public class MockApiHandler : HttpMessageHandler
         return order;
     }
 
-    /// <summary>[ĐỀ XUẤT] PUT don-hang/{id}/trang-thai-phuc-vu: chỉ đi tới (WAITING → PREPARING → SERVED).</summary>
+    /// <summary>[ĐỀ XUẤT] PUT don-hang/{id}/trang-thai-phuc-vu: lần lượt từng bước WAITING → PREPARING → SERVED.</summary>
     private static DonHang SetServingStatus(DonHang order, TrangThaiPhucVuRequest req)
     {
         int Rank(string s) => s switch
@@ -889,8 +889,13 @@ public class MockApiHandler : HttpMessageHandler
 
         if (Rank(req.TrangThaiPhucVu) < 0) throw Invalid();
         if (order.DaHuy) throw Conflict("Đơn đã bị hủy");
-        if (Rank(req.TrangThaiPhucVu) <= Rank(order.PhucVu))
-            throw Conflict($"Đơn đang ở trạng thái {TrangThaiPhucVus.Label(order.PhucVu)}, không chuyển ngược được");
+        // Chỉ được sang ĐÚNG bước kế tiếp: WAITING → PREPARING → SERVED (không lùi, không bỏ qua bước chuẩn bị)
+        if (Rank(req.TrangThaiPhucVu) != Rank(order.PhucVu) + 1)
+        {
+            throw Conflict(order.PhucVu == TrangThaiPhucVus.Waiting && req.TrangThaiPhucVu == TrangThaiPhucVus.Served
+                ? "Đơn chưa bắt đầu chuẩn bị, không thể xác nhận đã phục vụ"
+                : $"Đơn đang ở trạng thái {TrangThaiPhucVus.Label(order.PhucVu)}, không chuyển sang {TrangThaiPhucVus.Label(req.TrangThaiPhucVu)} được");
+        }
 
         order.TrangThaiPhucVu = req.TrangThaiPhucVu;
         return order;
@@ -1075,7 +1080,7 @@ public class MockApiHandler : HttpMessageHandler
                 ChiTiet = [new() { MaChiTietMon = sellable[Random.Shared.Next(sellable.Count)].MaChiTietMon, SoLuong = Random.Shared.Next(1, 3) }]
             }, null);
 
-            // Khách chuyển khoản ngay trên tablet → cổng thanh toán báo về, đơn tự sang "Đã thanh toán"
+            // Khách chuyển khoản ngay trên tablet → cổng thanh toán báo về, đơn tự sang PAID ("Đã thu")
             if (method == PhuongThucThanhToans.QrTransfer)
             {
                 Pay(order, new ThanhToanRequest { PhuongThucThanhToan = method });

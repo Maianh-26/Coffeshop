@@ -1816,36 +1816,6 @@ tfoot td {
     100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
 }
 
-.realtime-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--live-bg);
-    border: 1px solid var(--live-line);
-    color: var(--live);
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    padding: 7px 14px;
-    border-radius: var(--r-pill);
-    cursor: pointer;
-    user-select: none;
-}
-
-.realtime-pill:hover {
-    background: var(--success-bg);
-}
-
-.realtime-pill.paused {
-    background: var(--neutral-bg);
-    border-color: var(--line-strong);
-    color: var(--neutral);
-}
-
-.realtime-pill.paused .live-indicator {
-    background-color: var(--line-strong);
-    animation: none;
-}
-
 .qr-payment-box {
     background: var(--surface-warm);
     border: 1px dashed var(--action-warning);
@@ -2342,11 +2312,6 @@ tbody tr {
     align-items: center;
 }
 
-.realtime-pill {
-    white-space: nowrap;
-    transition: background-color var(--ease), border-color var(--ease), color var(--ease);
-}
-
 .btn-compact {
     min-height: 36px;
     padding: 6px 12px;
@@ -2498,17 +2463,19 @@ input:-webkit-autofill:focus {
 
 /* Đơn hàng: khi mở khung chi tiết bên cạnh, ẩn cột phụ (Nguồn, Thời gian tạo — đều có trong khung chi tiết)
    để Tổng tiền / Số nhận món / Thanh toán / Trạng thái không bị đẩy khuất */
-.orders-page.has-detail .orders-table th:nth-child(2),
-.orders-page.has-detail .orders-table td:nth-child(2),
-.orders-page.has-detail .orders-table th:nth-child(3),
-.orders-page.has-detail .orders-table td:nth-child(3) {
+.orders-page.has-detail .orders-table th:nth-child(6),
+.orders-page.has-detail .orders-table td:nth-child(6),
+.orders-page.has-detail .orders-table th:nth-child(7),
+.orders-page.has-detail .orders-table td:nth-child(7) {
     display: none;
 }
 
-.orders-page.has-detail .orders-table th,
-.orders-page.has-detail .orders-table td {
-    padding-left: 12px;
-    padding-right: 12px;
+@media (min-width: 1001px) {
+    .orders-page.has-detail .orders-table th,
+    .orders-page.has-detail .orders-table td {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
 }
 
 @media (max-width: 1440px) and (min-width: 1201px) {
@@ -2565,18 +2532,13 @@ input:-webkit-autofill:focus {
     }
 
     /* Ẩn cột phụ của bảng đơn hàng trên điện thoại (Nguồn, Thời gian tạo); giữ Số nhận món / Thanh toán / Trạng thái */
-    .orders-table th:nth-child(2),
-    .orders-table td:nth-child(2),
-    .orders-table th:nth-child(3),
-    .orders-table td:nth-child(3) {
+    .orders-table th:nth-child(6),
+    .orders-table td:nth-child(6),
+    .orders-table th:nth-child(7),
+    .orders-table td:nth-child(7) {
         display: none;
     }
 
-    /* Cho nhãn "Tiền mặt · Chưa thanh toán" xuống dòng để bảng vừa màn hình */
-    .orders-table td .badge {
-        white-space: normal;
-        text-align: center;
-    }
 
     /* Bảng rỗng: không ép bề rộng tối thiểu để dòng "Chưa có dữ liệu" nằm gọn trong màn hình */
     .table-wrap:has(.empty-cell) table {
@@ -2958,10 +2920,10 @@ a.sidebar-user {
 
 /* Máy tính bảng: ẩn cột phụ của bảng đơn hàng (Nguồn, Thời gian tạo) để thấy Số nhận món / Thanh toán / Trạng thái */
 @media (max-width: 1000px) {
-    .orders-table th:nth-child(2),
-    .orders-table td:nth-child(2),
-    .orders-table th:nth-child(3),
-    .orders-table td:nth-child(3) {
+    .orders-table th:nth-child(6),
+    .orders-table td:nth-child(6),
+    .orders-table th:nth-child(7),
+    .orders-table td:nth-child(7) {
         display: none;
     }
 }
@@ -3242,7 +3204,7 @@ fieldset.field {
         margin: 0;
     }
 
-/* Điện thoại: bảng đơn hàng chỉ còn 5 cột → bỏ bề rộng tối thiểu 650px, cho chữ xuống dòng để không phải cuộn ngang */
+/* Điện thoại: bảng đơn hàng chỉ còn 4 cột → bỏ bề rộng tối thiểu 650px, cho chữ xuống dòng để không phải cuộn ngang */
 @media (max-width: 650px) {
     .table-wrap .orders-table {
         min-width: 0;
@@ -3254,4 +3216,696 @@ fieldset.field {
         padding-left: 6px;
         padding-right: 6px;
     }
+}
+
+
+/* Tiêu đề khung chi tiết nhận focus bằng code (sau khi bấm Xem) — không cần viền focus */
+.detail-heading:focus {
+    outline: none;
+}
+
+/* Tiến trình phục vụ: Chờ phục vụ → Đang chuẩn bị → Đã phục vụ */
+.serving-steps {
+    display: flex;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+}
+
+    .serving-steps li {
+        flex: 1;
+        padding: 6px 4px;
+        border-radius: var(--r-sm);
+        background: var(--line);
+        color: var(--muted);
+        font-size: var(--fs-xs);
+        text-align: center;
+        counter-increment: step;
+    }
+
+        .serving-steps li::before {
+            content: counter(step) ". ";
+        }
+
+        .serving-steps li.done {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .serving-steps li.current {
+            background: var(--info-bg);
+            color: var(--info);
+            font-weight: 700;
+        }
+
+/* Gợi ý trong ô số nhận món: chữ mờ, mảnh — không bị nhầm với số đã nhập */
+.pickup-input-row input::placeholder {
+    color: var(--muted);
+    font-size: var(--fs-md);
+    font-weight: 400;
+    opacity: 1;
+}
+
+/* Ô số nhận món đang có lỗi (vd. số đang được dùng) */
+.pickup-input-row input.input-error {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px var(--danger-bg);
+}
+
+/* =====================================================================
+   ĐƠN HÀNG — GIAO DIỆN VẬN HÀNH (tối giản)
+   Bố cục: thanh công cụ phẳng, bảng không lồng thẻ, chi tiết đơn kiểu phiếu order.
+   Màu trạng thái và màu nút: xem khối "4 MÀU TRẠNG THÁI" ở cuối file.
+   ===================================================================== */
+
+/* ---- Bề mặt phẳng: bỏ bóng, không lồng thẻ trong thẻ ---- */
+.orders-page .panel,
+.orders-page .detail-panel {
+    box-shadow: none;
+}
+
+.orders-toolbar .toolbar-actions {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+}
+
+/* Tự cập nhật: chấm nhỏ + chữ, không phải nút màu */
+.live-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 6px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: var(--fs-sm);
+    cursor: pointer;
+}
+
+    .live-toggle:hover {
+        color: var(--ink);
+    }
+
+    .live-toggle.paused .live-indicator {
+        background-color: var(--line-strong);
+        box-shadow: none;
+        animation: none;
+    }
+
+/* ---- Thông báo: nền trắng, vạch màu bên trái ---- */
+.alert.orders-alert {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--ink);
+}
+
+.alert.orders-alert.success {
+    border-left-color: var(--success);
+}
+
+.alert.orders-alert.error {
+    border-left-color: var(--danger);
+}
+
+.alert.orders-alert.new-order-alert {
+    border-left-color: var(--coffee-600);
+}
+
+.new-order-text {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.new-order-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+/* ---- Trạng thái: chỉ việc cần làm mới có nền màu, luôn kèm chữ ---- */
+.orders-page .status {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: var(--r-sm);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.orders-page .status-waiting,
+.orders-page .status-due {
+    color: var(--warning);
+    background: var(--warning-bg);
+}
+
+.orders-page .status-preparing {
+    color: var(--info);
+    background: var(--info-bg);
+}
+
+.pay-method {
+    margin-left: 6px;
+    font-size: var(--fs-xs);
+}
+
+/* ---- Bảng ---- */
+.orders-page .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.orders-table .order-id {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Đơn mới chưa xem: vạch nâu bên trái + chữ "Mới", không tô cả dòng */
+.orders-table tr.is-new td:first-child {
+    box-shadow: inset 3px 0 0 var(--coffee-600);
+}
+
+.new-mark {
+    margin-left: 6px;
+    color: var(--coffee-700);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+}
+
+.page-of {
+    margin-left: 8px;
+}
+
+.orders-page .pickup-input-row input.input-error {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px var(--danger-bg);
+}
+
+/* ---- Khung chi tiết: chia phần bằng đường kẻ, không lồng thẻ ---- */
+.orders-page .order-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.order-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px 16px;
+    margin: 0 0 4px;
+}
+
+    .order-facts dt {
+        color: var(--muted);
+        font-size: var(--fs-xs);
+    }
+
+    .order-facts dd {
+        margin: 0;
+        color: var(--ink);
+        font-size: var(--fs-sm);
+        font-weight: 600;
+    }
+
+.orders-page .serving-box,
+.orders-page .pay-box {
+    margin: 0;
+    padding: 14px 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: none;
+}
+
+/* Phiếu order: món, số lượng, giá thẳng cột */
+.order-ticket {
+    margin-top: 14px;
+    padding: 14px 0;
+    border-top: 1px solid var(--line);
+}
+
+    .order-ticket h4 {
+        margin: 0 0 6px;
+        color: var(--ink);
+        font-size: var(--fs-md);
+    }
+
+.ticket-lines {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+    .ticket-lines li {
+        padding: 8px 0;
+        border-bottom: 1px dashed var(--line);
+    }
+
+.ticket-row {
+    display: grid;
+    grid-template-columns: 34px 1fr auto;
+    gap: 8px;
+    align-items: baseline;
+}
+
+.ticket-qty {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.ticket-name {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.ticket-sub {
+    font-size: var(--fs-sm);
+}
+
+    .ticket-sub .ticket-name {
+        color: var(--ink-soft);
+        font-weight: 400;
+    }
+
+.ticket-note {
+    margin: 2px 0 0 42px;
+    color: var(--muted);
+    font-size: var(--fs-sm);
+    font-style: italic;
+}
+
+.ticket-total {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 10px;
+    color: var(--ink);
+    font-size: var(--fs-lg);
+    font-weight: 800;
+}
+
+/* Thanh tiến trình phục vụ: nền trung tính; bước hiện tại tô màu trạng thái ở khối "4 MÀU" cuối file */
+.orders-page .serving-steps li {
+    background: var(--surface-muted);
+    color: var(--muted);
+}
+
+    .orders-page .serving-steps li.done {
+        background: var(--surface-muted);
+        color: var(--muted);
+        text-decoration: line-through;
+    }
+
+    .orders-page .serving-steps li.current {
+        background: var(--surface);
+        color: var(--ink);
+        box-shadow: inset 0 0 0 2px var(--coffee-600);
+    }
+
+/* Máy tính bảng / khi mở khung chi tiết: bảng đơn hàng vừa khung, chữ dài (thanh toán) được xuống dòng */
+@media (max-width: 1000px) {
+    .table-wrap .orders-table {
+        min-width: 0;
+    }
+
+    .orders-table th,
+    .orders-table td {
+        white-space: normal;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+}
+
+.orders-page.has-detail .orders-table th,
+.orders-page.has-detail .orders-table td {
+    white-space: normal;
+}
+
+/* Số tiền luôn trên một dòng (thắng các quy tắc cho phép xuống dòng ở trên) */
+.orders-page .orders-table td.num,
+.orders-page.has-detail .orders-table td.num,
+.orders-page .orders-table th.num {
+    white-space: nowrap;
+}
+
+/* Điện thoại: ẩn thêm cột Tổng tiền (có trong chi tiết đơn) để cột "Chưa thu" luôn nhìn thấy */
+@media (max-width: 650px) {
+    .orders-table th:nth-child(4),
+    .orders-table td:nth-child(4) {
+        display: none;
+    }
+}
+
+/* =====================================================================
+   ĐƠN HÀNG — chỉnh sau review giao diện lần 2
+   ===================================================================== */
+
+/* Thông báo nổi ở góc dưới, không chiếm chỗ trong trang */
+.orders-toasts {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 900;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(440px, calc(100vw - 32px));
+    pointer-events: none;
+}
+
+    .orders-toasts .alert.orders-alert {
+        margin: 0;
+        max-height: 50vh;
+        overflow-y: auto;
+        box-shadow: var(--shadow-md);
+        pointer-events: auto;
+    }
+
+.alert.orders-alert.has-stock-warning {
+    border-left-color: var(--warning);
+}
+
+/* Tự cập nhật: chấm tĩnh, không nhấp nháy */
+.live-toggle .live-indicator {
+    background-color: var(--coffee-600);
+    box-shadow: none;
+    animation: none;
+}
+
+/* Dòng đang chọn chỉ đổi nền; vạch trái dành riêng cho đơn "Mới" */
+.orders-table tr.selected,
+.orders-table tr.selected:hover {
+    box-shadow: none;
+}
+
+/* Tiêu đề cột ngắn trên điện thoại */
+.label-short {
+    display: none;
+}
+
+/* Phương thức thanh toán đi nguyên cụm dưới nhãn "Chưa thu" */
+.orders-table .pay-method {
+    display: block;
+    margin: 2px 0 0;
+    white-space: nowrap;
+}
+
+/* Bước đã xong: dấu ✓, không gạch ngang (gạch ngang dành cho "Đã hủy") */
+.orders-page .serving-steps li.done {
+    text-decoration: none;
+}
+
+    .orders-page .serving-steps li.done::before {
+        content: "✓ ";
+    }
+
+/* Bộ lọc: màn hình rộng hiện đủ; màn hình hẹp gom vào nút "Bộ lọc" */
+.filters-toggle {
+    display: none;
+}
+
+.filter-extra {
+    display: contents;
+}
+
+.clear-filters {
+    align-self: center;
+    white-space: nowrap;
+}
+
+@media (max-width: 1000px) {
+    .filters-toggle {
+        display: inline-flex;
+    }
+
+    .filter-extra {
+        display: none;
+    }
+
+        .filter-extra.open {
+            display: contents;
+        }
+}
+
+@media (max-width: 650px) {
+    .label-long {
+        display: none;
+    }
+
+    .label-short {
+        display: inline;
+    }
+
+    .orders-table .pay-method {
+        display: none;
+    }
+
+    .orders-page .serving-steps li::before,
+    .orders-page .serving-steps li.done::before {
+        content: none;
+    }
+}
+
+/* Màn hình rộng: thông báo nổi ở góc dưới bên TRÁI (cạnh thanh menu) để không che nút thao tác trong khung chi tiết */
+@media (min-width: 1001px) {
+    .orders-toasts {
+        right: auto;
+        left: 240px;
+    }
+}
+
+/* =====================================================================
+   ĐƠN HÀNG — 4 MÀU TRẠNG THÁI + NÚT THEO VIỆC (theo góp ý chủ dự án)
+     vàng     = chờ phục vụ / chưa thu tiền
+     xanh dương = đang chuẩn bị
+     xanh lá  = đã phục vụ / đã thu tiền
+     đỏ       = đã hủy / đã hoàn tiền
+   Nút: Bắt đầu chuẩn bị = xanh dương, Xác nhận đã phục vụ = xanh lá,
+        Thu tiền = cam (chữ tối để đủ tương phản), Hủy đơn = đỏ.
+   ===================================================================== */
+
+.orders-page .status-served,
+.orders-page .status-paid {
+    padding-left: 8px;
+    padding-right: 8px;
+    color: var(--success);
+    background: var(--success-bg);
+    font-weight: 600;
+}
+
+.orders-page .status-cancelled,
+.orders-page .status-refund {
+    padding-left: 8px;
+    padding-right: 8px;
+    color: var(--danger);
+    background: var(--danger-bg);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.orders-page .status-void {
+    color: var(--muted);
+    background: var(--surface-muted);
+}
+
+/* Thông báo đơn mới: đầu trang, nền xanh, nổi rõ */
+.alert.orders-alert.new-order-alert {
+    margin-bottom: 14px;
+    border: 1px solid var(--info);
+    border-left: 5px solid var(--info);
+    background: var(--info-bg);
+    color: var(--ink);
+    font-size: var(--fs-md);
+}
+
+    .alert.orders-alert.new-order-alert .new-order-text {
+        color: var(--info);
+    }
+
+        .alert.orders-alert.new-order-alert .new-order-text strong {
+            color: var(--ink);
+        }
+
+/* Đơn mới chưa xem: cùng màu xanh với thông báo */
+.orders-table tr.is-new td:first-child {
+    box-shadow: inset 4px 0 0 var(--info);
+}
+
+.new-mark {
+    padding: 1px 6px;
+    border-radius: var(--r-sm);
+    color: var(--surface);
+    background: var(--info);
+}
+
+/* Nút theo việc */
+.btn.btn-act-prepare {
+    border-color: var(--info);
+    background: var(--info);
+    color: var(--surface);
+}
+
+.btn.btn-act-serve {
+    border-color: var(--action-success-line);
+    background: var(--action-success);
+    color: var(--surface);
+}
+
+.btn.btn-act-pay {
+    border-color: var(--action-warning-hover);
+    background: var(--action-warning);
+    color: var(--ink);
+    font-weight: 700;
+}
+
+    .btn.btn-act-prepare:hover:not(:disabled),
+    .btn.btn-act-serve:hover:not(:disabled) {
+        filter: brightness(0.92);
+    }
+
+    /* Nút cam chữ tối: làm SÁNG hơn khi hover để chữ vẫn đủ tương phản */
+    .btn.btn-act-pay:hover:not(:disabled) {
+        filter: brightness(1.06);
+        box-shadow: inset 0 0 0 2px var(--action-warning-hover);
+    }
+
+/* Thanh tiến trình: bước hiện tại mang màu của trạng thái */
+.orders-page .serving-steps li.current.step-waiting {
+    background: var(--warning-bg);
+    color: var(--warning);
+    box-shadow: inset 0 0 0 2px var(--warning);
+}
+
+.orders-page .serving-steps li.current.step-preparing {
+    background: var(--info-bg);
+    color: var(--info);
+    box-shadow: inset 0 0 0 2px var(--info);
+}
+
+.orders-page .serving-steps li.done {
+    color: var(--success);
+}
+
+
+/* Điện thoại: nhãn trạng thái có nền màu được xuống dòng, lề hẹp hơn để bảng vừa màn hình */
+@media (max-width: 650px) {
+    .orders-page .orders-table .status {
+        padding-left: 6px;
+        padding-right: 6px;
+        white-space: normal;
+        text-align: center;
+    }
+}
+
+/* Điện thoại: "Số nhận món" / "Chưa nhập" thu gọn trên màn hình nhưng trình đọc màn hình vẫn đọc đủ */
+@media (max-width: 650px) {
+    .orders-table .label-long {
+        display: inline;
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+}
+
+/* =====================================================================
+   ĐƠN HÀNG — chỉnh sau test giao diện v4
+   ===================================================================== */
+
+/* [1] Dòng đang chọn có nền trùng màu ô số → ô số đổi nền trắng + viền để vẫn nổi */
+.orders-table tr.selected .pickup-number {
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--coffee-300);
+}
+
+/* [2] Thông báo nổi: chữ dài không đẩy nút × xuống dòng */
+.orders-toasts .alert.orders-alert {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+}
+
+    .orders-toasts .alert.orders-alert > div {
+        flex: 1;
+        min-width: 0;
+    }
+
+/* [3] Viền focus dòng bảng rõ ràng (tô trên các ô, không phụ thuộc outline của <tr>) */
+.orders-table tr.selectable:focus-visible {
+    outline: none;
+}
+
+    .orders-table tr.selectable:focus-visible td {
+        box-shadow: inset 0 2px 0 var(--coffee-700), inset 0 -2px 0 var(--coffee-700);
+    }
+
+        .orders-table tr.selectable:focus-visible td:first-child {
+            box-shadow: inset 2px 2px 0 var(--coffee-700), inset 0 -2px 0 var(--coffee-700);
+        }
+
+        .orders-table tr.selectable:focus-visible td:last-child {
+            box-shadow: inset -2px 2px 0 var(--coffee-700), inset 0 -2px 0 var(--coffee-700);
+        }
+
+/* [5] "Đơn mới" dùng màu TÍM riêng → xanh dương chỉ còn nghĩa "Đang chuẩn bị" */
+.alert.orders-alert.new-order-alert {
+    border-color: var(--purple);
+    border-left-color: var(--purple);
+    background: var(--purple-bg);
+}
+
+    .alert.orders-alert.new-order-alert .new-order-text {
+        color: var(--purple);
+    }
+
+.orders-table tr.is-new td:first-child {
+    box-shadow: inset 4px 0 0 var(--purple);
+}
+
+.new-mark {
+    background: var(--purple);
+}
+
+/* [6] Số tiền dưới nhãn thanh toán — chỉ hiện trên điện thoại (cột Tổng tiền ẩn ở đó) */
+.orders-table .pay-amount {
+    display: none;
+}
+
+@media (max-width: 650px) {
+    .orders-table .pay-amount {
+        display: block;
+        margin-top: 2px;
+        color: var(--ink);
+        font-size: var(--fs-xs);
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+}
+
+/* [7] Bấm "Thu tiền trước" → nút thu tiền hiện viền rõ (kể cả khi bấm bằng chuột) */
+.btn.btn-act-pay:focus {
+    outline: 3px solid var(--warning);
+    outline-offset: 2px;
+}
+
+/* [11] Link "Khách đổi sang …" đủ vùng bấm 44px trên màn hình cảm ứng */
+.text-button.switch-pay {
+    min-height: 44px;
+    padding: 0 8px;
 }
