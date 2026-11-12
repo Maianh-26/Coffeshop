@@ -13,10 +13,9 @@
 
 ## 2. Trạng thái Git
 
-- Commit `eb1d588` (11/11, 15:58) đã chứa phần đầu: số nhận món, trạng thái phục vụ, sửa đơn, API đề xuất, mock.
-- **Chưa commit**: toàn bộ phần làm lại giao diện sau đó (`Orders.razor`, `app.css`, `DonHang.cs`, `MockApiHandler.cs`, `index.html`), quy tắc mới trong `CLAUDE.md`, đề xuất API v2.1 (.md + .docx), file này.
-- `wwwroot/appsettings.json` đang là **`UseMock: true`** (có người đổi lại sau khi Claude trả về false). **Trước khi commit phải đặt lại `false`.**
-- Không commit: `.playwright-mcp/` (ảnh test, ở cả gốc repo lẫn `03-Web-Admin/`), 2 ảnh trong `docs/` (`Screenshot …png`, `1793106…jpg`) chưa rõ có nên commit không. Hỏi người dùng.
+- Nhánh `web-admin`. Commit `eb1d588` (phần đầu: số nhận món, trạng thái phục vụ, sửa đơn, API đề xuất, mock) và `aa66bbf` (làm lại giao diện, bước phục vụ tuần tự, đề xuất API v2.1, quy tắc CLAUDE.md, file này). **Chưa push, chưa mở PR.**
+- `wwwroot/appsettings.json` đã commit với `UseMock: false`. Muốn demo bằng dữ liệu giả thì đổi tạm sang `true`, không commit.
+- Chưa commit (cố ý): `.playwright-mcp/` (ảnh test, ở cả gốc repo lẫn `03-Web-Admin/`). 2 ảnh trong `docs/` (`Screenshot …png`, `1793106…jpg`) chưa rõ có nên commit không, cần hỏi người dùng.
 
 ## 3. Chức năng đã làm trên trang `/orders`
 
@@ -64,7 +63,7 @@ Người dùng đã được hỏi có ghi phần này vào tài liệu đề xu
 
 ## 5. Việc còn mở / cần hỏi người dùng
 
-- [ ] Commit + push lên nhánh `web-admin`, mở PR (nhớ đặt `UseMock: false`, không commit `.playwright-mcp/`).
+- [ ] Push nhánh `web-admin` và mở PR cho trưởng nhóm (chỉ làm khi người dùng yêu cầu).
 - [ ] `CLAUDE.md` có 3 chỗ đã lỗi thời: dòng 21 ("backend has only payment statuses"), dòng 49 ("orders cannot be edited"), dòng 70 (`TrangThaiDon` "`Label`/`Color`", nay dùng `Tone`; `TrangThaiDon.Color` không còn ai gọi). Hỏi người dùng trước khi sửa.
 - [ ] Thu tiền mặt một cú bấm, không hỏi lại, không hoàn tác: agent đề nghị thêm xác nhận hoặc hoàn tác vài giây. Chờ chủ quán quyết định.
 - [ ] Có cho hủy đơn "Đã phục vụ" không? Có bắt buộc thu tiền trước khi phục vụ không? Chờ chủ quán.
