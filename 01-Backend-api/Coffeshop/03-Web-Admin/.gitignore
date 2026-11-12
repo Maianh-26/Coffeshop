@@ -1,0 +1,15 @@
+# Build
+bin/
+obj/
+publish/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# File tạm, log
+.playwright-mcp/
+server.out
+server.err
+_check-server.*

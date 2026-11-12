@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # API Hệ thống đặt món thông minh – Quán cà phê
 
 **C# · ASP.NET Core 8 · SQL Server (QuanCaPheDB) · Kiến trúc API-first**
@@ -244,3 +245,6 @@ CREATE UNIQUE INDEX UQ_CongThuc_Topping    ON CongThucMon(MaTopping, MaNguyenLie
 | 401 khi gọi API | Chưa bấm Authorize / token hết hạn (12 giờ) → đăng nhập lại. |
 | 403 | Đúng token nhưng sai vai trò (ví dụ NhanVien gọi API của QuanLy). |
 | Cổng 3000 bị chiếm | Đổi `applicationUrl` trong `Properties/launchSettings.json` và `servers.url` trong `openapi.yaml`. |
+=======
+# Coffeshop
+>>>>>>> 4700bb27b59fd3108267fad3b75919b686396fe1
