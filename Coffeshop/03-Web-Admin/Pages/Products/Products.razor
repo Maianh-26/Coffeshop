@@ -1,0 +1,785 @@
+@page "/products"
+@attribute [Authorize(Roles = Roles.Admin)]
+
+<PageTitle>Món - Coffee Shop</PageTitle>
+
+<div class="products-page">
+
+    <section class="panel filters-panel">
+
+        <div class="tabs" role="tablist">
+
+            <button class="tab @(ProductTab ? "active" : "")" role="tab" aria-selected="@ProductTab"
+                    @onclick='() => SwitchTab("products")'>
+                <Icon Name="cup" />
+                Món
+            </button>
+
+            <button class="tab @(CategoryTab ? "active" : "")" role="tab" aria-selected="@CategoryTab"
+                    @onclick='() => SwitchTab("categories")'>
+                <Icon Name="grid" />
+                Danh mục
+            </button>
+
+            <button class="tab @(ToppingTab ? "active" : "")" role="tab" aria-selected="@ToppingTab"
+                    @onclick='() => SwitchTab("toppings")'>
+                <Icon Name="recipe" />
+                Topping
+            </button>
+
+            <button class="tab @(SizeTab ? "active" : "")" role="tab" aria-selected="@SizeTab"
+                    @onclick='() => SwitchTab("sizes")'>
+                <Icon Name="box" />
+                Kích thước
+            </button>
+
+        </div>
+
+        <div class="filter-row">
+
+            <div class="search-field">
+
+                <Icon Name="search" />
+
+                <input @bind="search"
+                       @bind:event="oninput"
+                       @bind:after="Filter"
+                       aria-label="Tìm kiếm"
+                       placeholder="@(ToppingTab ? "Tìm mã hoặc tên topping"
+                           : CategoryTab ? "Tìm mã hoặc tên danh mục"
+                           : SizeTab ? "Tìm mã hoặc tên kích thước"
+                           : "Tìm mã hoặc tên món")" />
+
+            </div>
+
+            @if (ProductTab)
+            {
+                <select aria-label="Lọc danh mục" @bind="categoryFilter" @bind:after="Filter">
+                    <option value="">Tất cả danh mục</option>
+                    @foreach (var item in categories)
+                    {
+                        <option value="@item.MaDanhMuc">@item.TenDanhMuc</option>
+                    }
+                </select>
+            }
+
+            @if (ProductTab || ToppingTab)
+            {
+                <select aria-label="Lọc trạng thái" @bind="statusFilter" @bind:after="Filter">
+                    <option value="">Tất cả trạng thái</option>
+                    <option>@TrangThaiMon.DangBan</option>
+                    <option>@TrangThaiMon.TamHet</option>
+                    <option>@TrangThaiMon.HetNguyenLieu</option>
+                    <option>@TrangThaiMon.NgungBan</option>
+                </select>
+            }
+
+            <button class="btn outline"
+                    @onclick="Reset">
+
+                <Icon Name="reset" />
+                Đặt lại
+
+            </button>
+
+        </div>
+
+    </section>
+
+    <section class="panel action-bar">
+
+        <button class="btn primary"
+                @onclick="Add">
+
+            <Icon Name="plus" />
+            @(ToppingTab ? "Thêm topping" : CategoryTab ? "Thêm danh mục" : SizeTab ? "Thêm kích thước" : "Thêm món")
+
+        </button>
+
+        <button class="btn outline"
+                disabled="@(!HasSelection)"
+                @onclick="Edit">
+
+            <Icon Name="edit" />
+            Sửa
+
+        </button>
+
+        <button class="btn danger-outline"
+                disabled="@(!HasSelection || SelectedProduct is { NgungBan: true } || SelectedTopping is { NgungBan: true })"
+                @onclick="AskDelete">
+
+            <Icon Name="trash" />
+            @(ProductTab || ToppingTab ? "Ngừng bán" : "Xóa")
+
+        </button>
+
+        @if (ProductTab || ToppingTab)
+        {
+            <button class="btn outline"
+                    disabled="@(saving || (SelectedProduct is null && SelectedTopping is null))"
+                    @onclick="ToggleAvailable">
+
+                <Icon Name="box" />
+                @((SelectedProduct?.ConHang ?? SelectedTopping?.ConHang ?? true) ? "Báo tạm hết" : "Có hàng lại")
+
+            </button>
+
+            <button class="btn outline"
+                    @onclick="OpenRecipe">
+
+                <Icon Name="recipe" />
+                Công thức
+
+            </button>
+        }
+
+    </section>
+
+    @if (message is not null)
+    {
+        <p class="alert success" role="status">
+            @message
+        </p>
+    }
+
+    @if (loadError is not null)
+    {
+        <p class="alert error" role="alert">
+            @loadError
+            <button type="button" class="text-button" @onclick="Load">Thử lại</button>
+        </p>
+    }
+
+    <section class="panel list-panel">
+
+        <div class="table-wrap">
+
+            <table class="products-table">
+
+                <thead>
+
+                    @if (ToppingTab)
+                    {
+                        <tr>
+                            <th>Mã</th>
+                            <th>Tên topping</th>
+                            <th>Giá thêm</th>
+                            <th>Trạng thái</th>
+                        </tr>
+                    }
+                    else if (CategoryTab)
+                    {
+                        <tr>
+                            <th>Mã danh mục</th>
+                            <th>Tên danh mục</th>
+                            <th>Số món đang bán</th>
+                        </tr>
+                    }
+                    else if (SizeTab)
+                    {
+                        <tr>
+                            <th>Mã kích thước</th>
+                            <th>Tên hiển thị</th>
+                            <th>Số món đang dùng</th>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <th>Mã món</th>
+                            <th>Ảnh</th>
+                            <th>Tên món</th>
+                            <th>Danh mục</th>
+                            <th>Giá theo size</th>
+                            <th>Khuyến mãi</th>
+                            <th>Trạng thái</th>
+                        </tr>
+                    }
+
+                </thead>
+
+                <tbody>
+
+                    @if (ToppingTab)
+                    {
+                        @foreach (var item in Paged(ToppingMatches))
+                        {
+                            string key = item.MaTopping.ToString();
+                            string status = TrangThaiMon.Of(item);
+
+                            <tr class="selectable @(selected == key ? "selected" : "")"
+                                tabindex="0"
+                                @onkeydown="e => SelectKey(e, key)"
+                                @onclick="() => selected = key">
+
+                                <td><strong>@item.MaTopping</strong></td>
+                                <td>@item.TenTopping</td>
+                                <td><strong class="text-accent">+@Money(item.GiaThem)</strong></td>
+                                <td><span class="badge @TrangThaiMon.Color(status)">@status</span></td>
+
+                            </tr>
+                        }
+                    }
+                    else if (CategoryTab)
+                    {
+                        @foreach (var item in Paged(CategoryMatches))
+                        {
+                            string key = item.MaDanhMuc.ToString();
+
+                            <tr class="selectable @(selected == key ? "selected" : "")"
+                                tabindex="0"
+                                @onkeydown="e => SelectKey(e, key)"
+                                @onclick="() => selected = key">
+
+                                <td><strong>@item.MaDanhMuc</strong></td>
+                                <td>@item.TenDanhMuc</td>
+                                <td>@item.SoMon</td>
+
+                            </tr>
+                        }
+                    }
+                    else if (SizeTab)
+                    {
+                        @foreach (var item in Paged(SizeMatches))
+                        {
+                            string key = item.MaKichThuoc;
+
+                            <tr class="selectable @(selected == key ? "selected" : "")"
+                                tabindex="0"
+                                @onkeydown="e => SelectKey(e, key)"
+                                @onclick="() => selected = key">
+
+                                <td><strong>@item.MaKichThuoc</strong></td>
+                                <td>@item.TenKichThuoc</td>
+                                <td>@products.Count(p => p.KichThuoc.Any(s => s.DangApDung && s.MaKichThuoc == item.MaKichThuoc))</td>
+
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        @foreach (var item in Paged(ProductMatches))
+                        {
+                            string key = item.MaTenMon.ToString();
+                            string status = TrangThaiMon.Of(item);
+
+                            <tr class="selectable @(selected == key ? "selected" : "")"
+                                tabindex="0"
+                                @onkeydown="e => SelectKey(e, key)"
+                                @onclick="() => selected = key">
+
+                                <td><strong>@item.MaTenMon</strong></td>
+
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(item.HinhAnh))
+                                    {
+                                        <img class="product-image" src="@item.HinhAnh" alt="@item.TenMon" loading="lazy" />
+                                    }
+                                    else
+                                    {
+                                        <span class="image-placeholder">
+                                            <Icon Name="cup" />
+                                        </span>
+                                    }
+                                </td>
+
+                                <td>@item.TenMon</td>
+                                <td>@item.TenDanhMuc</td>
+
+                                <td>
+                                    <div class="size-prices">
+                                        @foreach (var size in ActiveSizes(item))
+                                        {
+                                            <span class="size-price @(size.DuNguyenLieu ? "" : "is-short")"
+                                                  title="@(size.DuNguyenLieu ? "" : "Không đủ nguyên liệu")">
+                                                <strong>@size.MaKichThuoc</strong>
+                                                @if (size.GiaSauGiam < size.GiaBan)
+                                                {
+                                                    <s>@Money(size.GiaBan)</s>
+                                                }
+                                                @Money(size.GiaSauGiam)
+                                            </span>
+                                        }
+
+                                        @if (!ActiveSizes(item).Any())
+                                        {
+                                            <span class="muted">Chưa có giá</span>
+                                        }
+                                    </div>
+                                </td>
+
+                                <td>
+                                    @if (item.KhuyenMai is { } km)
+                                    {
+                                        <span class="badge @(km.DangApDung ? "green" : "gray")"
+                                              title="@(km.GioBatDau is null ? "Cả ngày" : $"Giờ vàng {km.GioBatDau}–{km.GioKetThuc}")">
+                                            @km.Code −@km.PhanTramGiam.ToString("0.##", Vi)%
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="muted">—</span>
+                                    }
+                                </td>
+
+                                <td><span class="badge @TrangThaiMon.Color(status)">@status</span></td>
+
+                            </tr>
+                        }
+                    }
+
+                    @if (Count == 0)
+                    {
+                        <tr>
+
+                            <td class="empty-cell"
+                                colspan="@(ToppingTab ? 4 : CategoryTab || SizeTab ? 3 : 7)">
+
+                                <Icon Name="cup" Size="32" />
+
+                                <p>
+                                    @(loading ? "Đang tải dữ liệu…" : "Chưa có dữ liệu phù hợp.")
+                                </p>
+
+                            </td>
+
+                        </tr>
+                    }
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        <div class="list-footer">
+
+            <span>
+
+                Chọn một dòng để sửa, ngừng bán hoặc xem công thức.
+
+                <small>
+                    @Count @(ToppingTab ? "topping" : CategoryTab ? "danh mục" : SizeTab ? "kích thước" : "món")
+                    · Trang @(page)/@Pages
+                </small>
+
+            </span>
+
+            <div class="pagination">
+
+                <button class="page-button"
+                        aria-label="Trang trước"
+                        disabled="@(page <= 1)"
+                        @onclick="() => Move(-1)">
+                    <Icon Name="left" Size="16" />
+                </button>
+
+                <span class="page-number">
+                    @(page)
+                </span>
+
+                <button class="page-button"
+                        aria-label="Trang sau"
+                        disabled="@(page >= Pages)"
+                        @onclick="() => Move(1)">
+                    <Icon Name="right" Size="16" />
+                </button>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</div>
+
+@if (dialog != "")
+{
+    <Modal Title="@DialogTitle"
+           OnClose="Close"
+           Busy="@saving">
+
+        @if (dialog == "product")
+        {
+            <EditForm Model="productModel"
+                      OnValidSubmit="SaveProduct">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-grid">
+
+                    <div class="field">
+                        <label for="p-name">Tên món *</label>
+                        <InputText id="p-name"
+                                   @bind-Value="productModel.TenMon"
+                                   placeholder="Nhập tên món" />
+                        <ValidationMessage For="@(() => productModel.TenMon)" />
+                    </div>
+
+                    <div class="field">
+                        <label for="p-category">Danh mục *</label>
+                        <InputSelect id="p-category"
+                                     @bind-Value="productModel.MaDanhMuc">
+                            <option value="0">Chọn danh mục</option>
+                            @foreach (var item in categories)
+                            {
+                                <option value="@item.MaDanhMuc">@item.TenDanhMuc</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => productModel.MaDanhMuc)" />
+                    </div>
+
+                    <div class="field">
+                        <label for="p-promo">Khuyến mãi</label>
+                        <InputSelect id="p-promo"
+                                     @bind-Value="productModel.MaKhuyenMai">
+                            <option value="0">Không áp dụng</option>
+                            @foreach (var item in promotions)
+                            {
+                                <option value="@item.MaKhuyenMai">@item.Code (−@item.PhanTramGiam.ToString("0.##", Vi)%)</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="field">
+                        <label for="p-image">Ảnh món (đường dẫn)</label>
+                        <InputText id="p-image"
+                                   @bind-Value="productModel.HinhAnh"
+                                   placeholder="images/mon/bac-xiu.jpg hoặc https://…" />
+                        <ValidationMessage For="@(() => productModel.HinhAnh)" />
+
+                        @if (!string.IsNullOrWhiteSpace(productModel.HinhAnh))
+                        {
+                            <div class="image-preview">
+                                <img src="@productModel.HinhAnh" alt="Ảnh xem trước" />
+                                <button type="button" class="text-button" @onclick="() => productModel.HinhAnh = null">
+                                    Xóa ảnh
+                                </button>
+                            </div>
+                        }
+                    </div>
+
+                </div>
+
+                <fieldset class="field">
+                    <legend>Giá bán theo kích thước *</legend>
+
+                    <div class="size-price-editor">
+                        @foreach (var price in productModel.Prices)
+                        {
+                            <div class="size-price-row">
+                                <label class="checkbox-line">
+                                    <InputCheckbox @bind-Value="price.Ban" />
+                                    @price.MaKichThuoc – @price.TenKichThuoc
+                                </label>
+
+                                <InputNumber @bind-Value="price.GiaBan"
+                                             disabled="@(!price.Ban)"
+                                             step="1000"
+                                             placeholder="Giá (đ)"
+                                             aria-label="@($"Giá size {price.MaKichThuoc}")" />
+                            </div>
+                        }
+
+                        @if (productModel.Prices.Count == 0)
+                        {
+                            <p class="form-note">Chưa có kích thước nào — thêm ở tab Kích thước trước.</p>
+                        }
+                    </div>
+                </fieldset>
+
+                <div class="checkbox-row">
+                    <label class="checkbox-line">
+                        <InputCheckbox @bind-Value="productModel.ConHang" />
+                        Còn hàng hôm nay
+                    </label>
+
+                    @if (editing)
+                    {
+                        <label class="checkbox-line">
+                            <InputCheckbox @bind-Value="productModel.NgungBan" />
+                            Ngừng bán (ẩn khỏi thực đơn tablet)
+                        </label>
+                    }
+                </div>
+
+                <p class="form-note">
+                    Giá mới chỉ áp dụng cho đơn mới; đơn cũ giữ nguyên giá. Món chỉ bán được khi đã có công thức và kho đủ nguyên liệu.
+                </p>
+
+                @if (error is not null)
+                {
+                    <p class="alert error" role="alert">@error</p>
+                }
+
+                <div class="modal-footer">
+                    <button type="button" class="btn outline" disabled="@saving" @onclick="Close">Hủy</button>
+                    <button type="submit" class="btn primary" disabled="@saving">
+                        @(saving ? "Đang lưu…" : editing ? "Lưu thay đổi" : "Thêm món")
+                    </button>
+                </div>
+
+            </EditForm>
+        }
+
+        @if (dialog == "category")
+        {
+            <EditForm Model="nameModel"
+                      OnValidSubmit="SaveCategory">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-stack">
+                    <div class="field">
+                        <label for="c-name">Tên danh mục *</label>
+                        <InputText id="c-name"
+                                   @bind-Value="nameModel.Ten"
+                                   placeholder="Nhập tên danh mục" />
+                        <ValidationMessage For="@(() => nameModel.Ten)" />
+                    </div>
+                </div>
+
+                @if (error is not null)
+                {
+                    <p class="alert error" role="alert">@error</p>
+                }
+
+                <div class="modal-footer">
+                    <button type="button" class="btn outline" disabled="@saving" @onclick="Close">Hủy</button>
+                    <button type="submit" class="btn primary" disabled="@saving">
+                        @(saving ? "Đang lưu…" : editing ? "Lưu thay đổi" : "Thêm danh mục")
+                    </button>
+                </div>
+
+            </EditForm>
+        }
+
+        @if (dialog == "topping")
+        {
+            <EditForm Model="toppingModel"
+                      OnValidSubmit="SaveTopping">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-grid">
+
+                    <div class="field">
+                        <label for="t-name">Tên topping *</label>
+                        <InputText id="t-name"
+                                   @bind-Value="toppingModel.TenTopping"
+                                   placeholder="VD: Trân châu đen, Kem cheese…" />
+                        <ValidationMessage For="@(() => toppingModel.TenTopping)" />
+                    </div>
+
+                    <div class="field">
+                        <label for="t-price">Giá thêm (đ) *</label>
+                        <InputNumber id="t-price"
+                                     @bind-Value="toppingModel.GiaThem"
+                                     step="1000" />
+                        <ValidationMessage For="@(() => toppingModel.GiaThem)" />
+                    </div>
+
+                </div>
+
+                <div class="checkbox-row">
+                    <label class="checkbox-line">
+                        <InputCheckbox @bind-Value="toppingModel.ConHang" />
+                        Còn hàng hôm nay
+                    </label>
+
+                    <label class="checkbox-line">
+                        <InputCheckbox @bind-Value="toppingModel.NgungBan" />
+                        Ngừng bán
+                    </label>
+                </div>
+
+                <p class="form-note">Định mức nguyên liệu của topping đặt ở nút Công thức.</p>
+
+                @if (error is not null)
+                {
+                    <p class="alert error" role="alert">@error</p>
+                }
+
+                <div class="modal-footer">
+                    <button type="button" class="btn outline" disabled="@saving" @onclick="Close">Hủy</button>
+                    <button type="submit" class="btn primary" disabled="@saving">
+                        @(saving ? "Đang lưu…" : editing ? "Lưu thay đổi" : "Thêm topping")
+                    </button>
+                </div>
+
+            </EditForm>
+        }
+
+        @if (dialog == "size")
+        {
+            <EditForm Model="sizeModel"
+                      OnValidSubmit="SaveSize">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-stack">
+
+                    <div class="field">
+                        <label for="s-code">Mã kích thước *</label>
+                        <InputText id="s-code"
+                                   @bind-Value="sizeModel.MaKichThuoc"
+                                   readonly="@editing"
+                                   placeholder="S, M, L, XL…" />
+                        <ValidationMessage For="@(() => sizeModel.MaKichThuoc)" />
+                    </div>
+
+                    <div class="field">
+                        <label for="s-name">Tên hiển thị *</label>
+                        <InputText id="s-name"
+                                   @bind-Value="sizeModel.TenKichThuoc"
+                                   placeholder="Nhỏ, Vừa, Lớn…" />
+                        <ValidationMessage For="@(() => sizeModel.TenKichThuoc)" />
+                    </div>
+
+                </div>
+
+                <p class="form-note">Giá từng size đặt trong form Sửa món.</p>
+
+                @if (error is not null)
+                {
+                    <p class="alert error" role="alert">@error</p>
+                }
+
+                <div class="modal-footer">
+                    <button type="button" class="btn outline" disabled="@saving" @onclick="Close">Hủy</button>
+                    <button type="submit" class="btn primary" disabled="@saving">
+                        @(saving ? "Đang lưu…" : editing ? "Lưu thay đổi" : "Thêm kích thước")
+                    </button>
+                </div>
+
+            </EditForm>
+        }
+
+        @if (dialog == "delete")
+        {
+            <p>
+                @(ProductTab || ToppingTab ? "Ngừng bán" : "Xóa") <strong>@SelectedName</strong>?
+            </p>
+
+            <p class="form-note">
+                @(ProductTab || ToppingTab
+                    ? "Món/topping được ẩn khỏi thực đơn nhưng vẫn giữ lịch sử đơn hàng. Có thể mở bán lại bằng nút Sửa."
+                    : CategoryTab
+                        ? "Chỉ xóa được danh mục không còn món (kể cả món ngừng bán)."
+                        : "Chỉ xóa được kích thước chưa có trong bảng giá món nào.")
+            </p>
+
+            @if (error is not null)
+            {
+                <p class="alert error" role="alert">@error</p>
+            }
+
+            <div class="modal-footer">
+                <button class="btn outline" disabled="@saving" @onclick="Close">Hủy</button>
+                <button class="btn danger" disabled="@saving" @onclick="Delete">
+                    @(saving ? "Đang lưu…" : ProductTab || ToppingTab ? "Ngừng bán" : "Xóa")
+                </button>
+            </div>
+        }
+
+        @if (dialog == "recipe")
+        {
+            <div class="field">
+                <label for="recipe-target">
+                    @(ToppingTab ? "Topping · định mức cho 1 phần" : "Món – size · định mức cho 1 ly")
+                </label>
+
+                <select id="recipe-target"
+                        value="@recipeOwner"
+                        disabled="@(saving || recipeLoading)"
+                        @onchange="PickRecipe">
+                    <option value="0">Chọn @(ToppingTab ? "topping" : "món – size")</option>
+                    @foreach (var (id, label) in RecipeTargets)
+                    {
+                        <option value="@id">@label</option>
+                    }
+                </select>
+            </div>
+
+            @if (recipeLoading)
+            {
+                <p class="muted">Đang tải công thức…</p>
+            }
+            else if (recipeOwner != 0)
+            {
+                <div class="table-wrap recipe-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nguyên liệu</th>
+                                <th>Định lượng</th>
+                                <th>Đơn vị</th>
+                                <th><span class="sr-only">Xóa dòng</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var line in recipe)
+                            {
+                                <tr @key="line">
+                                    <td>
+                                        <select aria-label="Nguyên liệu" @bind="line.MaNguyenLieu">
+                                            <option value="0">Chọn nguyên liệu</option>
+                                            @foreach (var ingredient in ingredients.Where(i => i.DangSuDung || i.MaNguyenLieu == line.MaNguyenLieu))
+                                            {
+                                                <option value="@ingredient.MaNguyenLieu">@ingredient.TenNguyenLieu</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number"
+                                               aria-label="Định lượng"
+                                               @bind="line.LuongSuDung"
+                                               min="0.01"
+                                               step="0.01" />
+                                    </td>
+                                    <td>@UnitOf(line.MaNguyenLieu)</td>
+                                    <td>
+                                        <button type="button" class="icon-button" aria-label="Xóa dòng" @onclick="() => recipe.Remove(line)">
+                                            <Icon Name="close" Size="16" />
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+
+                            @if (recipe.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="4" class="empty-cell">Chưa có định mức — món sẽ không trừ kho khi bán.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <button type="button" class="btn outline" @onclick="() => recipe.Add(new())">
+                    <Icon Name="plus" Size="16" />
+                    Thêm dòng
+                </button>
+            }
+
+            <p class="form-note">
+                Chọn nguyên liệu đã khai báo trong kho; định lượng lớn hơn 0, không trùng nguyên liệu.
+                Lưu công thức không sửa tiêu hao của đơn cũ.
+            </p>
+
+            @if (error is not null)
+            {
+                <p class="alert error" role="alert">@error</p>
+            }
+
+            <div class="modal-footer">
+                <button class="btn outline" disabled="@saving" @onclick="Close">Đóng</button>
+                <button class="btn primary" disabled="@(saving || recipeLoading || recipeOwner == 0)" @onclick="SaveRecipe">
+                    @(saving ? "Đang lưu…" : "Lưu công thức")
+                </button>
+            </div>
+        }
+
+    </Modal>
+}
