@@ -1,0 +1,24 @@
+@inject NavigationManager Navigation
+@inject TokenAuthenticationStateProvider AuthState
+
+@code {
+    /// <summary>
+    /// Chuyển về trang Đăng nhập. Nếu phiên hết hạn hoặc mở link khi chưa đăng nhập
+    /// thì nhớ trang đang mở để quay lại; nếu người dùng tự bấm Đăng xuất thì không nhớ
+    /// (người đăng nhập tiếp theo có thể là người khác, vai trò khác).
+    /// </summary>
+    protected override void OnInitialized()
+    {
+        string current = Navigation.ToBaseRelativePath(Navigation.Uri);
+
+        bool skipReturnUrl = AuthState.SignedOutByUser
+                             || string.IsNullOrEmpty(current)
+                             || current.StartsWith("login", StringComparison.OrdinalIgnoreCase);
+
+        AuthState.SignedOutByUser = false;
+
+        Navigation.NavigateTo(
+            skipReturnUrl ? "login" : $"login?returnUrl={Uri.EscapeDataString(current)}",
+            replace: true);
+    }
+}

@@ -1,0 +1,221 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+
+@inject NavigationManager Navigation
+@inject AuthenticationService AuthService
+
+
+@* Chỉ vẽ khung quản trị khi đã đăng nhập — tránh chớp menu/tiêu đề trước khi chuyển về trang Đăng nhập *@
+<AuthorizeView Context="auth">
+<NotAuthorized>
+    @Body
+</NotAuthorized>
+<Authorized>
+<div class="admin-shell" @onkeydown="OnShellKeyDown">
+
+    <aside class="sidebar @(menuOpen ? "open" : "")">
+
+        <a href="@Roles.HomeUrl(auth.User)" aria-label="Coffee Shop – về trang chính">
+            <Brand />
+        </a>
+
+        <nav aria-label="Điều hướng chính"
+             @onclick="() => menuOpen = false">
+
+            @if (auth.User.IsInRole(Roles.Admin))
+            {
+                @* Chủ quán: đầy đủ chức năng quản lý *@
+                <NavLink class="nav-item" href="" Match="NavLinkMatch.All">
+                    <Icon Name="home" />
+                    Tổng quan
+                </NavLink>
+
+                <NavLink class="nav-item" href="orders">
+                    <Icon Name="orders" />
+                    Đơn hàng
+                </NavLink>
+
+                <NavLink class="nav-item" href="products">
+                    <Icon Name="cup" />
+                    Món
+                </NavLink>
+
+                <NavLink class="nav-item" href="inventory">
+                    <Icon Name="box" />
+                    Kho nguyên liệu
+                </NavLink>
+
+                <NavLink class="nav-item" href="promotions">
+                    <Icon Name="tag" />
+                    Khuyến mãi
+                </NavLink>
+
+                <NavLink class="nav-item" href="accounts">
+                    <Icon Name="user" />
+                    Tài khoản
+                </NavLink>
+            }
+            else
+            {
+                @* Nhân viên: chỉ xử lý đơn hàng và tài khoản của mình *@
+                <NavLink class="nav-item" href="orders">
+                    <Icon Name="orders" />
+                    Đơn hàng
+                </NavLink>
+
+                <NavLink class="nav-item" href="my-account">
+                    <Icon Name="user" />
+                    Tài khoản
+                </NavLink>
+            }
+
+        </nav>
+
+        @* Điện thoại: header chỉ còn icon → hiện rõ ai đang đăng nhập ở cuối menu trượt *@
+        <a class="sidebar-user" href="my-account" @onclick="() => menuOpen = false">
+            <Icon Name="user" Size="18" />
+            <span>
+                <strong>@auth.User.Identity?.Name</strong>
+                <small>@Roles.Label(auth.User)</small>
+            </span>
+        </a>
+
+    </aside>
+
+    @if (menuOpen)
+    {
+        <button class="sidebar-overlay"
+                aria-label="Đóng menu"
+                @onclick="() => menuOpen = false">
+        </button>
+    }
+
+    <div class="main-area">
+
+        <header class="header">
+
+            <button class="icon-button mobile-toggle"
+                    aria-label="Mở menu"
+                    aria-expanded="@(menuOpen ? "true" : "false")"
+                    @onclick="() => menuOpen = !menuOpen">
+
+                <Icon Name="menu" />
+
+            </button>
+
+            <h1>@TitleFor(auth.User)</h1>
+
+            <div class="user-menu">
+
+                @* Bấm vào tên → trang thông tin cá nhân / đổi mật khẩu *@
+                <a class="user-chip"
+                   href="my-account"
+                   title="@($"Tài khoản của tôi: {auth.User.Identity?.Name} ({Roles.Label(auth.User)})")">
+                    <Icon Name="user" Size="18" />
+                    <span class="user-text">
+                        <strong>@auth.User.Identity?.Name</strong>
+                        <small>@Roles.Label(auth.User)</small>
+                    </span>
+                </a>
+
+                <button type="button"
+                        class="btn outline btn-compact logout-button"
+                        title="Đăng xuất"
+                        disabled="@loggingOut"
+                        @onclick="Logout">
+                    <Icon Name="logout" Size="16" />
+                    <span class="logout-text">Đăng xuất</span>
+                </button>
+
+            </div>
+
+        </header>
+
+        <main class="page-content">
+            @Body
+        </main>
+
+    </div>
+
+</div>
+</Authorized>
+</AuthorizeView>
+
+@code {
+    private bool menuOpen;
+
+    // Trang chỉ dành cho chủ quán (khớp [Authorize(Roles = "Admin")] trên các trang)
+    private static readonly HashSet<string> AdminPages = ["", "products", "inventory", "promotions", "accounts"];
+
+    private string CurrentPage =>
+        Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/');
+
+    /// <summary>
+    /// Tiêu đề header; nhân viên đứng ở trang của chủ quán thì ghi "Không có quyền truy cập"
+    /// thay vì tên trang (tránh nhầm "Tài khoản" quản lý với "Tài khoản" của mình).
+    /// </summary>
+    private string TitleFor(System.Security.Claims.ClaimsPrincipal user) =>
+        !user.IsInRole(Roles.Admin) && AdminPages.Contains(CurrentPage)
+            ? "Không có quyền truy cập"
+            : Title;
+
+    private string Title =>
+        CurrentPage switch
+        {
+            "products" => "Món",
+            "orders" => "Đơn hàng",
+            "inventory" => "Kho nguyên liệu",
+            "promotions" => "Khuyến mãi",
+            "accounts" => "Tài khoản",
+            "my-account" => "Tài khoản của tôi",
+            "" => "Tổng quan",
+            _ => "Không tìm thấy trang"
+        };
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += Changed;
+    }
+
+    private void Changed(
+        object? sender,
+        LocationChangedEventArgs e
+    )
+    {
+        menuOpen = false;
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private bool loggingOut;
+
+    /// <summary>
+    /// Phím Escape đóng menu trượt trên điện thoại.
+    /// </summary>
+    private void OnShellKeyDown(KeyboardEventArgs e)
+    {
+        if (menuOpen && e.Key == "Escape")
+        {
+            menuOpen = false;
+        }
+    }
+
+    /// <summary>
+    /// Đăng xuất: xóa phiên; AuthorizeRouteView → RedirectToLogin tự chuyển về trang Đăng nhập
+    /// (chỉ một cơ chế điều hướng, không gọi NavigateTo ở đây để tránh hai lần chuyển trang chồng nhau).
+    /// </summary>
+    private async Task Logout()
+    {
+        if (loggingOut) return;
+
+        loggingOut = true;
+        await AuthService.LogoutAsync();
+        loggingOut = false;
+    }
+
+    public void Dispose()
+    {
+        // Hủy đăng ký để không rò rỉ handler khi layout bị thay (ví dụ chuyển sang trang Đăng nhập)
+        Navigation.LocationChanged -= Changed;
+    }
+}
