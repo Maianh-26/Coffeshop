@@ -71,6 +71,19 @@ Follow these when writing code (existing code still violates some — fix them w
 - Put styles in `wwwroot/css/app.css` using the design tokens — not new inline `style="..."`, and not a `.razor.css` (the scoped-CSS bundle isn't linked in `index.html`, so it would have no effect). Bump `app.css?v=N` in `index.html` after editing.
 - Any change to an `api/...` route or DTO shape: update `MockApiHandler` to match and flag that the API contract doc / backend team needs updating.
 
+## Quy trình bắt buộc khi sửa / nâng cấp chức năng (yêu cầu của chủ dự án)
+
+Áp dụng cho **mọi phiên** phát triển dự án này, với mọi thay đổi code hoặc giao diện (trừ sửa chữ / lỗi chính tả rất nhỏ):
+
+1. **Trước khi sửa: gọi skill liên quan** (Skill tool) để hướng sửa đúng quy trình, rồi mới viết code. Chọn theo việc:
+   - Component / trang Blazor: `dotnet-blazor:author-component`; form, ô nhập, validation: `dotnet-blazor:collect-user-input`; gọi API / tải dữ liệu: `dotnet-blazor:fetch-and-send-data`; đăng nhập / phân quyền: `dotnet-blazor:configure-auth`; JS interop: `dotnet-blazor:use-js-interop`; kế hoạch đổi giao diện lớn: `dotnet-blazor:plan-ui-change`.
+   - Giao diện / trải nghiệm: `ui-ux-pro-max:ui-ux-pro-max` (hoặc `frontend-design:frontend-design`).
+   - Code C# thuần: `dotnet:csharp-expert`; test: `dotnet-test:*`; tài liệu Word: `anthropic-skills:docx`.
+   Nói ngắn cho người dùng biết đã gọi skill nào.
+2. **Sau khi làm xong: gọi agent kiểm tra** — `code-reviewer`, và thêm `ui-ux-reviewer` nếu thay đổi chạm tới giao diện hoặc luồng người dùng (chạy song song được). **Sửa mọi lỗi được xác nhận**, build lại, rồi báo kết quả (đã sửa gì, còn gì chưa sửa và vì sao).
+3. Nếu phiên được mở ở thư mục gốc repo (`C:\dev\Coffeshop`), các agent trong `03-Web-Admin/.claude/agents/` không được nạp: dùng agent `general-purpose` và bảo nó đọc rồi làm đúng theo file `.claude/agents/code-reviewer.md` / `ui-ux-reviewer.md`.
+4. Muốn test giao diện với dữ liệu giả thì tạm đặt `Api:UseMock: true`, **xong phải trả về `false`**. Không chạy `ui-ux-reviewer` khi người dùng đang tự chạy app ở cổng 5101 nếu chưa hỏi.
+
 ## Review workflow
 
 Project subagents live in `.claude/agents/` (read-only reviewers; they report, the main agent fixes):
@@ -78,7 +91,7 @@ Project subagents live in `.claude/agents/` (read-only reviewers; they report, t
 - **`code-reviewer`** — project-specific code review (API contract sync, Blazor patterns, status strings, conventions).
 - **`ui-ux-reviewer`** — runs the app with Playwright, screenshots at 3 widths, reads the console, checks accessibility and the order flow.
 
-The user has asked for this standing rule: after completing a **significant** change (wiring a page to services, a new feature, edits across several files), run `code-reviewer`; if the change touched UI or a user flow, also run `ui-ux-reviewer`. Then fix confirmed issues and report. For small edits, don't run them — just offer in one line. Don't run `ui-ux-reviewer` while the user is debugging on port 5101 unless they agree.
+Standing rule (superseded/strengthened by "Quy trình bắt buộc" above): after **every** feature change or fix, run `code-reviewer`; if it touched UI or a user flow, also run `ui-ux-reviewer`. Then fix confirmed issues and report. Only trivial text/typo edits may skip this. Don't run `ui-ux-reviewer` while the user is debugging on port 5101 unless they agree.
 
 ## Repo notes
 
