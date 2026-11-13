@@ -3339,10 +3339,6 @@ fieldset.field {
     border-left-color: var(--danger);
 }
 
-.alert.orders-alert.new-order-alert {
-    border-left-color: var(--coffee-600);
-}
-
 .new-order-text {
     display: flex;
     align-items: center;
@@ -3392,11 +3388,6 @@ fieldset.field {
 
 .orders-table .order-id {
     font-variant-numeric: tabular-nums;
-}
-
-/* Đơn mới chưa xem: vạch nâu bên trái + chữ "Mới", không tô cả dòng */
-.orders-table tr.is-new td:first-child {
-    box-shadow: inset 3px 0 0 var(--coffee-600);
 }
 
 .new-mark {
@@ -3642,11 +3633,6 @@ fieldset.field {
     display: contents;
 }
 
-.clear-filters {
-    align-self: center;
-    white-space: nowrap;
-}
-
 @media (max-width: 1000px) {
     .filters-toggle {
         display: inline-flex;
@@ -3722,34 +3708,35 @@ fieldset.field {
     background: var(--surface-muted);
 }
 
-/* Thông báo đơn mới: đầu trang, nền xanh, nổi rõ */
+/* Thông báo đơn mới: đầu trang, nền CAM — màu báo "đơn mới" quen thuộc trên các app bán hàng / giao đồ ăn.
+   Không trùng nghĩa trạng thái nào (vàng = chờ, xanh dương = chuẩn bị, xanh lá = xong, đỏ = hủy). */
 .alert.orders-alert.new-order-alert {
     margin-bottom: 14px;
-    border: 1px solid var(--info);
-    border-left: 5px solid var(--info);
-    background: var(--info-bg);
+    border: 1px solid var(--orange);
+    border-left: 5px solid var(--orange);
+    background: var(--orange-bg);
     color: var(--ink);
     font-size: var(--fs-md);
 }
 
     .alert.orders-alert.new-order-alert .new-order-text {
-        color: var(--info);
+        color: var(--orange);
     }
 
         .alert.orders-alert.new-order-alert .new-order-text strong {
             color: var(--ink);
         }
 
-/* Đơn mới chưa xem: cùng màu xanh với thông báo */
+/* Đơn mới chưa xem: cùng màu cam với thông báo */
 .orders-table tr.is-new td:first-child {
-    box-shadow: inset 4px 0 0 var(--info);
+    box-shadow: inset 4px 0 0 var(--orange);
 }
 
 .new-mark {
     padding: 1px 6px;
     border-radius: var(--r-sm);
     color: var(--surface);
-    background: var(--info);
+    background: var(--orange);
 }
 
 /* Nút theo việc */
@@ -3862,25 +3849,6 @@ fieldset.field {
             box-shadow: inset -2px 2px 0 var(--coffee-700), inset 0 -2px 0 var(--coffee-700);
         }
 
-/* [5] "Đơn mới" dùng màu TÍM riêng → xanh dương chỉ còn nghĩa "Đang chuẩn bị" */
-.alert.orders-alert.new-order-alert {
-    border-color: var(--purple);
-    border-left-color: var(--purple);
-    background: var(--purple-bg);
-}
-
-    .alert.orders-alert.new-order-alert .new-order-text {
-        color: var(--purple);
-    }
-
-.orders-table tr.is-new td:first-child {
-    box-shadow: inset 4px 0 0 var(--purple);
-}
-
-.new-mark {
-    background: var(--purple);
-}
-
 /* [6] Số tiền dưới nhãn thanh toán — chỉ hiện trên điện thoại (cột Tổng tiền ẩn ở đó) */
 .orders-table .pay-amount {
     display: none;
@@ -3904,8 +3872,420 @@ fieldset.field {
     outline-offset: 2px;
 }
 
-/* [11] Link "Khách đổi sang …" đủ vùng bấm 44px trên màn hình cảm ứng */
-.text-button.switch-pay {
-    min-height: 44px;
-    padding: 0 8px;
+
+/* =========================================================================
+   [7] Trang Đơn hàng — tìm kiếm, lọc thời gian, nút Làm mới, màu đơn mới (12/11/2026)
+   ========================================================================= */
+
+/* (Màu đơn mới: xem khối "Thông báo đơn mới" phía trên — chỉ khai báo một chỗ) */
+
+/* Gợi ý "chỉ nhập số": nổi dưới ô tìm kiếm, không đẩy bố cục */
+.search-hint {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 5;
+    padding: 4px 10px;
+    border-radius: var(--r-sm);
+    background: var(--ink);
+    color: var(--surface);
+    font-size: var(--fs-xs);
+    white-space: nowrap;
+    box-shadow: var(--shadow-md);
+    pointer-events: none;
+}
+
+/* Nút Làm mới (biểu tượng) thay cho chữ "Xóa lọc" */
+.refresh-button {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+    .refresh-button.is-loading svg {
+        animation: refresh-spin 0.8s linear infinite;
+    }
+
+    /* Chấm báo đang có bộ lọc → bấm sẽ bỏ lọc */
+    .refresh-button .filter-dot {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 8px;
+        height: 8px;
+        border-radius: var(--r-pill);
+        background: var(--coffee-600);
+        box-shadow: 0 0 0 2px var(--surface);
+    }
+
+@keyframes refresh-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .refresh-button.is-loading svg {
+        animation: none;
+    }
+}
+
+/* Dòng tóm tắt khoảng thời gian đang lọc */
+.active-range {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 10px 0 0;
+    color: var(--ink-soft);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+}
+
+@media (max-width: 1000px) {
+    .refresh-button {
+        width: 44px;
+        height: 44px;
+    }
+}
+
+/* Nút Làm mới giữ hình vuông kể cả trên màn hình hẹp (ghi đè ".filter-row > .btn { flex: 1 }") */
+.filter-row > .btn.refresh-button {
+    flex: 0 0 auto;
+}
+
+/* Màn hình rộng: nút Làm mới ở cuối hàng bộ lọc (trong markup nó đứng cạnh nút "Bộ lọc") */
+@media (min-width: 1001px) {
+    .filter-row > .btn.refresh-button {
+        order: 5;
+    }
+}
+
+/* Màn hình hẹp: nút "Bộ lọc" + nút Làm mới chiếm một hàng riêng, các ô lọc xếp gọn ở hàng dưới */
+@media (max-width: 1000px) {
+    .filter-row > .btn.filters-toggle {
+        flex: 1 1 auto;
+    }
+
+    .filter-row select.date-preset {
+        flex-basis: 100%;
+    }
+}
+
+/* Không ngắt dòng giữa số tiền và "đ" */
+.nowrap {
+    white-space: nowrap;
+}
+
+/* Placeholder dài của ô tìm kiếm: hiện "…" thay vì cắt ngang chữ trên màn hình hẹp */
+.search-field input {
+    text-overflow: ellipsis;
+}
+
+/* Điện thoại: chip "Mới" nằm dưới mã đơn (không đứng cạnh) để cột Mã đơn không phình ra,
+   tránh ép nhãn trạng thái ("Chờ phục vụ", "Chưa thu") xuống 2 dòng */
+@media (max-width: 650px) {
+    .orders-table .new-mark {
+        display: block;
+        width: fit-content;
+        margin: 3px 0 0;
+    }
+}
+
+/* =========================================================================
+   [8] Sắp xếp theo cột (Mã đơn, Tổng tiền) — mẫu W3C APG "Sortable Table":
+   tiêu đề là <button>, mũi tên lên/xuống mờ khi chưa sắp xếp, mũi tên theo chiều đang dùng đậm lên.
+   ========================================================================= */
+.sort-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    margin: -6px -8px;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+    cursor: pointer;
+}
+
+    .sort-button:hover {
+        background: var(--coffee-100);
+    }
+
+    .sort-button:focus-visible {
+        outline: none;
+        box-shadow: var(--focus-ring);
+    }
+
+/* Cột số căn phải: mũi tên vẫn nằm sát chữ */
+.orders-table th.num .sort-button {
+    justify-content: flex-end;
+}
+
+.sort-icon {
+    flex: 0 0 auto;
+    color: var(--muted);
+}
+
+    .sort-icon path {
+        fill: currentColor;
+        opacity: 0.35;
+        transition: opacity var(--ease);
+    }
+
+.sort-button:hover .sort-icon path {
+    opacity: 0.6;
+}
+
+/* Đang sắp xếp: chữ và mũi tên đang dùng đậm màu, mũi tên còn lại mờ hẳn */
+.sort-button.is-sorted {
+    color: var(--coffee-800);
+}
+
+    .sort-button.is-sorted .sort-icon {
+        color: var(--coffee-700);
+    }
+
+.sort-icon.sort-asc .sort-up,
+.sort-icon.sort-desc .sort-down,
+.sort-button:hover .sort-icon.sort-asc .sort-up,
+.sort-button:hover .sort-icon.sort-desc .sort-down {
+    opacity: 1;
+}
+
+.sort-icon.sort-asc .sort-down,
+.sort-icon.sort-desc .sort-up {
+    opacity: 0.18;
+}
+
+/* Ghi chú khi máy chủ chưa hỗ trợ sắp xếp toàn bộ (chỉ sắp xếp trong trang) */
+.sort-note {
+    margin: 8px 16px 0;
+    color: var(--warning);
+    font-size: var(--fs-xs);
+}
+
+@media (max-width: 1000px) {
+    .sort-button {
+        min-height: 44px;
+        margin: -12px -8px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sort-icon path {
+        transition: none;
+    }
+}
+
+/* =========================================================================
+   [9] Chọn hình thức thanh toán (thay link "Khách đổi sang …"): 2 lựa chọn liền nhau, radio thật bên trong
+   ========================================================================= */
+.pay-picker {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+    .pay-picker legend {
+        grid-column: 1 / -1;
+        margin-bottom: 6px;
+        padding: 0;
+        color: var(--muted);
+        font-size: var(--fs-xs);
+        font-weight: 600;
+    }
+
+.pay-picker-option {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 6px 10px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--ink-soft);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+    .pay-picker-option:first-of-type {
+        border-radius: var(--r-sm) 0 0 var(--r-sm);
+    }
+
+    .pay-picker-option:last-of-type {
+        margin-left: -1px;
+        border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    }
+
+    .pay-picker-option:hover {
+        background: var(--coffee-50);
+    }
+
+    /* Radio thật vẫn nhận bàn phím (mũi tên trái/phải), chỉ ẩn hình tròn mặc định */
+    .pay-picker-option input {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        margin: 0;
+        cursor: pointer;
+    }
+
+    .pay-picker-option.is-selected {
+        z-index: 1;
+        border-color: var(--coffee-700);
+        background: var(--coffee-100);
+        color: var(--coffee-800);
+        box-shadow: inset 0 0 0 1px var(--coffee-700);
+    }
+
+    .pay-picker-option:focus-within {
+        z-index: 2;
+        box-shadow: var(--focus-ring);
+    }
+
+.pay-picker:disabled .pay-picker-option {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.pay-picker-changed {
+    margin: 0;
+    padding: 8px 10px;
+    border-left: 3px solid var(--warning);
+    border-radius: var(--r-sm);
+    background: var(--warning-bg);
+    color: var(--ink);
+    font-size: var(--fs-xs);
+}
+
+@media (max-width: 1000px) {
+    .pay-picker-option {
+        min-height: 44px;
+    }
+}
+
+/* Tiêu đề cột không xuống dòng ("Mã đơn" thành 2 dòng trên điện thoại) */
+.sort-button {
+    white-space: nowrap;
+}
+
+/* Nút sắp xếp tổng tiền phụ: chỉ hiện trên điện thoại (cột Tổng tiền bị ẩn ở ≤650px) */
+.sort-button.sort-mobile-only {
+    display: none;
+}
+
+@media (max-width: 650px) {
+    .sort-button.sort-mobile-only {
+        display: flex;
+        width: fit-content;
+        margin: 4px -8px -12px;
+        font-size: var(--fs-xs);
+    }
+}
+
+/* Cảnh báo kho đã thu gọn: 1 dòng bấm được để mở lại danh sách */
+.alert .stock-expand {
+    display: inline-flex;
+    margin-left: 4px;
+    min-height: 32px;
+    font-weight: 700;
+}
+
+/* Tiêu đề danh sách cảnh báo kho khi thông báo phía trên là thông báo khác */
+.alert .stock-heading {
+    display: block;
+    margin-top: 4px;
+    font-size: var(--fs-sm);
+}
+
+@media (max-width: 1000px) {
+    .alert .stock-expand {
+        min-height: 44px;
+    }
+}
+
+/* =========================================================================
+   [10] Chọn khoảng ngày (Từ ngày / Đến ngày + Áp dụng): dòng riêng dưới bộ lọc, nhãn rõ ràng
+   ========================================================================= */
+.custom-range {
+    flex-basis: 100%;
+    order: 10;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px 12px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface-warm);
+}
+
+.range-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--ink-soft);
+}
+
+    .range-field input {
+        height: 40px;
+        min-width: 150px;
+    }
+
+    .range-field input[aria-invalid="true"] {
+        border-color: var(--danger);
+    }
+
+.custom-range .btn {
+    height: 40px;
+}
+
+.range-help {
+    flex-basis: 100%;
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--fs-xs);
+}
+
+    .range-help.is-error {
+        color: var(--danger);
+        font-weight: 600;
+    }
+
+@media (max-width: 1000px) {
+    .custom-range .btn,
+    .range-field input {
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 650px) {
+    .range-field {
+        flex: 1 1 140px;
+    }
+
+        .range-field input {
+            min-width: 0;
+            width: 100%;
+        }
+
+    .custom-range .btn {
+        flex: 1 1 100%;
+    }
 }

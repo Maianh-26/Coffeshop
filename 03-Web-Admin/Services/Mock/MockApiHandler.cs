@@ -821,7 +821,19 @@ public class MockApiHandler : HttpMessageHandler
         if (Date(q, "tuNgay") is { } from) list = list.Where(d => d.ThoiGianTao >= from);
         if (Date(q, "denNgay") is { } to) list = list.Where(d => d.ThoiGianTao <= to);
 
-        return Ok(Page(list.OrderByDescending(d => d.ThoiGianTao).ThenByDescending(d => d.MaDonHang), q));
+        // [ĐỀ XUẤT] sapXep: sắp xếp toàn bộ danh sách TRƯỚC khi phân trang ("-" = giảm dần).
+        // Hòa giá trị (cùng tổng tiền) thì đơn mới hơn đứng trước để thứ tự giữa các trang ổn định.
+        IOrderedEnumerable<DonHang> sorted = (q.GetValueOrDefault("sapXep") ?? "") switch
+        {
+            "" => list.OrderByDescending(d => d.ThoiGianTao).ThenByDescending(d => d.MaDonHang),
+            "maDonHang" => list.OrderBy(d => d.MaDonHang),
+            "-maDonHang" => list.OrderByDescending(d => d.MaDonHang),
+            "tongTien" => list.OrderBy(d => d.TongTien).ThenByDescending(d => d.MaDonHang),
+            "-tongTien" => list.OrderByDescending(d => d.TongTien).ThenByDescending(d => d.MaDonHang),
+            _ => throw Invalid()
+        };
+
+        return Ok(Page(sorted, q));
     }
 
     private DonHang PlaceOrder(DatMonRequest req, int? maNhanVien)
