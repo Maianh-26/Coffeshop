@@ -254,8 +254,6 @@
 
                 </div>
 
-                <p class="form-note">Bỏ trống giờ vàng nếu khuyến mãi áp dụng cả ngày.</p>
-
                 <fieldset class="field">
                     <legend>Món áp dụng (@model.MaTenMons.Count)</legend>
 
@@ -268,24 +266,19 @@
                         <div class="toppings-picker-grid">
                             @foreach (var mon in products)
                             {
-                                var other = mon.KhuyenMai is { } km && km.MaKhuyenMai != model.MaKhuyenMai ? km.Code : null;
-
                                 <label class="topping-checkbox-item">
                                     <input type="checkbox"
                                            checked="@model.MaTenMons.Contains(mon.MaTenMon)"
                                            @onchange="e => ToggleProduct(mon.MaTenMon, e)" />
-                                    <span>
-                                        @mon.TenMon
-                                        @if (other is not null)
-                                        {
-                                            <small class="muted"> (đang thuộc @other)</small>
-                                        }
-                                    </span>
+                                    <span>@mon.TenMon</span>
+                                    @* Dữ liệu (không phải câu giải thích): món đang thuộc khuyến mãi khác → tích sẽ chuyển món sang khuyến mãi này *@
+                                    @if (mon.KhuyenMai is { } km && km.MaKhuyenMai != model.MaKhuyenMai)
+                                    {
+                                        <span class="badge gray" title="Đang thuộc khuyến mãi @km.Code">@km.Code</span>
+                                    }
                                 </label>
                             }
                         </div>
-
-                        <p class="form-note">Mỗi món chỉ thuộc một khuyến mãi — chọn món đang thuộc khuyến mãi khác sẽ chuyển món sang khuyến mãi này.</p>
                     }
                 </fieldset>
 
@@ -316,12 +309,6 @@
         @if (dialog == "delete" && Selected is { } target)
         {
             <p>Xóa khuyến mãi <strong>@target.Code</strong>?</p>
-
-            <p class="form-note">
-                @(target.SoMonApDung > 0
-                    ? $"{target.SoMonApDung} món đang áp dụng sẽ được gỡ khuyến mãi và trở về giá gốc."
-                    : "Khuyến mãi chưa gắn với món nào.")
-            </p>
 
             @if (error is not null)
             {

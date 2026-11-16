@@ -229,10 +229,6 @@
                                    placeholder="ví dụ: lan.nv"
                                    autocomplete="off" />
                         <ValidationMessage For="@(() => model.TenDangNhap)" />
-                        @if (editing)
-                        {
-                            <small class="form-note">Không đổi được tên đăng nhập.</small>
-                        }
                     </div>
 
                     <div class="field">
@@ -302,12 +298,6 @@
             <p>
                 @(target.TrangThai ? "Khóa" : "Mở khóa") tài khoản
                 <strong>@target.HoTen (@target.TenDangNhap)</strong>?
-            </p>
-
-            <p class="form-note">
-                @(target.TrangThai
-                    ? "Tài khoản bị khóa sẽ không đăng nhập được. Lịch sử đơn hàng vẫn được giữ."
-                    : "Tài khoản sẽ đăng nhập lại được bằng mật khẩu hiện tại.")
             </p>
 
             @if (error is not null)

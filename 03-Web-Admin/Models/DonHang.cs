@@ -39,9 +39,6 @@ public class DonHang
     /// </summary>
     public string? TrangThaiPhucVu { get; set; }
 
-    /// <summary>Nguồn đơn suy ra từ người tạo.</summary>
-    public string Nguon => MaNguoiDung is null ? "Tablet" : "Tại quầy";
-
     public int SoPhan => ChiTiet?.Sum(c => c.SoLuong) ?? 0;
 
     public bool DaHuy => TrangThaiThanhToan == TrangThaiDon.Cancelled;

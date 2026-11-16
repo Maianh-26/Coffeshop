@@ -17,14 +17,89 @@ public class NguyenLieu
     /// <summary>false = đã ngừng sử dụng (xóa mềm).</summary>
     public bool DangSuDung { get; set; } = true;
 
-    /// <summary>Tồn ≤ mức cảnh báo hoặc dự báo còn ≤ 2 ngày.</summary>
+    // Ba trường dự báo dưới đây backend vẫn trả về (giữ để khớp DTO) nhưng giao diện KHÔNG dùng nữa:
+    // dự báo theo trung bình 7 ngày không đáng tin khi quán đông bất thường, và quy tắc "còn ≤ 2 ngày" bị ẩn.
+    // Tình trạng hiển thị dùng một quy tắc rõ ràng: TinhTrangKho.Of (tồn so với mức cảnh báo).
+
+    /// <summary>[Không dùng trên giao diện] Backend: tồn ≤ mức cảnh báo hoặc dự báo còn ≤ 2 ngày.</summary>
     public bool SapHet { get; set; }
 
-    /// <summary>Tiêu hao trung bình/ngày trong 7 ngày gần nhất.</summary>
+    /// <summary>[Không dùng trên giao diện] Tiêu hao trung bình/ngày trong 7 ngày gần nhất.</summary>
     public decimal TieuHaoTrungBinhNgay { get; set; }
 
-    /// <summary>Dự báo số ngày còn dùng được (null nếu chưa có dữ liệu tiêu hao).</summary>
+    /// <summary>[Không dùng trên giao diện] Dự báo số ngày còn dùng được.</summary>
     public decimal? SoNgayConLai { get; set; }
+
+    /// <summary>Tình trạng hiển thị, xem <see cref="TinhTrangKho"/>.</summary>
+    public string TinhTrang => TinhTrangKho.Of(this);
+}
+
+/// <summary>
+/// Tình trạng tồn kho hiển thị — MỘT nơi duy nhất cho quy tắc và chuỗi.
+/// Quy tắc (giống các phần mềm bán hàng phổ biến: ngưỡng cố định do chủ quán đặt):
+/// ngừng sử dụng → "Ngừng sử dụng"; tồn ≤ 0 → "Hết hàng"; tồn ≤ mức cảnh báo → "Sắp hết"; còn lại → "Đủ dùng".
+/// </summary>
+public static class TinhTrangKho
+{
+    public const string DuDung = "DU_DUNG";
+    public const string SapHet = "SAP_HET";
+    public const string HetHang = "HET_HANG";
+    public const string NgungSuDung = "NGUNG_SU_DUNG";
+
+    /// <summary>Giá trị bộ lọc gộp: sắp hết + hết hàng (nút "Xem" trên cảnh báo cần nhập thêm).</summary>
+    public const string CanNhapFilter = "CAN_NHAP";
+
+    /// <summary>Các lựa chọn của bộ lọc tình trạng (nguyên liệu đang sử dụng).</summary>
+    public static readonly string[] FilterOptions = [DuDung, CanNhapFilter, SapHet, HetHang];
+
+    /// <summary>Nguyên liệu có khớp lựa chọn của bộ lọc tình trạng không ("" = tất cả).</summary>
+    public static bool Matches(NguyenLieu n, string filter) =>
+        filter == "" || (filter == CanNhapFilter ? CanNhap(n) : Of(n) == filter);
+
+    public static string Of(NguyenLieu n) =>
+        !n.DangSuDung ? NgungSuDung
+        : n.SoLuongTon <= 0 ? HetHang
+        : n.SoLuongTon <= n.MucCanhBaoToiThieu ? SapHet
+        : DuDung;
+
+    /// <summary>Cần nhập thêm: sắp hết hoặc đã hết (chỉ tính nguyên liệu đang sử dụng).</summary>
+    public static bool CanNhap(NguyenLieu n) => Of(n) is SapHet or HetHang;
+
+    public static string Label(string tinhTrang) => tinhTrang switch
+    {
+        DuDung => "Đủ dùng",
+        SapHet => "Sắp hết",
+        HetHang => "Hết hàng",
+        NgungSuDung => "Ngừng sử dụng",
+        CanNhapFilter => "Cần nhập thêm",   // = Sắp hết + Hết hàng
+        _ => tinhTrang
+    };
+
+    /// <summary>Lớp màu huy hiệu: xanh lá đủ dùng, vàng sắp hết, đỏ hết hàng, xám ngừng sử dụng.</summary>
+    public static string Color(string tinhTrang) => tinhTrang switch
+    {
+        DuDung => "green",
+        SapHet => "yellow",
+        HetHang => "red",
+        _ => "gray"
+    };
+}
+
+/// <summary>Bộ lọc trạng thái sử dụng của nguyên liệu — chuỗi dùng trong trang Kho.</summary>
+public static class LocSuDung
+{
+    public const string DangSuDung = "";          // mặc định
+    public const string NgungSuDung = "stopped";
+    public const string TatCa = "all";
+
+    public static readonly string[] Options = [DangSuDung, NgungSuDung, TatCa];
+
+    public static string Label(string loc) => loc switch
+    {
+        NgungSuDung => "Ngừng sử dụng",
+        TatCa => "Mọi trạng thái sử dụng",
+        _ => "Đang sử dụng"
+    };
 }
 
 /// <summary>POST api/v1/nguyen-lieu</summary>

@@ -2461,12 +2461,10 @@ input:-webkit-autofill:focus {
     white-space: nowrap;
 }
 
-/* Đơn hàng: khi mở khung chi tiết bên cạnh, ẩn cột phụ (Nguồn, Thời gian tạo — đều có trong khung chi tiết)
+/* Đơn hàng: khi mở khung chi tiết bên cạnh, ẩn cột phụ Thời gian tạo (đã có trong khung chi tiết)
    để Tổng tiền / Số nhận món / Thanh toán / Trạng thái không bị đẩy khuất */
 .orders-page.has-detail .orders-table th:nth-child(6),
-.orders-page.has-detail .orders-table td:nth-child(6),
-.orders-page.has-detail .orders-table th:nth-child(7),
-.orders-page.has-detail .orders-table td:nth-child(7) {
+.orders-page.has-detail .orders-table td:nth-child(6) {
     display: none;
 }
 
@@ -2531,11 +2529,9 @@ input:-webkit-autofill:focus {
         font-size: var(--fs-md);
     }
 
-    /* Ẩn cột phụ của bảng đơn hàng trên điện thoại (Nguồn, Thời gian tạo); giữ Số nhận món / Thanh toán / Trạng thái */
+    /* Ẩn cột phụ của bảng đơn hàng trên điện thoại (Thời gian tạo); giữ Số nhận món / Thanh toán / Trạng thái */
     .orders-table th:nth-child(6),
-    .orders-table td:nth-child(6),
-    .orders-table th:nth-child(7),
-    .orders-table td:nth-child(7) {
+    .orders-table td:nth-child(6) {
         display: none;
     }
 
@@ -2639,14 +2635,6 @@ input:-webkit-autofill:focus {
         opacity: 0.6;
     }
 
-.auth-help {
-    margin: 12px 0 0;
-    color: var(--muted);
-    font-size: var(--fs-xs);
-    line-height: 1.6;
-    text-align: center;
-}
-
 .auth-back {
     text-align: center;
 }
@@ -2682,10 +2670,6 @@ input:-webkit-autofill:focus {
 
 .auth-finish h1 {
     margin-bottom: 8px;
-}
-
-.auth-finish .auth-intro {
-    margin: 0 0 8px;
 }
 
 /* Màn chờ kiểm tra đăng nhập (dự phòng — bình thường phiên đã được khôi phục trước khi vẽ):
@@ -2903,11 +2887,6 @@ a.user-chip {
     text-align: center;
 }
 
-    .placeholder-page p {
-        max-width: 420px;
-        margin: 0;
-    }
-
 /* Khối người dùng ở cuối menu điện thoại là link tới Tài khoản của tôi */
 a.sidebar-user {
     border-radius: var(--r-md);
@@ -2918,12 +2897,10 @@ a.sidebar-user {
         background: var(--coffee-200);
     }
 
-/* Máy tính bảng: ẩn cột phụ của bảng đơn hàng (Nguồn, Thời gian tạo) để thấy Số nhận món / Thanh toán / Trạng thái */
+/* Máy tính bảng: ẩn cột phụ của bảng đơn hàng (Thời gian tạo) để thấy Số nhận món / Thanh toán / Trạng thái */
 @media (max-width: 1000px) {
     .orders-table th:nth-child(6),
-    .orders-table td:nth-child(6),
-    .orders-table th:nth-child(7),
-    .orders-table td:nth-child(7) {
+    .orders-table td:nth-child(6) {
         display: none;
     }
 }
@@ -2946,6 +2923,16 @@ a.sidebar-user {
 }
 
 /* Nhóm ô chọn trong form (giá theo size, món áp dụng, topping) */
+/* Khoảng cách giữa lưới ô nhập và nhóm phía dưới (trước đây có dòng ghi chú chen giữa) */
+.form-grid + fieldset.field {
+    margin-top: 20px;
+}
+
+/* Trang Tài khoản của tôi: nút Đổi mật khẩu cách danh sách thông tin */
+.info-list + .actions {
+    margin-top: 20px;
+}
+
 fieldset.field {
     margin: 0 0 12px;
     padding: 0;
@@ -3182,11 +3169,6 @@ fieldset.field {
 
 .pay-box .text-button {
     justify-self: center;
-}
-
-.serving-box .form-note,
-.pay-box .form-note {
-    margin: 0;
 }
 
 /* Hỏi lại ngay trong khung chi tiết (vd. phục vụ khi chưa thanh toán) */
@@ -4064,13 +4046,6 @@ fieldset.field {
     opacity: 0.18;
 }
 
-/* Ghi chú khi máy chủ chưa hỗ trợ sắp xếp toàn bộ (chỉ sắp xếp trong trang) */
-.sort-note {
-    margin: 8px 16px 0;
-    color: var(--warning);
-    font-size: var(--fs-xs);
-}
-
 @media (max-width: 1000px) {
     .sort-button {
         min-height: 44px;
@@ -4085,9 +4060,10 @@ fieldset.field {
 }
 
 /* =========================================================================
-   [9] Chọn hình thức thanh toán (thay link "Khách đổi sang …"): 2 lựa chọn liền nhau, radio thật bên trong
+   [9] Ô chọn 2 lựa chọn liền nhau, radio thật bên trong (.choice-picker):
+       hình thức thanh toán ở trang Đơn hàng
    ========================================================================= */
-.pay-picker {
+.choice-picker {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0;
@@ -4097,7 +4073,7 @@ fieldset.field {
     min-width: 0;
 }
 
-    .pay-picker legend {
+    .choice-picker legend {
         grid-column: 1 / -1;
         margin-bottom: 6px;
         padding: 0;
@@ -4106,7 +4082,7 @@ fieldset.field {
         font-weight: 600;
     }
 
-.pay-picker-option {
+.choice-picker-option {
     position: relative;
     display: flex;
     align-items: center;
@@ -4122,21 +4098,21 @@ fieldset.field {
     cursor: pointer;
 }
 
-    .pay-picker-option:first-of-type {
+    .choice-picker-option:first-of-type {
         border-radius: var(--r-sm) 0 0 var(--r-sm);
     }
 
-    .pay-picker-option:last-of-type {
+    .choice-picker-option:last-of-type {
         margin-left: -1px;
         border-radius: 0 var(--r-sm) var(--r-sm) 0;
     }
 
-    .pay-picker-option:hover {
+    .choice-picker-option:hover {
         background: var(--coffee-50);
     }
 
     /* Radio thật vẫn nhận bàn phím (mũi tên trái/phải), chỉ ẩn hình tròn mặc định */
-    .pay-picker-option input {
+    .choice-picker-option input {
         position: absolute;
         inset: 0;
         opacity: 0;
@@ -4144,7 +4120,7 @@ fieldset.field {
         cursor: pointer;
     }
 
-    .pay-picker-option.is-selected {
+    .choice-picker-option.is-selected {
         z-index: 1;
         border-color: var(--coffee-700);
         background: var(--coffee-100);
@@ -4152,28 +4128,18 @@ fieldset.field {
         box-shadow: inset 0 0 0 1px var(--coffee-700);
     }
 
-    .pay-picker-option:focus-within {
+    .choice-picker-option:focus-within {
         z-index: 2;
         box-shadow: var(--focus-ring);
     }
 
-.pay-picker:disabled .pay-picker-option {
+.choice-picker:disabled .choice-picker-option {
     opacity: 0.6;
     cursor: not-allowed;
 }
 
-.pay-picker-changed {
-    margin: 0;
-    padding: 8px 10px;
-    border-left: 3px solid var(--warning);
-    border-radius: var(--r-sm);
-    background: var(--warning-bg);
-    color: var(--ink);
-    font-size: var(--fs-xs);
-}
-
 @media (max-width: 1000px) {
-    .pay-picker-option {
+    .choice-picker-option {
         min-height: 44px;
     }
 }
@@ -4287,5 +4253,131 @@ fieldset.field {
 
     .custom-range .btn {
         flex: 1 1 100%;
+    }
+}
+
+/* =========================================================================
+   [11] Trang Kho nguyên liệu: bảng vừa màn hình hẹp, bộ lọc xếp như trang Đơn hàng, ghi chú trong form
+   ========================================================================= */
+
+/* Dòng phụ trong ô (Mức cảnh báo dưới Tồn kho; Đơn hàng / Ghi chú dưới tên nguyên liệu): chỉ hiện khi cột tương ứng bị ẩn */
+.stock-sub {
+    display: none;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: var(--fs-xs);
+    font-weight: 400;
+}
+
+/* Ngắt hàng trong bộ lọc: chỉ dùng ở màn hình hẹp */
+.filter-break {
+    display: none;
+}
+
+
+/* Cảnh báo cần nhập thêm: tên từng nguyên liệu hết / sắp hết + nút "Lọc danh sách" */
+.alert.restock-alert {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 6px 12px;
+}
+
+    .restock-text {
+        flex: 1 1 260px;
+        min-width: 0;
+    }
+
+        .restock-text p {
+            margin: 2px 0 0;
+        }
+
+    .restock-label {
+        margin-right: 4px;   /* Blazor bỏ khoảng trắng sau </span> → "Sắp hết:Bánh…" */
+        font-weight: 600;
+    }
+    /* "Bánh tiramisu còn 3 miếng" không bị tách số với đơn vị; chỉ xuống dòng sau dấu phẩy */
+    .restock-item {
+        white-space: nowrap;
+    }
+
+    /* Nút "Lọc danh sách": vùng bấm đủ lớn (chạm ngón tay ≥ 44px trên màn hình hẹp) */
+    .restock-alert .restock-filter {
+        min-height: 36px;
+        padding: 0 4px;
+    }
+
+/* Danh sách nhận focus bằng code sau khi lọc nhanh: không viền khi focus do chuột */
+.list-panel:focus:not(:focus-visible) {
+    outline: none;
+}
+
+@media (max-width: 1000px) {
+    .restock-alert .restock-filter {
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 1000px) {
+    .table-wrap .inventory-table {
+        min-width: 0;
+    }
+
+    .inventory-table th,
+    .inventory-table td {
+        white-space: normal;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    /* Nguyên liệu: gộp Mức cảnh báo vào ô Tồn kho. Lịch sử: bỏ cột Mã (không đụng ô báo bảng rỗng colspan) */
+    .ingredient-table th:nth-child(4),
+    .ingredient-table td:nth-child(4),
+    .stock-history-table th:nth-child(1),
+    .stock-history-table td:nth-child(1):not(.empty-cell) {
+        display: none;
+    }
+
+    .ingredient-table .stock-sub {
+        display: block;
+    }
+
+    /* Nút "Bộ lọc" + Làm mới một hàng; các ô lọc xuống hàng dưới, chia đôi */
+    .filter-row .filter-break {
+        display: block;
+        flex-basis: 100%;
+        height: 0;
+    }
+
+    .filter-row select.filter-half {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 650px) {
+    /* Nguyên liệu: bỏ cột Mã NL. Lịch sử: Đơn hàng / Ghi chú hiện dưới tên nguyên liệu */
+    .ingredient-table th:nth-child(1),
+    .ingredient-table td:nth-child(1):not(.empty-cell),
+    .stock-history-table th:nth-child(6),
+    .stock-history-table td:nth-child(6),
+    .stock-history-table th:nth-child(7),
+    .stock-history-table td:nth-child(7) {
+        display: none;
+    }
+
+    .stock-history-table .stock-sub {
+        display: block;
+    }
+
+    .inventory-table th,
+    .inventory-table td {
+        padding-left: 6px;
+        padding-right: 6px;
+    }
+
+    .filter-row select.filter-half {
+        flex-basis: 100%;
     }
 }

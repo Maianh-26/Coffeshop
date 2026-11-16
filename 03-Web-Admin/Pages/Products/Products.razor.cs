@@ -468,7 +468,7 @@ public partial class Products : IDisposable
             }
 
             selected = saved.MaTenMon.ToString();
-            return editing ? $"Đã cập nhật món {saved.TenMon}." : $"Đã thêm món {saved.TenMon}. Nhớ thiết lập công thức để món bán được.";
+            return editing ? $"Đã cập nhật món {saved.TenMon}." : $"Đã thêm món {saved.TenMon}.";
         });
 
         // Lưu món gồm 2–3 lời gọi API: nếu bước sau lỗi thì bước trước đã ghi → tải lại để danh sách khớp máy chủ
@@ -700,7 +700,7 @@ public partial class Products : IDisposable
             if (ToppingTab) await ToppingApi.SaveRecipeAsync(recipeOwner, request, pageCts.Token);
             else await ProductApi.SaveRecipeAsync(recipeOwner, request, pageCts.Token);
 
-            message = "Đã lưu công thức. Đơn mới sẽ trừ kho theo định mức này.";
+            message = "Đã lưu công thức.";
             dialog = "";
             await Load(); // tình trạng "đủ nguyên liệu" của món có thể đổi
         }
