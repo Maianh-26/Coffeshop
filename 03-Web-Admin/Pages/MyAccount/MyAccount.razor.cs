@@ -131,7 +131,7 @@ public partial class MyAccount : IDisposable
 
             form = new ChangePasswordForm();
             changing = false;
-            success = "Đã đổi mật khẩu. Lần đăng nhập sau hãy dùng mật khẩu mới.";
+            success = "Đã đổi mật khẩu.";
         }
         finally
         {

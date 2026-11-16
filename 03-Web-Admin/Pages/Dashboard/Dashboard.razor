@@ -78,8 +78,6 @@
                 @(report is null ? "—" : Money(report.DoanhThu))
             </strong>
 
-            <small>Đã áp khuyến mãi; không tính đơn hủy.</small>
-
         </div>
 
     </section>
@@ -98,11 +96,10 @@
                 @(report is null ? "—" : report.SoDonDaThanhToan + " đơn")
             </strong>
 
-            <small>
-                @(report is null
-                    ? "Trong khoảng thời gian đã áp dụng."
-                    : $"Chờ thanh toán: {report.SoDonChoThanhToan} · Đã hủy: {report.SoDonHuy}")
-            </small>
+            @if (report is not null)
+            {
+                <small>Chờ thanh toán: @report.SoDonChoThanhToan · Đã hủy: @report.SoDonHuy</small>
+            }
 
         </div>
 
@@ -122,11 +119,10 @@
                 @(report is null ? "—" : Money(report.GiaTriDonTrungBinh))
             </strong>
 
-            <small>
-                @(report is null
-                    ? "Doanh thu chia số đơn đã thanh toán."
-                    : $"Tiền mặt: {Money(report.TheoPhuongThuc.GetValueOrDefault(PhuongThucThanhToans.Cash))} · QR: {Money(report.TheoPhuongThuc.GetValueOrDefault(PhuongThucThanhToans.QrTransfer))}")
-            </small>
+            @if (report is not null)
+            {
+                <small>Tiền mặt: @Money(report.TheoPhuongThuc.GetValueOrDefault(PhuongThucThanhToans.Cash)) · QR: @Money(report.TheoPhuongThuc.GetValueOrDefault(PhuongThucThanhToans.QrTransfer))</small>
+            }
 
         </div>
 
@@ -343,11 +339,6 @@
             </button>
 
         </div>
-
-        <p class="form-note">
-            Báo cáo dùng bộ lọc đã Áp dụng.
-            Với PDF, chọn Lưu dưới dạng PDF trong hộp thoại in.
-        </p>
 
         <div class="modal-footer">
 

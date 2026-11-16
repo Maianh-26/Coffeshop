@@ -178,7 +178,7 @@
                                    @bind="customFrom"
                                    max="@IsoDate(customTo ?? DateTime.Today)"
                                    aria-invalid="@(dateError is not null ? "true" : null)"
-                                   aria-describedby="date-range-help" />
+                                   aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
                         </label>
 
                         <label class="range-field">
@@ -188,14 +188,15 @@
                                    min="@(customFrom is { } cf ? IsoDate(cf) : null)"
                                    max="@IsoDate(DateTime.Today)"
                                    aria-invalid="@(dateError is not null ? "true" : null)"
-                                   aria-describedby="date-range-help" />
+                                   aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
                         </label>
 
                         <button type="submit" class="btn primary btn-compact" disabled="@userLoading">Áp dụng</button>
 
-                        <p id="date-range-help" class="range-help @(dateError is not null ? "is-error" : "")">
-                            @(dateError ?? "Chỉ chọn một ngày thì xem đơn của riêng ngày đó.")
-                        </p>
+                        @if (dateError is not null)
+                        {
+                            <p id="date-range-help" class="range-help is-error">@dateError</p>
+                        }
 
                         @* Vùng live luôn có mặt khi khung mở → lỗi được trình đọc màn hình đọc, kể cả lỗi lặp lại *@
                         <span class="sr-only" role="alert">@dateError</span>
@@ -360,7 +361,6 @@
                                     <SortIcon Direction="@SortDirection(SortKeys.Total)" />
                                 </button>
                             </th>
-                            <th>Nguồn</th>
                             <th>Thời gian tạo</th>
                         </tr>
 
@@ -422,8 +422,6 @@
                                     <span class="pay-amount">@Money(order.TongTien)</span>
                                 </td>
 
-                                <td class="muted">@order.Nguon</td>
-
                                 <td class="muted">@order.ThoiGianTao.ToString("HH:mm, dd/MM")</td>
 
                             </tr>
@@ -433,7 +431,7 @@
                         {
                             <tr>
 
-                                <td class="empty-cell" colspan="7">
+                                <td class="empty-cell" colspan="6">
 
                                     <Icon Name="orders" Size="32" />
 
@@ -441,7 +439,7 @@
                                         @(loading && orders.Count == 0
                                             ? "Đang tải đơn hàng…"
                                             : search.Length > 0 && orders.Count > 0
-                                                ? $"Không có đơn khớp \"{search}\" trên trang này. Thử trang khác hoặc bấm nút Làm mới."
+                                                ? $"Không có đơn khớp \"{search}\" trên trang này."
                                                 : "Không tìm thấy đơn hàng nào phù hợp với bộ lọc.")
                                     </p>
 
@@ -456,13 +454,6 @@
 
             </div>
 
-            @* Vùng live luôn có mặt (chỉ đổi chữ) để trình đọc màn hình đọc được; phần nhìn thấy ở <p> bên dưới *@
-            <span class="sr-only" role="status">@(SortNoteVisible ? SortNoteText : "")</span>
-            @if (SortNoteVisible)
-            {
-                <p class="sort-note" aria-hidden="true">@SortNoteText</p>
-            }
-
             <div class="list-footer">
 
                 <span>
@@ -472,7 +463,7 @@
                     }
                     else
                     {
-                        @($"{FooterTotal} đơn hàng")@(SelectedOrder == null && totalOrders > 0 ? ", nhấp vào một đơn để xem chi tiết" : "")
+                        @($"{FooterTotal} đơn hàng")
                     }
                     <span class="page-of">Trang @(page)/@totalPages</span>
                 </span>
@@ -536,19 +527,10 @@
             </div>
 
             <!-- Thông tin tổng quan đơn hàng -->
-            @if (!orders.Any(o => o.MaDonHang == detail.MaDonHang))
-            {
-                <p class="form-note">Đơn này không nằm trong danh sách đang hiển thị (trang hoặc bộ lọc khác).</p>
-            }
-
             <dl class="order-facts">
                 <div>
                     <dt>Tạo lúc</dt>
                     <dd>@detail.ThoiGianTao.ToString("HH:mm, dd/MM/yyyy")</dd>
-                </div>
-                <div>
-                    <dt>Nguồn</dt>
-                    <dd>@(detail.TenNhanVien is { } staff ? $"Tại quầy, {staff}" : "Khách đặt trên Tablet")</dd>
                 </div>
                 <div>
                     <dt>Thanh toán</dt>
@@ -608,17 +590,12 @@
             </section>
 
             <!-- NGHIỆP VỤ: SỐ NHẬN MÓN & PHỤC VỤ -->
-            @if (!servingSupported)
-            {
-                <p class="form-note serving-box">
-                    Số nhận món và trạng thái phục vụ chưa dùng được: máy chủ chưa hỗ trợ (đã đề xuất với nhóm backend).
-                </p>
-            }
-            else
+            @* Máy chủ chưa hỗ trợ số nhận món / trạng thái phục vụ → ẩn cả khối (không hiện dòng giải thích) *@
+            @if (servingSupported)
             {
             <div class="serving-box">
                 <div class="field">
-                    <label for="pickup-number">Số nhận món (bảng gỗ @SoNhanMons.Min–@SoNhanMons.Max)</label>
+                    <label for="pickup-number">Số nhận món</label>
 
                     @if (detail.DangPhucVu)
                     {
@@ -658,7 +635,6 @@
                             @if (detail.SoNhanMon is { } so)
                             {
                                 <span class="pickup-number">@so</span>
-                                <span class="muted">@(detail.DaHuy ? "Đơn đã hủy, số đã được giải phóng." : "Đã phục vụ, số đã được giải phóng.")</span>
                             }
                             else
                             {
@@ -675,7 +651,7 @@
                     <div class="confirm-inline" role="alertdialog" aria-labelledby="no-pickup-msg"
                          @onkeydown="CloseConfirmOnEscape">
                         <p id="no-pickup-msg">
-                            Đơn <strong>#@detail.MaDonHang</strong> <strong>chưa có số nhận món</strong>, người phục vụ sẽ không biết mang món tới bàn nào.
+                            Đơn <strong>#@detail.MaDonHang</strong> <strong>chưa có số nhận món</strong>.
                         </p>
                         <div class="serving-actions">
                             <button type="button" class="btn primary" disabled="@servingBusy" @onclick="FocusPickupInput"
@@ -697,7 +673,6 @@
                          @onkeydown="CloseConfirmOnEscape">
                         <p id="serve-unpaid-msg">
                             Đơn <strong>#@detail.MaDonHang</strong> <strong>chưa thanh toán</strong>. Vẫn xác nhận đã phục vụ?
-                            @(detail.SoNhanMon is { } holding ? $" Số {holding} sẽ được giải phóng." : "")
                         </p>
                         <div class="serving-actions">
                             <button type="button" class="btn btn-act-pay" disabled="@servingBusy" @onclick="FocusPayButton"
@@ -773,11 +748,11 @@
 
                         @* Hình thức thanh toán: chọn ngay trên nút xác nhận (như các phần mềm bán hàng), mặc định là hình thức khách đã chọn.
                            Chỉ được ghi vào đơn khi bấm xác nhận — để đối soát két tiền mặt / sao kê ngân hàng cuối ca cho đúng. *@
-                        <fieldset class="pay-picker" disabled="@paying">
+                        <fieldset class="choice-picker" disabled="@paying">
                             <legend>Hình thức thanh toán</legend>
                             @foreach (var m in PayMethods)
                             {
-                                <label class="pay-picker-option @(payMethod == m ? "is-selected" : "")">
+                                <label class="choice-picker-option @(payMethod == m ? "is-selected" : "")">
                                     <input type="radio"
                                            name="pay-method"
                                            value="@m"
@@ -789,31 +764,6 @@
                                 </label>
                             }
                         </fieldset>
-
-                        @{
-                            string? payChangedText = payMethod != detail.PhuongThucThanhToan
-                                ? $"Khách đã chọn {PhuongThucThanhToans.Label(detail.PhuongThucThanhToan).ToLowerInvariant()} khi đặt. " +
-                                  $"Đơn sẽ được ghi là {PhuongThucThanhToans.Label(payMethod).ToLowerInvariant()} khi xác nhận."
-                                : null;
-                        }
-                        @* Vùng live luôn có mặt (chỉ đổi chữ); phần nhìn thấy ở <p> bên dưới *@
-                        <span class="sr-only" role="status">@payChangedText</span>
-                        @if (payChangedText is not null)
-                        {
-                            <p class="pay-picker-changed" aria-hidden="true">@payChangedText</p>
-                        }
-
-                        @if (payMethod == PhuongThucThanhToans.QrTransfer)
-                        {
-                            <p class="form-note">
-                                @* Câu "tự cập nhật" chỉ đúng khi chính khách chọn chuyển khoản lúc đặt (cổng thanh toán báo về) *@
-                                @if (detail.PhuongThucThanhToan == PhuongThucThanhToans.QrTransfer && detail.MaNguoiDung is null)
-                                {
-                                    <text>Khách chuyển khoản trên tablet: hệ thống tự cập nhật "@TrangThaiDon.Label(TrangThaiDon.Paid)" khi nhận được tiền. </text>
-                                }
-                                Chỉ bấm xác nhận khi đã kiểm tra tài khoản nhận được tiền (nội dung: <strong>COFFEE @detail.MaDonHang</strong>).
-                            </p>
-                        }
 
                         <button type="button"
                                 class="btn btn-act-pay btn-large"
@@ -924,7 +874,7 @@
                 @if (availableToppings.Count > 0)
                 {
                     <fieldset class="field">
-                        <legend>Topping thêm (mỗi loại 1 phần/ly)</legend>
+                        <legend>Topping thêm</legend>
                         <div class="toppings-picker-grid">
                             @foreach (var top in availableToppings)
                             {
@@ -989,7 +939,7 @@
                             {
                                 <tr>
                                     <td colspan="6" class="empty-cell">
-                                        Chưa có món nào. Chọn món rồi bấm "Thêm món này vào đơn".
+                                        Chưa có món nào.
                                     </td>
                                 </tr>
                             }
@@ -1002,12 +952,6 @@
                         </tfoot>
                     </table>
                 </div>
-
-                <p class="form-note">
-                    @(editingOrderId is null
-                        ? "Tổng tiền chính thức do máy chủ tính khi tạo đơn (áp khuyến mãi theo giờ hiện tại)."
-                        : "Tổng tiền chính thức do máy chủ tính lại khi lưu (áp khuyến mãi theo giờ tạo đơn).")
-                </p>
             </div>
 
         </div>
@@ -1619,40 +1563,8 @@
     // LỌC THEO THỜI GIAN
     // =========================================================================
 
-    /// <summary>
-    /// Các mốc chọn nhanh. Tính lùi đúng 24 giờ / 7 ngày / 30 ngày từ thời điểm hiện tại (khoảng trượt),
-    /// không có mốc kết thúc → luôn gồm cả đơn vừa tạo. Giống bộ lọc "Last 24 hours / 7 days / 30 days" của các trang quản trị lớn.
-    /// </summary>
-    private static class DatePresets
-    {
-        public const string All = "";
-        public const string Last24h = "24h";
-        public const string Last7 = "7d";
-        public const string Last30 = "30d";
-        public const string Custom = "custom";   // tự chọn Từ ngày / Đến ngày
-
-        public static readonly string[] Options = [All, Last24h, Last7, Last30, Custom];
-
-        public static string Label(string preset) => preset switch
-        {
-            Last24h => "Trong 24 giờ qua",
-            Last7 => "Trong 7 ngày qua",
-            Last30 => "Trong 30 ngày qua",
-            Custom => "Chọn khoảng ngày…",
-            _ => "Tất cả thời gian"
-        };
-
-        /// <summary>Mốc bắt đầu của một lựa chọn; null = không lọc theo thời gian.</summary>
-        public static DateTime? From(string preset, DateTime now) => preset switch
-        {
-            Last24h => now.AddHours(-24),
-            Last7 => now.AddDays(-7),
-            Last30 => now.AddDays(-30),
-            _ => null
-        };
-    }
-
-    private static string IsoDate(DateTime d) => d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+    // Mốc lọc thời gian dùng chung với trang Kho (Lịch sử kho): Utilities/DatePresets.cs
+    private static string IsoDate(DateTime d) => DatePresets.IsoDate(d);
 
     private async Task OnDatePresetChanged()
     {
@@ -1685,26 +1597,10 @@
 
     private async Task ApplyCustomRange()
     {
-        if (customFrom is null && customTo is null)
-        {
-            await ShowDateError("Hãy chọn ít nhất một ngày.");
-            return;
-        }
-
         // Chỉ chọn một đầu → lọc đúng ngày đó (không hiểu thành "từ ngày đó đến nay" hay "mọi ngày trước đó")
-        DateTime from = (customFrom ?? customTo)!.Value.Date;
-        DateTime to = (customTo ?? customFrom)!.Value.Date;
-
-        if (to < from)
+        if (DatePresets.ValidateCustom(customFrom, customTo, out DateTime from, out DateTime to) is { } rangeError)
         {
-            await ShowDateError("Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.");
-            return;
-        }
-
-        // Ô ngày có max nhưng vẫn gõ tay được ngày vượt mốc (form dùng novalidate) → kiểm tra lại cả 2 đầu
-        if (from > DateTime.Today || to > DateTime.Today)
-        {
-            await ShowDateError("Không chọn ngày trong tương lai.");
+            await ShowDateError(rangeError);
             return;
         }
 
@@ -1740,10 +1636,6 @@
     // Tổng số đơn khớp bộ lọc (khi danh sách quá dài chỉ sắp xếp phần đầu, vẫn ghi tổng thật)
     private int FooterTotal => sortTruncated && sortKey != SortKeys.None ? totalOrdersAll : totalOrders;
 
-    private bool SortNoteVisible => sortKey != SortKeys.None && sortTruncated;
-
-    private string SortNoteText =>
-        $"Danh sách có {totalOrdersAll:N0} đơn: đang sắp xếp {MaxClientSortOrders:N0} đơn mới nhất. Hãy lọc theo thời gian để sắp xếp đủ.";
 
     /// <summary>
     /// Bấm tiêu đề cột: cột mới → thấp đến cao; bấm lại cùng cột → đổi chiều (cao đến thấp ↔ thấp đến cao).
@@ -1979,7 +1871,7 @@
         autoRefreshEnabled = !autoRefreshEnabled;
         ShowAlert(autoRefreshEnabled
             ? $"Đã bật tự động cập nhật đơn mới (mỗi {RefreshSeconds} giây)."
-            : "Đã tắt tự động cập nhật. Bấm nút Làm mới (biểu tượng tải lại) để xem đơn mới nhất.", "success");
+            : "Đã tắt tự động cập nhật.", "success");
     }
 
     /// <summary>Chế độ giả lập: yêu cầu API giả sinh một đơn tablet rồi tải lại danh sách.</summary>
@@ -2691,7 +2583,7 @@
             var created = await OrderApi.CreateAsync(request, pageCts.Token);
 
             isOrderModalOpen = false;
-            ShowAlert($"Đã tạo đơn #{created.MaDonHang} — tổng {Money(created.TongTien)}. Chọn đơn để thu tiền.", "success");
+            ShowAlert($"Đã tạo đơn #{created.MaDonHang} — tổng {Money(created.TongTien)}.", "success");
 
             page = 1;
             ClearClientSortCache();   // đơn mới phải có trong danh sách đã sắp xếp ở web

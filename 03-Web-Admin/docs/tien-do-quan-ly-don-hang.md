@@ -22,7 +22,7 @@
 
 **Danh sách**
 - Ô tìm kiếm chỉ nhận chữ số, khớp **mã đơn (tiền tố)** hoặc **số nhận món (chính xác)**. Trước đây tìm cả tên món/nhân viên không hiện trên bảng nên trông như "lọc sai".
-- Cột: Mã đơn, Số nhận món, Trạng thái, Tổng tiền (căn phải), Thanh toán (nhãn + hình thức bên dưới), Nguồn, Thời gian tạo. Màn hình hẹp hoặc đang mở chi tiết: ẩn Nguồn/Thời gian. Điện thoại: ẩn thêm Tổng tiền, số tiền hiện dưới nhãn thanh toán.
+- Cột: Mã đơn, Số nhận món, Trạng thái, Tổng tiền (căn phải), Thanh toán (nhãn + hình thức bên dưới), Thời gian tạo (đã bỏ cột Nguồn 14/11, xem mục 9). Màn hình hẹp hoặc đang mở chi tiết: ẩn Thời gian. Điện thoại: ẩn thêm Tổng tiền, số tiền hiện dưới nhãn thanh toán.
 - Bộ lọc trạng thái phục vụ + bộ lọc thanh toán. Màn hình ≤1000px gom vào nút "Bộ lọc (n)". Nút **Làm mới** (biểu tượng) thay chữ "Xóa lọc" (xem mục 7).
 - **Đơn mới từ Tablet**: dò mỗi 10 giây trên **toàn bộ dữ liệu** (không phụ thuộc trang hay bộ lọc). Thông báo ở **đầu trang, màu cam** (12/11: chủ quán yêu cầu đổi từ tím sang màu thông dụng hơn; nút Xem không còn icon con mắt), có nút **Xem** (mở chi tiết, kể cả đơn không có trong trang đang xem). Dòng mới có vạch cam + chip "Mới" cho đến khi mở. Đơn tạo tại quầy **không** tính là đơn mới (cố ý).
 - Thông báo kết quả thao tác nổi ở góc dưới trái (điện thoại: dưới cùng), thành công tự ẩn sau 6 giây. Thông báo có cảnh báo kho thì giữ lại.
@@ -79,7 +79,7 @@ Người dùng đã được hỏi có ghi phần này vào tài liệu đề xu
 - Dữ liệu mẫu: đơn #20 "Đang chuẩn bị" giữ số 18, #19 đã phục vụ số 18, #21 chờ phục vụ chưa có số.
 - Chạy app: `dotnet run --launch-profile http` → http://localhost:5101 (tự đăng nhập `quanly` ở mock). **Kiểm tra cổng 5101 trước**: nếu đang có app (người dùng chạy từ Visual Studio) thì không tắt và hỏi trước khi chạy `ui-ux-reviewer`.
 - Mở Claude **từ thư mục `03-Web-Admin`** để các agent `code-reviewer` / `ui-ux-reviewer` được nạp. Mở từ gốc repo thì dùng agent `general-purpose` và bảo nó đọc `.claude/agents/<tên>.md`.
-- Mỗi lần sửa `app.css` / `app.js`: tăng `?v=` trong `wwwroot/index.html` (hiện `app.css?v=57`, `app.js?v=7`).
+- Mỗi lần sửa `app.css` / `app.js`: tăng `?v=` trong `wwwroot/index.html` (hiện `app.css?v=66`, `app.js?v=7`).
 
 ## 7. Cập nhật 12/11/2026 (các phiên sau)
 
@@ -106,7 +106,7 @@ Người dùng đã được hỏi có ghi phần này vào tài liệu đề xu
 ### 7.4. Hình thức thanh toán (thay link "Khách đổi sang chuyển khoản")
 
 - Phân tích: link chỉ đổi biến tạm `payMethod`; hình thức chỉ ghi vào đơn khi bấm xác nhận (`POST thanh-toan` gửi `phuongThucThanhToan`). **Cần giữ chức năng** (khách đặt chọn chuyển khoản nhưng trả tiền mặt hoặc ngược lại → không ghi đúng thì đối soát két / sao kê cuối ca và báo cáo theo hình thức bị lệch), nhưng link chữ khó thấy, không cho biết đang chọn gì và khách ban đầu chọn gì.
-- Đã đổi thành ô chọn 2 lựa chọn **Tiền mặt | Chuyển khoản** (`fieldset.pay-picker`, radio thật, dùng được bàn phím) ngay trên nút xác nhận, mặc định = hình thức khách chọn; khác lựa chọn ban đầu thì hiện ghi chú vàng "Khách đã chọn … khi đặt. Đơn sẽ được ghi là … khi xác nhận". Nhãn nút xác nhận đổi theo.
+- Đã đổi thành ô chọn 2 lựa chọn **Tiền mặt | Chuyển khoản** (`fieldset.choice-picker` — trước 16/11/2026 tên là `.pay-picker`, đổi tên vì trang Kho dùng chung cho ô chọn trạng thái sử dụng; radio thật, dùng được bàn phím) ngay trên nút xác nhận, mặc định = hình thức khách chọn; khác lựa chọn ban đầu thì hiện ghi chú vàng "Khách đã chọn … khi đặt. Đơn sẽ được ghi là … khi xác nhận". Nhãn nút xác nhận đổi theo.
 
 ### 7.5. Hóa đơn in (làm lại 12/11/2026 theo mẫu chủ quán gửi)
 
@@ -145,3 +145,19 @@ Người dùng đã được hỏi có ghi phần này vào tài liệu đề xu
 - `code-reviewer` kiểm tra lại các bản sửa: đúng; sửa thêm 2 điểm: (a) lượt tải toàn bộ bị thao tác chen vào thì **tự tải lại** (tối đa 2 lần) thay vì bỏ, nên bảng không giữ dữ liệu cũ và lượt tải lại sau 409 không bị mất; (b) mở danh sách cảnh báo kho dưới một thông báo khác thì có tiêu đề "Cảnh báo kho: N nguyên liệu sắp hết" (`.stock-heading`), dòng cảnh báo đã thu gọn luôn viền màu cảnh báo. `app.css?v=57`.
 - Gợi ý chưa làm (cố ý): mở lại cảnh báo kho bằng "Xem" thì không tự thu gọn lại (người dùng chủ động mở để đọc).
 - Chưa chạy `ui-ux-reviewer` cho đợt sửa này (chỉ đổi logic thông báo, không đổi bố cục).
+
+## 9. Cập nhật 14/11/2026: bỏ Nguồn
+
+- **Quyết định của chủ quán:** bỏ cột **Nguồn** ở bảng danh sách và dòng **Nguồn** ở chi tiết đơn (yêu cầu gốc có cột này, nay đổi). Lý do: quán gia đình, tablet cắm điện thẳng nên ít hỏng, đơn tại quầy chỉ phát sinh khi khách không muốn hoặc không biết dùng tablet, nên cột gần như luôn là "Tablet". Chỉ chủ quán, nhân viên nhận món và nhân viên pha chế tạo đơn tại quầy, cùng đứng quầy, nên tên người tạo không giúp đối soát. Đối soát tiền theo hình thức thanh toán (két tiền mặt, sao kê chuyển khoản). Hủy đơn chỉ chủ quán làm được.
+- **Vẫn giữ bên trong:** phân biệt đơn tablet (`MaNguoiDung` rỗng) để báo đơn mới và ghi chú chuyển khoản. Backend vẫn lưu tài khoản tạo đơn (`maNguoiDung`, `tenNhanVien` trong DTO), chỉ không hiển thị. Đã bỏ thuộc tính hiển thị `DonHang.Nguon`.
+- **Nếu giảng viên hỏi** "nhân viên nghỉ thì ai làm": hệ thống phân quyền theo vai trò (Nhân viên / Quản lý), không theo người; nhân viên nào cũng làm được mọi việc trên trang Đơn hàng, chủ quán làm được tất cả. "Làm sao biết ai tạo đơn": dữ liệu vẫn được lưu, chỉ ẩn khỏi giao diện; mỗi người nên đăng nhập tài khoản riêng.
+- CSS: các luật ẩn cột theo `nth-child` của `.orders-table` đã chỉnh cho bảng 6 cột (Thời gian tạo là cột 6). `app.css?v=58`.
+
+
+## 10. Cập nhật 16/11/2026: bỏ chữ giải thích trên toàn web admin
+
+- **Quyết định của chủ quán:** bỏ hết các dòng chữ nhỏ giải thích (ghi chú dưới ô nhập, câu hướng dẫn trong hộp thoại, gợi ý ở chân bảng / thông báo). Giữ: lỗi, validation, trạng thái trống ngắn, dữ liệu, câu hỏi xác nhận chính.
+- Trang Đơn hàng đã bỏ: ghi chú sắp xếp chỉ 2.000 đơn mới nhất (`sort-note`), "Đơn này không nằm trong danh sách…", dòng "máy chủ chưa hỗ trợ số nhận món" (nay ẩn cả khối), ghi chú chuyển khoản QR (kể cả nội dung CK "COFFEE {mã}"), hộp vàng "Khách đã chọn … khi đặt" khi đổi hình thức thanh toán (thay mục 7.4 — ô chọn Tiền mặt | Chuyển khoản vẫn giữ), ghi chú tổng tiền khi tạo đơn, phần ngoặc trong nhãn "Số nhận món" / "Topping thêm", câu gợi ý trong vài thông báo.
+- Ô Chọn khoảng ngày (Đơn hàng + Lịch sử kho) chỉ hiện dòng dưới khi có lỗi.
+- Trang Khuyến mãi: mã khuyến mãi mà món đang thuộc hiện thành nhãn xám cạnh tên món (dữ liệu, không phải câu giải thích) để tránh chuyển món âm thầm.
+- Lớp CSS `.pay-picker` đã đổi tên thành `.choice-picker` (trang Đơn hàng vẫn dùng).

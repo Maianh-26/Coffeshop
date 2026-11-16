@@ -106,7 +106,7 @@ public partial class ForgotPassword : IDisposable
                 // → vẫn cho sang bước nhập mã, đếm ngược đúng thời gian còn lại
                 if (result.ErrorCode == ResetErrorCodes.ResendTooSoon && step == Step.Email)
                 {
-                    info = "Mã đã được gửi tới email này ít phút trước. Hãy nhập mã đã nhận.";
+                    info = "Mã đã được gửi tới email này ít phút trước.";
                     codeModel.Code = "";
                     codeLocked = false;
                     GoTo(Step.Code);

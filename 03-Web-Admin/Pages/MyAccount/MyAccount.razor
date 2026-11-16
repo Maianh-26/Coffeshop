@@ -55,19 +55,6 @@
             </div>
         </dl>
 
-        @if (account.VaiTro == Roles.Admin)
-        {
-            <p class="form-note">
-                Sửa họ tên, email hoặc vai trò tại trang <a href="accounts">Quản lý tài khoản</a>.
-            </p>
-        }
-        else
-        {
-            <p class="form-note">
-                Cần sửa họ tên, email hoặc vai trò? Liên hệ chủ quán. Bạn có thể tự đổi mật khẩu của mình.
-            </p>
-        }
-
         <div class="actions">
             <button type="button" class="btn primary" @onclick="OpenChangePassword">
                 <Icon Name="lock" Size="18" />

@@ -72,16 +72,12 @@
 
         </button>
 
-        @* Quên mật khẩu: backend chưa có API — tạm chỉ dùng được ở chế độ giả lập *@
+        @* Quên mật khẩu: backend chưa có API — tạm chỉ dùng được ở chế độ giả lập (máy chủ thật: không hiện gì) *@
         @if (Configuration.GetValue("Api:UseMock", true))
         {
             <p class="auth-link">
                 <a href="forgot-password">Quên mật khẩu?</a>
             </p>
-        }
-        else
-        {
-            <p class="auth-link form-note">Quên mật khẩu? Liên hệ chủ quán để được đặt lại.</p>
         }
 
     </EditForm>
