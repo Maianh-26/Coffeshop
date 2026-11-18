@@ -1,7 +1,6 @@
 @page "/login"
 @layout AuthLayout
 @attribute [AllowAnonymous]
-@inject IConfiguration Configuration
 
 <PageTitle>Đăng nhập - Coffee Shop</PageTitle>
 
@@ -71,18 +70,6 @@
             @(loading ? "Đang đăng nhập…" : "Đăng nhập")
 
         </button>
-
-        @* Quên mật khẩu: backend chưa có API — tạm chỉ dùng được ở chế độ giả lập *@
-        @if (Configuration.GetValue("Api:UseMock", true))
-        {
-            <p class="auth-link">
-                <a href="forgot-password">Quên mật khẩu?</a>
-            </p>
-        }
-        else
-        {
-            <p class="auth-link form-note">Quên mật khẩu? Liên hệ chủ quán để được đặt lại.</p>
-        }
 
     </EditForm>
 

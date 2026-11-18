@@ -1,0 +1,15 @@
+@* Biểu tượng sắp xếp cạnh tiêu đề cột: 2 mũi tên lên / xuống.
+   Chưa sắp xếp: cả 2 mờ (báo cột này sắp xếp được). Đang sắp xếp: mũi tên theo chiều hiện tại đậm lên.
+   Chỉ để nhìn (aria-hidden) — trạng thái cho trình đọc màn hình nằm ở aria-sort của thẻ <th>. *@
+
+<svg class="sort-icon @(Direction == "" ? "" : "sort-" + Direction)"
+     width="10" height="14" viewBox="0 0 10 14"
+     aria-hidden="true" focusable="false">
+    <path class="sort-up" d="M5 1 9 6H1z" />
+    <path class="sort-down" d="M5 13 1 8h8z" />
+</svg>
+
+@code {
+    /// <summary>"" = chưa sắp xếp theo cột này, "asc" = thấp đến cao, "desc" = cao đến thấp.</summary>
+    [Parameter] public string Direction { get; set; } = "";
+}

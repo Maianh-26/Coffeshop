@@ -14,10 +14,11 @@ public class DashboardService
         _api = api;
     }
 
+    // Mốc gửi đúng như trang tính (24 giờ qua cần cả giờ phút); trang tự đưa "đến ngày" về 23:59:59.997
     private static string Range(string path, DashboardFilter filter, int? top = null) =>
         Query.Build(path,
-            ("tuNgay", filter.From?.Date),
-            ("denNgay", Query.EndOfDay(filter.To)),
+            ("tuNgay", filter.From),
+            ("denNgay", filter.To),
             ("soLuong", top));
 
     public Task<BaoCaoDoanhThu> GetRevenueAsync(DashboardFilter filter, CancellationToken ct = default) =>

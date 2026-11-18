@@ -27,7 +27,6 @@
                     <section class="panel placeholder-page">
                         <Icon Name="lock" Size="40" />
                         <h2>Không có quyền truy cập</h2>
-                        <p class="muted">Trang này chỉ dành cho tài khoản quản lý (chủ quán). Liên hệ chủ quán nếu bạn cần quyền này.</p>
                         <a class="btn primary" href="@Roles.HomeUrl(context.User)">Về trang chính</a>
                     </section>
                 }
@@ -47,13 +46,12 @@
                     <section class="panel placeholder-page">
                         <Icon Name="search" Size="40" />
                         <h2>Không tìm thấy trang</h2>
-                        <p class="muted">Đường dẫn bạn truy cập không tồn tại.</p>
                         <a class="btn primary" href="@Roles.HomeUrl(context.User)">Về trang chính</a>
                     </section>
                 </LayoutView>
             </Authorized>
             <NotAuthorized>
-                <RedirectToLogin />
+                <RedirectToLogin KeepReturnUrl="false" />
             </NotAuthorized>
         </AuthorizeView>
     </NotFound>

@@ -1,4 +1,4 @@
-@page "/inventory"
+﻿@page "/inventory"
 @attribute [Authorize(Roles = Roles.Admin)]
 @implements IDisposable
 @inject InventoryService InventoryApi
@@ -12,6 +12,7 @@
         <div class="tabs">
 
             <button class="tab @(!transactionTab ? "active" : "")"
+                    aria-pressed="@(!transactionTab ? "true" : "false")"
                     @onclick="() => SwitchTab(false)">
 
                 <Icon Name="box" />
@@ -20,6 +21,7 @@
             </button>
 
             <button class="tab @(transactionTab ? "active" : "")"
+                    aria-pressed="@(transactionTab ? "true" : "false")"
                     @onclick="() => SwitchTab(true)">
 
                 <Icon Name="orders" />
@@ -29,32 +31,11 @@
 
         </div>
 
+        @* Bộ lọc đồng bộ với trang Đơn hàng: màn hình rộng hiện đủ; màn hình hẹp gom vào nút "Bộ lọc (n)".
+           Nút Làm mới (biểu tượng) bỏ mọi bộ lọc của tab đang xem, về trang 1 và tải lại; có chấm khi đang lọc. *@
         <div class="filter-row">
 
-            @if (transactionTab)
-            {
-                <select aria-label="Lọc nguyên liệu" @bind="historyIngredient" @bind:after="ReloadHistory">
-                    <option value="0">Tất cả nguyên liệu</option>
-                    @foreach (var item in ingredients)
-                    {
-                        <option value="@item.MaNguyenLieu">@item.TenNguyenLieu</option>
-                    }
-                </select>
-
-                <select aria-label="Lọc loại giao dịch" @bind="historyType" @bind:after="ReloadHistory">
-                    <option value="">Tất cả loại</option>
-                    <option value="@LoaiGiaoDichKho.NhapHang">@LoaiGiaoDichKho.Label(LoaiGiaoDichKho.NhapHang)</option>
-                    <option value="@LoaiGiaoDichKho.XuatHuy">@LoaiGiaoDichKho.Label(LoaiGiaoDichKho.XuatHuy)</option>
-                    <option value="@LoaiGiaoDichKho.TieuHaoTheoDon">@LoaiGiaoDichKho.Label(LoaiGiaoDichKho.TieuHaoTheoDon)</option>
-                </select>
-
-                <div class="date-range">
-                    <input type="date" aria-label="Từ ngày" @bind="historyFrom" @bind:after="ReloadHistory" />
-                    <span>–</span>
-                    <input type="date" aria-label="Đến ngày" @bind="historyTo" @bind:after="ReloadHistory" />
-                </div>
-            }
-            else
+            @if (!transactionTab)
             {
                 <div class="search-field">
 
@@ -62,74 +43,168 @@
 
                     <input @bind="search"
                            @bind:event="oninput"
-                           @bind:after="Filter"
-                           placeholder="Tìm mã hoặc tên nguyên liệu"
-                           aria-label="Tìm nguyên liệu" />
+                           @bind:after="ResetPage"
+                           maxlength="100"
+                           placeholder="Tìm theo tên hoặc mã nguyên liệu…"
+                           aria-label="Tìm nguyên liệu theo tên hoặc mã" />
 
                 </div>
-
-                <select aria-label="Lọc tình trạng" @bind="stockFilter" @bind:after="Filter">
-                    <option value="">Đang sử dụng</option>
-                    <option value="low">Sắp hết</option>
-                    <option value="stopped">Ngừng sử dụng</option>
-                    <option value="all">Tất cả</option>
-                </select>
             }
 
-            <button class="btn outline"
-                    @onclick="Reset">
-
-                <Icon Name="reset" />
-                Đặt lại
-
+            <button type="button"
+                    class="btn outline filters-toggle"
+                    aria-expanded="@(filtersOpen ? "true" : "false")"
+                    aria-controls="inventory-filters"
+                    @onclick="() => filtersOpen = !filtersOpen">
+                <Icon Name="filter" />
+                Bộ lọc@(ActiveFilterCount > 0 ? $" ({ActiveFilterCount})" : "")
             </button>
+
+            <RefreshButton Active="FiltersActive" Spinning="refreshing" Title="@RefreshTitle" OnClick="RefreshAll" />
+
+            <div id="inventory-filters" class="filter-extra @(filtersOpen ? "open" : "")">
+
+                @if (transactionTab)
+                {
+                    @* Thời gian: mốc nhanh (áp dụng ngay) hoặc "Chọn khoảng ngày…" (chỉ lọc khi bấm Áp dụng) — giống trang Đơn hàng *@
+                    <select class="date-preset"
+                            aria-label="Lọc theo thời gian giao dịch"
+                            @bind="datePreset"
+                            @bind:after="OnDatePresetChanged">
+                        @foreach (var p in DatePresets.Options)
+                        {
+                            <option value="@p">@DatePresets.Label(p)</option>
+                        }
+                    </select>
+
+                    @if (datePreset == DatePresets.Custom)
+                    {
+                        <form class="custom-range" @onsubmit="ApplyCustomRange" novalidate>
+
+                            <label class="range-field">
+                                <span>Từ ngày</span>
+                                <input type="date"
+                                       @bind="customFrom"
+                                       max="@DatePresets.IsoDate(customTo ?? DateTime.Today)"
+                                       aria-invalid="@(dateError is not null ? "true" : null)"
+                                       aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
+                            </label>
+
+                            <label class="range-field">
+                                <span>Đến ngày</span>
+                                <input type="date"
+                                       @bind="customTo"
+                                       min="@(customFrom is { } cf ? DatePresets.IsoDate(cf) : null)"
+                                       max="@DatePresets.IsoDate(DateTime.Today)"
+                                       aria-invalid="@(dateError is not null ? "true" : null)"
+                                       aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
+                            </label>
+
+                            <button type="submit" class="btn primary btn-compact" disabled="@loading">Áp dụng</button>
+
+                            @if (dateError is not null)
+                            {
+                                <p id="date-range-help" class="range-help is-error">@dateError</p>
+                            }
+
+                            <span class="sr-only" role="alert">@dateError</span>
+
+                        </form>
+                    }
+
+                    <select class="filter-half" aria-label="Lọc nguyên liệu" @bind="historyIngredient" @bind:after="ApplyHistoryFilter">
+                        <option value="0">Tất cả nguyên liệu</option>
+                        @foreach (var item in ingredients)
+                        {
+                            <option value="@item.MaNguyenLieu">@item.TenNguyenLieu</option>
+                        }
+                    </select>
+
+                    <select class="filter-half" aria-label="Lọc loại giao dịch" @bind="historyType" @bind:after="ApplyHistoryFilter">
+                        <option value="">Tất cả loại giao dịch</option>
+                        @foreach (var type in HistoryTypes)
+                        {
+                            <option value="@type">@LoaiGiaoDichKho.Label(type)</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    @* Màn hình hẹp: xuống hàng sau nút Bộ lọc + Làm mới, 2 ô lọc chia đôi hàng dưới (như trang Đơn hàng) *@
+                    <span class="filter-break" aria-hidden="true"></span>
+
+                    <select class="filter-half" aria-label="Lọc trạng thái sử dụng" @bind="usageFilter" @bind:after="ApplyIngredientFilter">
+                        <option value="@LocSuDung.TatCa">@LocSuDung.Label(LocSuDung.TatCa)</option>
+                        @foreach (var u in LocSuDung.Options)
+                        {
+                            <option value="@u">@LocSuDung.Label(u)</option>
+                        }
+                    </select>
+
+                    @* Giống trang Đơn hàng: chọn "Đã hủy" thì khóa lọc thanh toán; ở đây chọn "Ngừng sử dụng" thì khóa lọc tình trạng tồn *@
+                    <select class="filter-half"
+                            aria-label="Lọc tình trạng tồn kho"
+                            @bind="stockFilter"
+                            @bind:after="ResetPage"
+                            disabled="@(usageFilter == LocSuDung.NgungSuDung)"
+                            title="@(usageFilter == LocSuDung.NgungSuDung ? "Nguyên liệu ngừng sử dụng không lọc theo tình trạng tồn" : null)">
+                        <option value="">Tất cả tình trạng</option>
+                        @foreach (var s in TinhTrangKho.FilterOptions)
+                        {
+                            <option value="@s">@TinhTrangKho.Label(s)</option>
+                        }
+                    </select>
+                }
+
+            </div>
 
         </div>
 
-    </section>
-
-    <section class="panel action-bar">
-
-        <button class="btn primary"
-                @onclick="Add">
-
-            <Icon Name="plus" />
-
-            @(transactionTab ? "Tạo phiếu nhập / xuất hủy" : "Thêm nguyên liệu")
-
-        </button>
-
-        @if (!transactionTab)
+        @* Khoảng thời gian đang lọc — ghi rõ mốc bắt đầu để không hiểu nhầm *@
+        @if (transactionTab && fromDate is { } rangeFrom)
         {
-            <button class="btn outline"
-                    disabled="@(Selected is null)"
-                    @onclick="Transact">
-
-                <Icon Name="box" />
-                Nhập / xuất hủy
-
-            </button>
-
-            <button class="btn outline"
-                    disabled="@(Selected is null)"
-                    @onclick="Edit">
-
-                <Icon Name="edit" />
-                Sửa
-
-            </button>
-
-            <button class="btn danger-outline"
-                    disabled="@(Selected is not { DangSuDung: true })"
-                    @onclick="AskDelete">
-
-                <Icon Name="trash" />
-                Ngừng sử dụng
-
-            </button>
+            <p class="active-range">
+                <Icon Name="calendar" Size="14" />
+                @if (toDate is { } rangeTo)
+                {
+                    @(rangeFrom.Date == rangeTo.Date
+                        ? $"Đang xem giao dịch ngày {rangeFrom:dd/MM/yyyy}"
+                        : $"Đang xem giao dịch từ {rangeFrom:dd/MM/yyyy} đến hết {rangeTo:dd/MM/yyyy}")
+                }
+                else
+                {
+                    @($"Đang xem giao dịch từ {rangeFrom:HH:mm dd/MM/yyyy} đến nay ({DatePresets.Label(appliedPreset).ToLowerInvariant()})")
+                }
+            </p>
         }
 
     </section>
+
+    @* Thanh thao tác chung Thêm · Sửa · Xóa + nút riêng Nhập / xuất hủy.
+       Lịch sử kho chỉ để xem (phiếu nhập / xuất hủy tạo ở tab Nguyên liệu) nên không có thanh thao tác. *@
+    @if (!transactionTab)
+    {
+        <CrudActions AddLabel="Thêm nguyên liệu"
+                     ItemName="nguyên liệu"
+                     HasSelection="@(Selected is not null)"
+                     DeleteBlockedReason="@(Selected is { DangSuDung: false } ? "Đã ngừng sử dụng — chọn Sửa để dùng lại" : null)"
+                     OnAdd="Add"
+                     OnEdit="Edit"
+                     OnDelete="AskDelete">
+            <button type="button"
+                    class="btn outline"
+                    title="@(Selected switch
+                    {
+                        { DangSuDung: true } s => $"Tạo phiếu nhập / xuất hủy cho {s.TenNguyenLieu}",
+                        { } s => $"{s.TenNguyenLieu} đã ngừng sử dụng — chọn nguyên liệu khác trong phiếu",
+                        _ => "Tạo phiếu nhập hàng hoặc xuất hủy"
+                    })"
+                    @onclick="Transact">
+                <Icon Name="box" />
+                Nhập / xuất hủy
+            </button>
+        </CrudActions>
+    }
 
     @if (message is not null)
     {
@@ -142,22 +217,62 @@
     {
         <p class="alert error" role="alert">
             @loadError
-            <button type="button" class="text-button" @onclick="Load">Thử lại</button>
+            <button type="button" class="text-button" @onclick="() => Load()">Thử lại</button>
         </p>
     }
 
-    @if (!transactionTab && LowStockCount > 0)
+    @* Cảnh báo cần nhập thêm: vàng = có nguyên liệu "Sắp hết", đỏ = có nguyên liệu "Hết hàng" (cùng màu huy hiệu).
+       Ẩn khi đang xem nguyên liệu ngừng sử dụng (các nguyên liệu được nhắc không nằm trong danh sách đó). *@
+    @if (!transactionTab && NeedRestockCount > 0 && usageFilter != LocSuDung.NgungSuDung)
     {
-        <p class="alert error" role="status">
-            Có @LowStockCount nguyên liệu sắp hết — cần nhập thêm.
-        </p>
+        var outOfStock = ingredients.Where(i => i.TinhTrang == TinhTrangKho.HetHang).ToList();
+        var lowStock = ingredients.Where(i => i.TinhTrang == TinhTrangKho.SapHet).ToList();
+
+        @* Nêu rõ từng nguyên liệu cần nhập: hết hàng (chỉ tên) và sắp hết (tên + số còn lại) *@
+        @* role="status" chỉ trên phần chữ: trình đọc màn hình đọc nội dung cảnh báo, không đọc lại nút *@
+        <div class="alert restock-alert @(outOfStock.Count > 0 ? "red" : "yellow")">
+            <div class="restock-text" role="status">
+                <strong>Cần nhập thêm @NeedRestockCount nguyên liệu</strong>
+                @if (outOfStock.Count > 0)
+                {
+                    <p>
+                        <span class="restock-label">Hết hàng:</span>
+                        @for (int k = 0; k < outOfStock.Count; k++)
+                        {
+                            @* Mỗi mục không ngắt dòng bên trong; danh sách chỉ xuống dòng sau dấu phẩy *@
+                            <span class="restock-item">@outOfStock[k].TenNguyenLieu@(k < outOfStock.Count - 1 ? "," : "")</span>
+                            @(" ")
+                        }
+                    </p>
+                }
+                @if (lowStock.Count > 0)
+                {
+                    <p>
+                        <span class="restock-label">Sắp hết:</span>
+                        @for (int k = 0; k < lowStock.Count; k++)
+                        {
+                            var item = lowStock[k];
+                            <span class="restock-item">@item.TenNguyenLieu còn @Number(item.SoLuongTon) @item.DonViTinh@(k < lowStock.Count - 1 ? "," : "")</span>
+                            @(" ")
+                        }
+                    </p>
+                }
+            </div>
+            @* Ẩn "Lọc danh sách" chỉ khi danh sách đang hiện ĐÚNG các nguyên liệu được đếm *@
+            @if (!(stockFilter == TinhTrangKho.CanNhapFilter && search.Trim() == ""))
+            {
+                <button type="button" class="text-button restock-filter" @onclick="ShowNeedRestock">Lọc danh sách</button>
+            }
+        </div>
     }
 
-    <section class="panel list-panel">
+    @* tabindex="-1": nhận focus bằng code sau khi bấm "Lọc danh sách" (nút đó tự ẩn), không nằm trong vòng Tab *@
+    <section class="panel list-panel" tabindex="-1" aria-label="Danh sách" @ref="listPanel">
 
         <div class="table-wrap">
 
-            <table>
+            @* Lớp riêng cho từng bảng để ẩn / gộp cột phụ trên màn hình hẹp (CSS mục [11]) *@
+            <table class="inventory-table @(transactionTab ? "stock-history-table" : "ingredient-table")">
 
                 <thead>
 
@@ -176,12 +291,10 @@
                     else
                     {
                         <tr>
-                            <th>Mã NL</th>
+                            <SortHeader Sort="sort" Key="@SortId" Label="Mã NL" Name="mã nguyên liệu" OnSort="ToggleSort" />
                             <th>Tên nguyên liệu</th>
-                            <th>Tồn kho</th>
+                            <SortHeader Sort="sort" Key="@SortStock" Label="Tồn kho" OnSort="ToggleSort" />
                             <th>Mức cảnh báo</th>
-                            <th>Tiêu hao / ngày</th>
-                            <th>Còn dùng</th>
                             <th>Tình trạng</th>
                         </tr>
                     }
@@ -194,10 +307,17 @@
                     {
                         @foreach (var item in history)
                         {
-                            <tr>
+                            <tr @key="item.MaLichSu">
                                 <td>@item.MaLichSu</td>
                                 <td>@item.ThoiGian.ToString("dd/MM/yyyy HH:mm")</td>
-                                <td>@item.TenNguyenLieu</td>
+                                <td>
+                                    @item.TenNguyenLieu
+                                    @* Điện thoại: cột Đơn hàng / Ghi chú bị ẩn → hiện gọn dưới tên nguyên liệu *@
+                                    @if (HistorySubText(item) is { } sub)
+                                    {
+                                        <span class="stock-sub">@sub</span>
+                                    }
+                                </td>
 
                                 <td>
                                     <span class="badge @LoaiGiaoDichKho.Color(item.LoaiGiaoDich)">
@@ -218,21 +338,26 @@
                     {
                         @foreach (var item in VisibleIngredients)
                         {
-                            <tr class="selectable @(selected == item.MaNguyenLieu ? "selected" : "")"
+                            string status = item.TinhTrang;
+
+                            <tr @key="item.MaNguyenLieu"
+                                class="selectable @(selected == item.MaNguyenLieu ? "selected" : "")"
                                 tabindex="0"
                                 @onclick="() => selected = item.MaNguyenLieu"
                                 @onkeydown="e => SelectKey(e, item.MaNguyenLieu)">
 
                                 <td>@item.MaNguyenLieu</td>
                                 <td>@item.TenNguyenLieu</td>
-                                <td><strong>@Number(item.SoLuongTon)</strong> @item.DonViTinh</td>
+                                <td>
+                                    <strong>@Number(item.SoLuongTon)</strong> @item.DonViTinh
+                                    @* Màn hình hẹp: cột Mức cảnh báo bị ẩn → hiện gọn dưới số tồn *@
+                                    <span class="stock-sub">Mức cảnh báo: @Number(item.MucCanhBaoToiThieu) @item.DonViTinh</span>
+                                </td>
                                 <td>@Number(item.MucCanhBaoToiThieu) @item.DonViTinh</td>
-                                <td>@(item.TieuHaoTrungBinhNgay > 0 ? $"{Number(item.TieuHaoTrungBinhNgay)} {item.DonViTinh}" : "—")</td>
-                                <td>@(item.SoNgayConLai is { } days ? $"≈ {Number(days)} ngày" : "—")</td>
 
                                 <td>
-                                    <span class="badge @(!item.DangSuDung ? "gray" : item.SapHet ? "red" : "green")">
-                                        @(!item.DangSuDung ? "Ngừng sử dụng" : item.SapHet ? "Sắp hết" : "Đủ dùng")
+                                    <span class="badge @TinhTrangKho.Color(status)">
+                                        @TinhTrangKho.Label(status)
                                     </span>
                                 </td>
 
@@ -242,19 +367,10 @@
 
                     @if (ItemCount == 0)
                     {
-                        <tr>
-
-                            <td class="empty-cell" colspan="7">
-
-                                <Icon Name="box" Size="32" />
-
-                                <p>
-                                    @(loading ? "Đang tải dữ liệu…" : "Chưa có dữ liệu.")
-                                </p>
-
-                            </td>
-
-                        </tr>
+                        <EmptyRow Columns="@(transactionTab ? 7 : 5)"
+                                  Text="@EmptyText"
+                                  ShowClear="@(!loading && FiltersActive)"
+                                  OnClear="RefreshAll" />
                     }
 
                 </tbody>
@@ -335,12 +451,11 @@
                                          @bind-Value="ingredientModel.SoLuongTon"
                                          step="0.01" />
                             <ValidationMessage For="@(() => ingredientModel.SoLuongTon)" />
-                            <small class="form-note">Được ghi vào lịch sử kho như một lần nhập hàng.</small>
                         </div>
                     }
 
                     <div class="field">
-                        <label for="i-min">Mức cảnh báo tối thiểu</label>
+                        <label for="i-min">Mức cảnh báo</label>
                         <InputNumber id="i-min"
                                      @bind-Value="ingredientModel.MucCanhBaoToiThieu"
                                      step="0.01" />
@@ -349,12 +464,15 @@
 
                     @if (editingIngredient)
                     {
-                        <label class="checkbox-line">
-                            <InputCheckbox @bind-Value="ingredientModel.DangSuDung" />
-                            Đang sử dụng
-                        </label>
-
-                        <p class="form-note">Tồn kho chỉ thay đổi qua phiếu nhập hàng / xuất hủy để có lịch sử.</p>
+                        @* Trạng thái: ô sổ xuống (Đang sử dụng / Ngừng sử dụng) theo yêu cầu chủ quán — mẫu chung cho mọi form Sửa *@
+                        <div class="field">
+                            <label for="i-status">Trạng thái</label>
+                            <InputSelect id="i-status"
+                                         @bind-Value="ingredientModel.DangSuDung">
+                                <option value="true">@LocSuDung.Label(LocSuDung.DangSuDung)</option>
+                                <option value="false">@LocSuDung.Label(LocSuDung.NgungSuDung)</option>
+                            </InputSelect>
+                        </div>
                     }
 
                 </div>
@@ -383,6 +501,23 @@
             </EditForm>
         }
 
+        @if (dialog == "delete" && Selected is { } target)
+        {
+            <p>Xóa nguyên liệu <strong>@target.TenNguyenLieu</strong>?</p>
+
+            @if (error is not null)
+            {
+                <p class="alert error" role="alert">@error</p>
+            }
+
+            <div class="modal-footer">
+                <button class="btn outline" disabled="@saving" @onclick="Close">Hủy</button>
+                <button class="btn danger" disabled="@saving" @onclick="Delete">
+                    @(saving ? "Đang xóa…" : "Xóa")
+                </button>
+            </div>
+        }
+
         @if (dialog == "transaction")
         {
             <EditForm Model="transactionModel"
@@ -396,8 +531,8 @@
                         <label for="t-type">Loại phiếu *</label>
                         <InputSelect id="t-type"
                                      @bind-Value="transactionModel.Loai">
-                            <option value="@LoaiGiaoDichKho.NhapHang">Nhập hàng (cộng tồn kho)</option>
-                            <option value="@LoaiGiaoDichKho.XuatHuy">Xuất hủy — hỏng, đổ vỡ, hết hạn (trừ tồn kho)</option>
+                            <option value="@LoaiGiaoDichKho.NhapHang">@LoaiGiaoDichKho.Label(LoaiGiaoDichKho.NhapHang)</option>
+                            <option value="@LoaiGiaoDichKho.XuatHuy">@LoaiGiaoDichKho.Label(LoaiGiaoDichKho.XuatHuy)</option>
                         </InputSelect>
                     </div>
 
@@ -415,7 +550,7 @@
                     </div>
 
                     <div class="field">
-                        <label for="t-qty">Số lượng (@UnitOf(transactionModel.MaNguyenLieu)) *</label>
+                        <label for="t-qty">Số lượng@(UnitOf(transactionModel.MaNguyenLieu) is { Length: > 0 } unit ? $" ({unit})" : "") *</label>
                         <InputNumber id="t-qty"
                                      @bind-Value="transactionModel.SoLuong"
                                      step="0.01" />
@@ -455,56 +590,49 @@
             </EditForm>
         }
 
-        @if (dialog == "delete" && Selected is { } target)
-        {
-            <p>
-                Ngừng sử dụng nguyên liệu <strong>@target.TenNguyenLieu</strong>?
-            </p>
-
-            <p class="form-note">
-                Nguyên liệu được ẩn khỏi danh sách đang dùng nhưng vẫn giữ lịch sử kho.
-                Có thể bật lại bằng nút Sửa.
-            </p>
-
-            @if (error is not null)
-            {
-                <p class="alert error" role="alert">@error</p>
-            }
-
-            <div class="modal-footer">
-
-                <button class="btn outline" disabled="@saving" @onclick="Close">Hủy</button>
-
-                <button class="btn danger" disabled="@saving" @onclick="Delete">
-                    @(saving ? "Đang lưu…" : "Ngừng sử dụng")
-                </button>
-
-            </div>
-        }
-
     </Modal>
 }
 
 @code {
     private static readonly System.Globalization.CultureInfo Vi = new("vi-VN");
 
+    private static readonly string[] HistoryTypes =
+        [LoaiGiaoDichKho.NhapHang, LoaiGiaoDichKho.XuatHuy, LoaiGiaoDichKho.TieuHaoTheoDon];
+
     private readonly CancellationTokenSource pageCts = new();
+
+    private ElementReference listPanel;
 
     private List<NguyenLieu> ingredients = [];
     private List<LichSuKho> history = [];
     private int historyTotal;
     private int historyPages = 1;
 
-    // Đổi bộ lọc nhanh → nhiều lần tải chồng nhau; chỉ nhận kết quả của lần gọi mới nhất
-    private int historyVersion;
+    // Đổi bộ lọc nhanh → nhiều lần tải chồng nhau; lượt mới hủy lượt cũ, chỉ nhận kết quả của lượt mới nhất
+    private CancellationTokenSource? loadCts;
+    private int loadVersion;
 
     private bool transactionTab;
+    private bool filtersOpen;   // màn hình hẹp: khung bộ lọc đang mở
+
+    // Bộ lọc tab Nguyên liệu (lọc tại chỗ — danh sách nguyên liệu ít)
     private string search = "";
+    private string usageFilter = LocSuDung.TatCa;   // mặc định hiện cả nguyên liệu ngừng sử dụng
+    private readonly ColumnSort sort = new();
+    private const string SortId = "id";
+    private const string SortStock = "stock";
     private string stockFilter = "";
+
+    // Bộ lọc tab Lịch sử kho (lọc ở máy chủ, có phân trang)
     private int historyIngredient;
     private string historyType = "";
-    private DateTime? historyFrom;
-    private DateTime? historyTo;
+    private string datePreset = DatePresets.All;      // lựa chọn đang hiện trong ô chọn
+    private string appliedPreset = DatePresets.All;   // lựa chọn ĐANG ÁP DỤNG (Custom chỉ có hiệu lực sau khi bấm Áp dụng)
+    private DateTime? fromDate;     // mốc đang lọc (tính lại mỗi lần tải với mốc nhanh)
+    private DateTime? toDate;       // chỉ có với khoảng ngày tự chọn
+    private DateTime? customFrom;
+    private DateTime? customTo;
+    private string? dateError;
 
     private int? selected;
     private int page = 1;
@@ -513,6 +641,7 @@
     private string dialog = "";
     private bool editingIngredient;
     private bool loading;
+    private bool refreshing;
     private bool saving;
     private string? error;
     private string? loadError;
@@ -523,33 +652,70 @@
 
     private static string Number(decimal value) => value.ToString("#,##0.##", Vi);
 
+    private static string? HistorySubText(LichSuKho item)
+    {
+        var parts = new List<string>(2);
+        if (item.MaDonHang is { } don) parts.Add($"Đơn #{don}");
+        if (!string.IsNullOrWhiteSpace(item.GhiChu)) parts.Add(item.GhiChu);
+        return parts.Count > 0 ? string.Join(" · ", parts) : null;
+    }
+
     private string UnitOf(int maNguyenLieu) =>
         ingredients.FirstOrDefault(i => i.MaNguyenLieu == maNguyenLieu)?.DonViTinh ?? "";
 
-    private NguyenLieu? Selected => ingredients.FirstOrDefault(i => i.MaNguyenLieu == selected);
+    // Chỉ tính dòng đang thấy trên trang hiện tại: nguyên liệu bị ẩn (vừa ngừng sử dụng, bị lọc,
+    // hoặc nằm ở trang khác) không còn được "chọn" ngầm cho nút Sửa / Nhập / xuất hủy
+    private NguyenLieu? Selected => VisibleIngredients.FirstOrDefault(i => i.MaNguyenLieu == selected);
 
-    private int LowStockCount => ingredients.Count(i => i.DangSuDung && i.SapHet);
+    private int NeedRestockCount => ingredients.Count(TinhTrangKho.CanNhap);
 
     private string DialogTitle => dialog switch
     {
         "ingredient" => editingIngredient ? "Sửa nguyên liệu" : "Thêm nguyên liệu",
         "transaction" => "Phiếu nhập hàng / xuất hủy",
-        "delete" => "Ngừng sử dụng nguyên liệu",
+        "delete" => "Xóa nguyên liệu",
         _ => ""
     };
 
-    private IEnumerable<NguyenLieu> FilteredIngredients =>
-        ingredients.Where(i =>
-            (search == ""
-             || i.MaNguyenLieu.ToString().Contains(search, StringComparison.OrdinalIgnoreCase)
-             || i.TenNguyenLieu.Contains(search, StringComparison.OrdinalIgnoreCase))
-            && stockFilter switch
-            {
-                "low" => i.DangSuDung && i.SapHet,
-                "stopped" => !i.DangSuDung,
-                "all" => true,
-                _ => i.DangSuDung
-            });
+    // ---------------------------------------------------------------- Bộ lọc
+
+    private int ActiveFilterCount => transactionTab
+        ? (appliedPreset != DatePresets.All ? 1 : 0) + (historyIngredient > 0 ? 1 : 0) + (historyType != "" ? 1 : 0)
+        : (usageFilter != LocSuDung.TatCa ? 1 : 0) + (stockFilter != "" ? 1 : 0);
+
+    // Đang lọc / tìm khác mặc định → nút Làm mới có chấm báo (bấm sẽ đưa về mặc định)
+    private bool FiltersActive => ActiveFilterCount > 0 || (!transactionTab && (search.Trim() != "" || sort.Active));
+
+    private string RefreshTitle => transactionTab
+        ? (FiltersActive ? "Làm mới và bỏ lọc, xem toàn bộ lịch sử kho" : "Làm mới lịch sử kho")
+        : (FiltersActive ? "Làm mới và bỏ lọc, xem toàn bộ nguyên liệu" : "Làm mới danh sách nguyên liệu");
+
+    private IEnumerable<NguyenLieu> FilteredIngredients
+    {
+        get
+        {
+            // Tìm không phân biệt dấu (giống trang Món): "duong" ra "Đường", "sua" ra "Sữa đặc"
+            string term = SearchText.Fold(search);
+
+            var list = ingredients.Where(i =>
+                (term == ""
+                 || i.MaNguyenLieu.ToString(System.Globalization.CultureInfo.InvariantCulture).Contains(term, StringComparison.Ordinal)
+                 || SearchText.Contains(i.TenNguyenLieu, term))
+                && usageFilter switch
+                {
+                    LocSuDung.NgungSuDung => !i.DangSuDung,
+                    LocSuDung.DangSuDung => i.DangSuDung,
+                    _ => true
+                }
+                // Lọc tình trạng tồn chỉ áp dụng cho nguyên liệu đang sử dụng
+                && (usageFilter == LocSuDung.NgungSuDung || TinhTrangKho.Matches(i, stockFilter)));
+
+            // Bấm tiêu đề cột → xếp theo cột đó; không thì lọc "Cần nhập thêm" đưa Hết hàng lên đầu (nhập gấp)
+            return sort.Active
+                ? sort.Apply(list, (SortId, i => i.MaNguyenLieu), (SortStock, i => i.SoLuongTon))
+                : list.OrderBy(i => stockFilter == TinhTrangKho.CanNhapFilter && i.TinhTrang != TinhTrangKho.HetHang ? 1 : 0);
+        }
+    }
 
     private List<NguyenLieu> VisibleIngredients =>
         FilteredIngredients
@@ -563,119 +729,243 @@
         ? Math.Max(1, historyPages)
         : Math.Max(1, (int)Math.Ceiling(FilteredIngredients.Count() / (double)PageSize));
 
-    protected override Task OnInitializedAsync() => Load();
+    private string EmptyText =>
+        loading ? "Đang tải dữ liệu…"
+        : FiltersActive ? (transactionTab ? "Không có giao dịch khớp bộ lọc." : "Không có nguyên liệu khớp bộ lọc.")
+        : transactionTab ? "Chưa có giao dịch kho." : "Chưa có nguyên liệu.";
 
-    private async Task Load()
+    // ---------------------------------------------------------------- Tải dữ liệu
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    /// <summary>Tải danh sách nguyên liệu (và lịch sử nếu đang ở tab Lịch sử kho); true nếu thành công.</summary>
+    private Task<bool> Load() => RunLoad(async ct =>
     {
-        loading = true;
-        loadError = null;
+        var list = await InventoryApi.GetIngredientsAsync(ct: ct);
+        ct.ThrowIfCancellationRequested();
+        ingredients = list;
 
-        try
+        if (transactionTab)
         {
-            ingredients = await InventoryApi.GetIngredientsAsync(ct: pageCts.Token);
-
-            if (transactionTab)
-            {
-                await LoadHistory();
-            }
-
+            await LoadHistory(ct);
+        }
+        else
+        {
             page = Math.Clamp(page, 1, Pages);
         }
-        catch (ApiException ex)
-        {
-            loadError = ex.Message;
-        }
-        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
-        {
-        }
-        finally
-        {
-            loading = false;
-        }
-    }
+    });
 
     /// <summary>Lịch sử kho phân trang ở máy chủ (có thể rất nhiều dòng).</summary>
-    private async Task LoadHistory()
+    private async Task LoadHistory(CancellationToken ct)
     {
-        int version = ++historyVersion;
+        // Mốc nhanh tính lại theo thời điểm hiện tại mỗi lần tải (khoảng trượt), giống trang Đơn hàng
+        if (appliedPreset != DatePresets.Custom)
+        {
+            fromDate = DatePresets.From(appliedPreset, DateTime.Now);
+            toDate = null;
+        }
 
         var result = await InventoryApi.GetHistoryAsync(
             page, PageSize,
             historyIngredient > 0 ? historyIngredient : null,
             historyType == "" ? null : historyType,
-            historyFrom, historyTo,
-            pageCts.Token);
+            fromDate, toDate,
+            ct);
 
-        if (version != historyVersion) return;
+        // Lượt này đã bị lượt mới hơn thay thế → không ghi đè dữ liệu
+        ct.ThrowIfCancellationRequested();
 
         history = result.Data;
         historyTotal = result.Meta.Total;
         historyPages = result.Meta.TotalPages;
     }
 
-    private async Task ReloadHistory()
+    /// <summary>
+    /// Chạy một lượt tải: hiện trạng thái đang tải, báo lỗi; trả về true nếu thành công.
+    /// Mỗi lượt mới hủy lượt đang chạy (đổi bộ lọc nhanh): lượt cũ không ghi đè dữ liệu,
+    /// không hiện lỗi và không tắt trạng thái đang tải của lượt mới.
+    /// </summary>
+    private async Task<bool> RunLoad(Func<CancellationToken, Task> action)
     {
-        if (historyFrom.HasValue && historyTo.HasValue && historyTo < historyFrom)
-        {
-            loadError = "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.";
-            return;
-        }
+        // Hủy lượt cũ; lượt cũ tự giải phóng token của nó khi kết thúc (finally bên dưới)
+        loadCts?.Cancel();
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(pageCts.Token);
+        loadCts = cts;
+        int version = ++loadVersion;
 
-        page = 1;
-        await RunLoad(LoadHistory);
-    }
-
-    private async Task RunLoad(Func<Task> action)
-    {
         loading = true;
         loadError = null;
 
         try
         {
-            await action();
+            await action(cts.Token);
+            return version == loadVersion;
         }
         catch (ApiException ex)
         {
-            loadError = ex.Message;
+            if (version == loadVersion) loadError = ex.Message;
         }
-        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
+            // Bị lượt mới thay thế hoặc rời trang
         }
         finally
         {
-            loading = false;
+            if (version == loadVersion) loading = false;
+
+            // Lượt đã bị thay thế: giải phóng token liên kết (bỏ đăng ký khỏi pageCts). Lượt mới nhất được giải phóng ở Dispose.
+            if (!ReferenceEquals(loadCts, cts)) cts.Dispose();
         }
+
+        return false;
     }
 
     private async Task SwitchTab(bool isTransaction)
     {
+        if (transactionTab == isTransaction) return;
+
         transactionTab = isTransaction;
-        search = "";
         page = 1;
         selected = null;
         message = null;
+        filtersOpen = false;
 
-        if (isTransaction)
+        // Mỗi lần chuyển tab tải lại dữ liệu mới nhất (tồn kho thay đổi theo đơn đã thanh toán)
+        await Load();
+    }
+
+    /// <summary>Đổi tìm kiếm / bộ lọc: về trang 1 (dòng đang chọn tự bỏ nếu không còn hiện — xem Selected).</summary>
+    private void ResetPage() => page = 1;
+
+    /// <summary>Bấm tiêu đề cột (Mã NL, Tồn kho): cột mới → thấp đến cao, bấm lại → đổi chiều.</summary>
+    private void ToggleSort(string key)
+    {
+        sort.Toggle(key);
+        page = 1;
+    }
+
+    /// <summary>Nút "Lọc danh sách" trên cảnh báo: lọc nhanh các nguyên liệu đang sử dụng cần nhập thêm.</summary>
+    private async Task ShowNeedRestock()
+    {
+        search = "";
+        usageFilter = LocSuDung.TatCa;
+        stockFilter = TinhTrangKho.CanNhapFilter;
+        sort.Reset();
+        page = 1;
+
+        // Nút vừa bấm sẽ ẩn → chuyển focus sang danh sách để người dùng bàn phím không bị đưa về đầu trang
+        StateHasChanged();
+        await Task.Yield();
+
+        try
         {
-            await RunLoad(LoadHistory);
+            await listPanel.FocusAsync();
+        }
+        catch (JSException)
+        {
+            // Không đặt được focus thì bỏ qua (không ảnh hưởng việc lọc)
         }
     }
 
-    private void Filter() => page = 1;
-
-    private async Task Reset()
+    private void ApplyIngredientFilter()
     {
-        search = "";
-        stockFilter = "";
+        // Giống "Đã hủy" ở trang Đơn hàng: lọc ngừng sử dụng không đi cùng lọc tình trạng tồn
+        if (usageFilter == LocSuDung.NgungSuDung) stockFilter = "";
+        page = 1;
+    }
+
+    private async Task ApplyHistoryFilter()
+    {
+        page = 1;
+        await RunLoad(LoadHistory);
+    }
+
+    private async Task OnDatePresetChanged()
+    {
+        dateError = null;
+
+        if (datePreset == DatePresets.Custom)
+        {
+            // Mở 2 ô Từ / Đến, điền sẵn khoảng đang lọc (hoặc hôm nay). Chưa lọc cho tới khi bấm Áp dụng.
+            customFrom = (fromDate ?? DateTime.Today).Date;
+            customTo = (toDate ?? DateTime.Today).Date;
+            return;
+        }
+
+        appliedPreset = datePreset;
+        await ApplyHistoryFilter();
+    }
+
+    /// <summary>Xóa lỗi một nhịp rồi mới gán, để vùng live đọc lại cả khi lỗi trùng lần trước.</summary>
+    private async Task ShowDateError(string text)
+    {
+        if (dateError == text)
+        {
+            dateError = null;
+            StateHasChanged();
+            await Task.Yield();
+        }
+
+        dateError = text;
+    }
+
+    private async Task ApplyCustomRange()
+    {
+        if (DatePresets.ValidateCustom(customFrom, customTo, out DateTime from, out DateTime to) is { } rangeError)
+        {
+            await ShowDateError(rangeError);
+            return;
+        }
+
+        dateError = null;
+        customFrom = from;
+        customTo = to;
+        fromDate = from;
+        toDate = to;
+        appliedPreset = DatePresets.Custom;
+
+        await ApplyHistoryFilter();
+    }
+
+    /// <summary>Nút Làm mới: bỏ mọi bộ lọc của tab đang xem, về trang 1 và tải lại dữ liệu mới nhất.</summary>
+    private async Task RefreshAll()
+    {
+        if (refreshing) return;
+
         page = 1;
 
         if (transactionTab)
         {
             historyIngredient = 0;
             historyType = "";
-            historyFrom = null;
-            historyTo = null;
-            await RunLoad(LoadHistory);
+            datePreset = DatePresets.All;
+            appliedPreset = DatePresets.All;
+            fromDate = null;
+            toDate = null;
+            customFrom = null;
+            customTo = null;
+            dateError = null;
+        }
+        else
+        {
+            search = "";
+            usageFilter = LocSuDung.TatCa;
+            stockFilter = "";
+            sort.Reset();
+        }
+
+        // Tải lại là thao tác thường xuyên: không hiện thông báo "Đã tải lại…" (yêu cầu chủ quán).
+        // Biểu tượng xoay khi đang tải là đủ phản hồi; chỉ hiện lỗi nếu tải thất bại.
+        refreshing = true;
+        message = null;
+
+        try
+        {
+            await Load();
+        }
+        finally
+        {
+            refreshing = false;
         }
     }
 
@@ -697,31 +987,26 @@
         if (e.Key is "Enter" or " ") selected = id;
     }
 
+    // ---------------------------------------------------------------- Hộp thoại
+
     private void Add()
     {
         error = null;
         message = null;
-
-        if (transactionTab)
-        {
-            transactionModel = new GiaoDichKhoForm();
-            dialog = "transaction";
-        }
-        else
-        {
-            editingIngredient = false;
-            ingredientModel = new NguyenLieuForm();
-            dialog = "ingredient";
-        }
+        editingIngredient = false;
+        ingredientModel = new NguyenLieuForm();
+        dialog = "ingredient";
     }
 
+    /// <summary>Phiếu nhập / xuất hủy: bấm được ngay; đang chọn nguyên liệu (đang sử dụng) thì điền sẵn.</summary>
     private void Transact()
     {
-        if (Selected is not { } source) return;
-
         error = null;
         message = null;
-        transactionModel = new GiaoDichKhoForm { MaNguyenLieu = source.MaNguyenLieu };
+        transactionModel = new GiaoDichKhoForm
+        {
+            MaNguyenLieu = Selected is { DangSuDung: true } source ? source.MaNguyenLieu : 0
+        };
         dialog = "transaction";
     }
 
@@ -746,11 +1031,26 @@
 
     private void AskDelete()
     {
-        if (Selected is null) return;
+        if (Selected is not { DangSuDung: true }) return;
 
         error = null;
         message = null;
         dialog = "delete";
+    }
+
+    /// <summary>Xóa mềm (backend): nguyên liệu chuyển sang "Ngừng sử dụng", vẫn hiện trong bảng để tra cứu lịch sử kho.</summary>
+    private Task Delete()
+    {
+        if (Selected is not { } target) return Task.CompletedTask;
+
+        return Save(() => DeleteIngredient(target));
+    }
+
+    private async Task<string> DeleteIngredient(NguyenLieu target)
+    {
+        await InventoryApi.DeleteAsync(target.MaNguyenLieu, pageCts.Token);
+        // Backend chuyển sang Ngừng sử dụng (dòng vẫn hiện, nhãn đã đủ rõ)
+        return $"Đã xóa nguyên liệu {target.TenNguyenLieu}.";
     }
 
     private void Close()
@@ -800,6 +1100,7 @@
                 DangSuDung = ingredientModel.DangSuDung
             }, pageCts.Token);
 
+            // Cùng một câu cho mọi trang (Món, Topping, Kho…): đổi trạng thái là một phần của "Sửa"
             return $"Đã cập nhật nguyên liệu {saved.TenNguyenLieu}.";
         }
 
@@ -832,17 +1133,10 @@
         return $"Đã {verb} {Number(transactionModel.SoLuong ?? 0)} {saved.DonViTinh} {saved.TenNguyenLieu}. Tồn kho: {Number(saved.SoLuongTon)} {saved.DonViTinh}.";
     });
 
-    private Task Delete() => Save(async () =>
-    {
-        var target = Selected!;
-        await InventoryApi.DeleteAsync(target.MaNguyenLieu, pageCts.Token);
-        selected = null;
-        return $"Đã ngừng sử dụng nguyên liệu {target.TenNguyenLieu}.";
-    });
-
     public void Dispose()
     {
         pageCts.Cancel();
+        loadCts?.Dispose();
         pageCts.Dispose();
     }
 }

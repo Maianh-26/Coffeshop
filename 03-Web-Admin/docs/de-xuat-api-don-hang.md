@@ -38,6 +38,7 @@
 | 5 | `GET api/v1/don-hang`: thêm tham số lọc `trangThaiPhucVu` | Sửa API | Trung bình |
 | 6 | `PUT api/v1/don-hang/{id}`: sửa món của đơn chưa thanh toán | API mới | Trung bình |
 | 7 | Đơn khách chuyển khoản trên tablet tự sang `PAID` | Tích hợp | Thấp (cần chốt, xem mục 10) |
+| 8 | `GET api/v1/don-hang`: thêm tham số sắp xếp `sapXep` (mã đơn / tổng tiền, tăng / giảm) — **bổ sung 12/11/2026** | Sửa API | Trung bình |
 
 > **Không thay đổi:** `POST don-hang` (tablet đặt món), `thanh-toan`, `huy`, báo cáo. Các API cũ giữ nguyên request/response. Response chỉ **thêm** trường mới.
 
@@ -332,6 +333,37 @@ GET api/v1/don-hang?page=1&limit=20&trangThaiPhucVu=PREPARING
 - Khi có `trangThaiPhucVu`, **loại đơn đã hủy** khỏi kết quả: `TrangThaiThanhToan <> 'CANCELLED'`.
 - Kết hợp được với `trangThai`, `tuNgay`, `denNgay` như hiện nay.
 - Web admin lọc "Đã hủy" bằng `trangThai=CANCELLED` (tham số đã có).
+
+### 5.3b. `GET api/v1/don-hang`: thêm tham số sắp xếp `sapXep` (bổ sung 12/11/2026)
+
+```
+GET api/v1/don-hang?page=1&limit=20&sapXep=-tongTien
+```
+
+| Giá trị `sapXep` | Thứ tự |
+|---|---|
+| (bỏ trống) | Như hiện nay: `ThoiGianTao` giảm dần, rồi `MaDonHang` giảm dần (mới nhất trước) |
+| `maDonHang` / `-maDonHang` | Mã đơn tăng / giảm dần |
+| `tongTien` / `-tongTien` | Tổng tiền tăng / giảm dần; **bằng nhau thì `MaDonHang` giảm dần** để thứ tự giữa các trang ổn định |
+
+- Sắp xếp **trước khi** `Skip/Take` (phân trang), để trang 2 nối tiếp đúng trang 1. Web admin cần điều này: sắp xếp chỉ trong 20 đơn của một trang là sai.
+- Giá trị khác danh sách trên → 400 `VALIDATION_ERROR` (giống các tham số khác; ví dụ `[AllowedValues("maDonHang", "-maDonHang", "tongTien", "-tongTien", null)]` trên `DonHangQuery.SapXep`).
+- Kết hợp được với mọi bộ lọc (`trangThai`, `trangThaiPhucVu`, `tuNgay`, `denNgay`).
+- Gợi ý code trong `DonHangController.DanhSach`:
+
+```csharp
+query = q.SapXep switch
+{
+    "maDonHang"  => query.OrderBy(d => d.MaDonHang),
+    "-maDonHang" => query.OrderByDescending(d => d.MaDonHang),
+    "tongTien"   => query.OrderBy(d => d.TongTien).ThenByDescending(d => d.MaDonHang),
+    "-tongTien"  => query.OrderByDescending(d => d.TongTien).ThenByDescending(d => d.MaDonHang),
+    _            => query.OrderByDescending(d => d.ThoiGianTao).ThenByDescending(d => d.MaDonHang)
+};
+```
+
+- **Tương thích:** backend hiện tại bỏ qua tham số lạ trên query string, nên web gửi `sapXep` không gây lỗi. Khi máy chủ chưa hỗ trợ (danh sách trả về không đúng thứ tự), web tự sắp xếp trong trang và hiện ghi chú "Máy chủ chưa hỗ trợ sắp xếp toàn bộ danh sách".
+- **Lưu ý `tuNgay`:** web giờ gửi mốc chính xác đến giờ phút (vd. `tuNgay=2026-11-11T13:27:43.000` cho "24 giờ qua"), không còn cắt về 00:00. Backend đang so sánh `ThoiGianTao >= tuNgay` nên không cần sửa.
 
 ### 5.4. `PUT api/v1/don-hang/{id}`: sửa món của đơn
 

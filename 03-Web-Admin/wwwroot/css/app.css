@@ -411,53 +411,11 @@ textarea {
     border-color: var(--danger);
 }
 
-/* Dashboard: bộ lọc */
+/* Dashboard: bộ lọc (dùng .filter-row / .date-preset / .custom-range chung với Đơn hàng, Kho) */
 
-.dashboard-toolbar,
-.date-filters {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-
-.dashboard-toolbar {
-    justify-content: space-between;
-}
-
-.date-range {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    height: 40px;
-    padding: 0 12px;
-    border: 1px solid var(--line-strong);
-    border-radius: var(--r-sm);
-    background: white;
-}
-
-    .date-range input {
-        width: 130px;
-        border: 0;
-        padding: 6px 4px;
-        font-size: 13px;
-        height: auto;
-        background: transparent;
-    }
-
-    .date-range input:focus {
-        outline: none;
-    }
-
-    .date-range span {
-        color: var(--line-strong);
-        font-weight: 600;
-    }
-
-.filter-caption {
-    color: var(--muted);
-    font-size: var(--fs-xs);
-    margin: 12px 0 18px;
+.dashboard-filters > .dashboard-export {
+    order: 6;
+    margin-left: auto;
 }
 
 /* Dashboard: thẻ thống kê */
@@ -508,109 +466,225 @@ textarea {
     font-size: var(--fs-xs);
 }
 
-/* Dashboard: biểu đồ */
+/* Dashboard: biểu đồ doanh thu (cột mảnh giữa mỗi ô, rê chuột / chạm / Tab → tô nền cả ô + thẻ số liệu) */
 
-.axis-unit {
-    display: block;
-    margin: 0 0 12px 20px;
-    font-size: var(--fs-xs);
-    color: var(--muted);
-}
-
-.chart-empty {
-    min-height: 220px;
-    display: grid;
-    place-items: center;
-    color: var(--muted);
-    border-left: 1px solid var(--line-strong);
-    border-bottom: 1px solid var(--line-strong);
-    background: repeating-linear-gradient( to top, transparent 0, transparent 43px, var(--line) 43px, var(--line) 44px );
-}
-
-.chart-scroll {
-    overflow-x: auto;
+.chart-panel h2 {
+    margin-bottom: 18px;
 }
 
 .chart-container {
     display: flex;
-    height: 200px;
-    padding-top: 20px;
+    padding-top: 8px;
+    transition: opacity 0.2s var(--ease);
 }
 
+    .chart-container.is-loading {
+        opacity: 0.55;
+    }
+
+/* Trục tiền: cùng chiều cao vùng cột; nhãn canh giữa vạch kẻ */
 .chart-axis {
     position: relative;
-    width: 48px;
-    height: 150px;
+    width: 64px;
+    height: 220px;
     flex-shrink: 0;
 }
 
     .chart-axis span {
         position: absolute;
-        right: 12px;
+        right: 10px;
         transform: translateY(-50%);
+        color: var(--muted);
         font-size: var(--fs-xs);
+        white-space: nowrap;
     }
 
 .plot {
     position: relative;
     flex: 1;
     min-width: 0;
-    height: 180px;
+    height: 264px;
+    container-type: inline-size;
 }
 
+/* Vạch kẻ ngang chia đều theo số mốc; chỉ có mốc 0 đ thì vạch nằm ở đáy */
 .grid-lines {
     position: absolute;
-    inset: 0 0 30px;
+    inset: 0 0 44px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    border-left: 1px solid var(--line-strong);
 }
+
+    .grid-lines.is-zero {
+        justify-content: flex-end;
+    }
 
     .grid-lines div {
         width: 100%;
-        border-top: 1px dashed var(--line);
+        border-top: 1px solid var(--line);
     }
+
+        .grid-lines div:last-child {
+            border-top-color: var(--line-strong);
+        }
 
 .bars {
     position: absolute;
     inset: 0;
     display: flex;
-    justify-content: space-around;
-    gap: 12px;
-    padding: 0 10px;
 }
 
 .bar-column {
+    position: relative;
     flex: 1;
     min-width: 0;
+    outline: none;
+    cursor: default;
 }
 
+/* Vùng cột: nền tô khi rê chuột như mẫu Sapo */
 .bar-value-area {
-    height: 150px;
     position: relative;
+    height: 220px;
+    border-radius: var(--r-sm) var(--r-sm) 0 0;
+    transition: background-color 0.15s var(--ease);
 }
 
+.bar-column:hover .bar-value-area,
+.bar-column:focus-visible .bar-value-area {
+    background: var(--coffee-50);
+}
+
+.bar-column:focus-visible .bar-value-area {
+    box-shadow: var(--focus-ring);
+}
+
+/* Bỏ viền focus chung của [tabindex] (đã có vòng focus trên vùng cột) */
+.bars > .bar-column[tabindex]:focus-visible {
+    outline: none;
+}
+
+/* Cột mảnh, rộng tối đa 28px, nằm giữa ô */
 .bar {
     position: absolute;
     bottom: 0;
-    left: 8%;
-    width: 84%;
-    background: linear-gradient( 105deg, var(--coffee-500), var(--coffee-600) );
+    left: 50%;
+    width: min(56%, 28px);
+    min-height: 2px;
+    transform: translateX(-50%);
+    border-radius: 3px 3px 0 0;
+    background: var(--coffee-500);
+    transition: background-color 0.15s var(--ease);
 }
 
-.bar-value-area strong {
+.bar-column:hover .bar,
+.bar-column:focus-visible .bar {
+    background: var(--coffee-700);
+}
+
+/* Thẻ số liệu khi rê chuột / chạm / Tab */
+/* Thẻ nằm ngay trên đỉnh cột (--h = chiều cao cột); cột gần chạm trần thì thẻ dừng ở sát trần vùng vẽ */
+.bar-tip {
     position: absolute;
-    width: 100%;
-    text-align: center;
-    font-size: var(--fs-xs);
+    bottom: min(calc(var(--h, 0%) + 8px), calc(100% - 40px));
+    left: 50%;
+    z-index: 3;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 132px;
+    padding: 9px 12px;
+    transform: translateX(-50%);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    box-shadow: var(--shadow-md);
+    white-space: nowrap;
+    pointer-events: none;
 }
 
-.bar-column > span {
-    display: block;
-    padding-top: 8px;
+    .bar-tip span {
+        color: var(--muted);
+        font-size: var(--fs-xs);
+    }
+
+    .bar-tip strong {
+        color: var(--ink);
+        font-size: var(--fs-sm);
+    }
+
+    .bar-tip small {
+        color: var(--ink-soft);
+        font-size: var(--fs-xs);
+    }
+
+/* Chỉ một thẻ tại một thời điểm: rê chuột (chạm trên điện thoại cũng kích hoạt :hover) hoặc Tab bằng bàn phím */
+.bar-column:hover .bar-tip,
+.bar-column:focus-visible .bar-tip {
+    display: flex;
+}
+
+.bars:hover .bar-column:focus-visible:not(:hover) .bar-tip {
+    display: none;
+}
+
+/* ~1/6 số cột ở mỗi mép: thẻ canh vào trong để không tràn khỏi khung */
+.bar-column.tip-start .bar-tip {
+    left: 0;
+    transform: none;
+}
+
+.bar-column.tip-end .bar-tip {
+    left: auto;
+    right: 0;
+    transform: none;
+}
+
+/* Không có doanh thu: dòng nhắc nhỏ giữa vùng vẽ (trục chỉ còn 0 đ) */
+.chart-note {
+    position: absolute;
+    top: 40%;
+    left: 0;
+    right: 0;
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--fs-sm);
     text-align: center;
+    pointer-events: none;
+}
+
+/* Nhãn trục thời gian: 1 dòng (giờ / ngày / tháng), cột 00:00 có thêm ngày ở dòng dưới */
+.bar-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 44px;
+    margin: 0 -16px;
+    padding-top: 8px;
+    color: var(--ink-soft);
     font-size: var(--fs-xs);
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+    .bar-label small {
+        color: var(--ink);
+        font-size: var(--fs-xs);
+        font-weight: 700;
+    }
+
+/* Vùng vẽ hẹp (điện thoại, hoặc máy tính bảng còn sidebar): chỉ giữ nhãn chính để nhãn không dính nhau */
+@container (max-width: 600px) {
+    .bar-label.is-minor {
+        visibility: hidden;
+    }
+}
+
+@media (max-width: 650px) {
+    .chart-axis {
+        width: 54px;
+    }
 }
 
 /* Bảng dữ liệu */
@@ -1069,11 +1143,6 @@ tfoot td {
         top: 15px;
     }
 
-.auth-link {
-    text-align: right;
-    margin-top: 18px;
-}
-
 .auth-submit {
     width: 100%;
     min-height: 48px;
@@ -1235,28 +1304,6 @@ tfoot td {
 
     .page-content {
         padding: 14px 12px;
-    }
-
-    .date-filters,
-    .date-range {
-        width: 100%;
-    }
-
-    .date-range {
-        justify-content: center;
-    }
-
-        .date-range input {
-            width: 125px;
-        }
-
-    .date-filters > select,
-    .date-filters > .btn {
-        flex: 1;
-    }
-
-    .dashboard-toolbar > .btn {
-        width: 100%;
     }
 
     .filter-row select {
@@ -2036,16 +2083,6 @@ textarea {
         cursor: not-allowed;
     }
 
-/* Ô chọn ngày nằm trong khung .date-range: viền focus đặt lên khung */
-.date-range input:focus {
-    box-shadow: none;
-}
-
-.date-range:focus-within {
-    border-color: var(--coffee-400);
-    box-shadow: var(--focus-ring);
-}
-
 .field input,
 .field select,
 .field textarea {
@@ -2461,12 +2498,10 @@ input:-webkit-autofill:focus {
     white-space: nowrap;
 }
 
-/* Đơn hàng: khi mở khung chi tiết bên cạnh, ẩn cột phụ (Nguồn, Thời gian tạo — đều có trong khung chi tiết)
+/* Đơn hàng: khi mở khung chi tiết bên cạnh, ẩn cột phụ Thời gian tạo (đã có trong khung chi tiết)
    để Tổng tiền / Số nhận món / Thanh toán / Trạng thái không bị đẩy khuất */
 .orders-page.has-detail .orders-table th:nth-child(6),
-.orders-page.has-detail .orders-table td:nth-child(6),
-.orders-page.has-detail .orders-table th:nth-child(7),
-.orders-page.has-detail .orders-table td:nth-child(7) {
+.orders-page.has-detail .orders-table td:nth-child(6) {
     display: none;
 }
 
@@ -2489,14 +2524,9 @@ input:-webkit-autofill:focus {
     .btn,
     input:not([type="checkbox"]):not([type="radio"]),
     select,
-    .date-range,
     .realtime-pill,
     .account a {
         min-height: 44px;
-    }
-
-    .date-range {
-        height: auto;
     }
 }
 
@@ -2531,11 +2561,9 @@ input:-webkit-autofill:focus {
         font-size: var(--fs-md);
     }
 
-    /* Ẩn cột phụ của bảng đơn hàng trên điện thoại (Nguồn, Thời gian tạo); giữ Số nhận món / Thanh toán / Trạng thái */
+    /* Ẩn cột phụ của bảng đơn hàng trên điện thoại (Thời gian tạo); giữ Số nhận món / Thanh toán / Trạng thái */
     .orders-table th:nth-child(6),
-    .orders-table td:nth-child(6),
-    .orders-table th:nth-child(7),
-    .orders-table td:nth-child(7) {
+    .orders-table td:nth-child(6) {
         display: none;
     }
 
@@ -2596,98 +2624,6 @@ input:-webkit-autofill:focus {
     color: var(--ink-soft);
 }
 
-/* Quên mật khẩu */
-.auth-step {
-    margin: 0 0 6px;
-    color: var(--coffee-600);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-}
-
-.auth-intro {
-    margin: -12px 0 20px;
-    color: var(--ink-soft);
-    line-height: 1.6;
-}
-
-    .auth-intro .text-button {
-        margin-left: 6px;
-    }
-
-.auth-link a {
-    color: var(--coffee-700);
-    font-weight: 600;
-    font-size: var(--fs-sm);
-}
-
-    .auth-link a:hover {
-        text-decoration: underline;
-    }
-
-.code-input {
-    text-align: center;
-    font-size: var(--fs-2xl) !important;
-    font-weight: 600;
-    letter-spacing: 0.5em;
-    /* Bù khoảng giãn chữ sau ký tự cuối để 6 số nằm đúng giữa */
-    padding-left: calc(12px + 0.5em) !important;
-    font-variant-numeric: tabular-nums;
-}
-
-    .code-input:disabled {
-        letter-spacing: 0.5em;
-        opacity: 0.6;
-    }
-
-.auth-help {
-    margin: 12px 0 0;
-    color: var(--muted);
-    font-size: var(--fs-xs);
-    line-height: 1.6;
-    text-align: center;
-}
-
-.auth-back {
-    text-align: center;
-}
-
-    .auth-back a {
-        gap: 4px;
-    }
-
-.dev-hint {
-    margin: 0 0 16px;
-    color: var(--info);
-    background: var(--info-bg);
-}
-
-.dev-code {
-    margin-left: 4px;
-    font-size: var(--fs-lg);
-    letter-spacing: 0.15em;
-}
-
-.auth-resend {
-    margin: 18px 0 0;
-    text-align: center;
-    color: var(--muted);
-    font-size: var(--fs-sm);
-}
-
-    .auth-resend .text-button {
-        margin-left: 4px;
-        font-size: var(--fs-sm);
-        font-weight: 600;
-    }
-
-.auth-finish h1 {
-    margin-bottom: 8px;
-}
-
-.auth-finish .auth-intro {
-    margin: 0 0 8px;
-}
-
 /* Màn chờ kiểm tra đăng nhập (dự phòng — bình thường phiên đã được khôi phục trước khi vẽ):
    phủ toàn màn hình để không lộ khung quản trị */
 .auth-checking {
@@ -2721,11 +2657,20 @@ input:-webkit-autofill:focus {
         min-width: 44px;
         padding: 6px;
     }
+
+    /* Biểu tượng người dùng chỉ để hiển thị: bỏ nền tròn để không trông giống nút bấm cạnh Đăng xuất */
+    .user-chip > svg {
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        background: none;
+        color: var(--muted);
+    }
 }
 
 
 /* ==========================================================
-   SỬA LỖI SAU REVIEW: quên mật khẩu, vùng bấm, menu điện thoại
+   SỬA LỖI SAU REVIEW: vùng bấm, menu điện thoại
    ========================================================== */
 
 /* Header không nhảy ngang giữa trang có và không có thanh cuộn */
@@ -2733,8 +2678,7 @@ html {
     scrollbar-gutter: stable;
 }
 
-/* Link / nút chữ trong thẻ đăng nhập: vùng bấm đủ 44px */
-.auth-card .auth-link a,
+/* Nút chữ trong thẻ đăng nhập: vùng bấm đủ 44px */
 .auth-card .text-button {
     display: inline-flex;
     align-items: center;
@@ -2794,69 +2738,7 @@ html {
 }
 
 
-/* ==========================================================
-   TÀI KHOẢN CỦA TÔI (nhân viên & chủ quán)
-   ========================================================== */
-
-/* Tên người dùng ở header là link tới trang Tài khoản của tôi */
-a.user-chip {
-    padding: 4px 10px 4px 4px;
-    border-radius: var(--r-pill);
-    transition: background-color var(--ease);
-}
-
-    a.user-chip:hover {
-        background: var(--coffee-50);
-    }
-
-.my-account {
-    max-width: 640px;
-}
-
-.my-account-head {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding-bottom: 18px;
-    margin-bottom: 18px;
-    border-bottom: 1px solid var(--line);
-}
-
-    .my-account-head h2 {
-        margin: 0 0 6px;
-    }
-
-.my-account-avatar {
-    display: grid;
-    place-items: center;
-    width: 56px;
-    height: 56px;
-    border-radius: var(--r-pill);
-    background: var(--coffee-100);
-    color: var(--coffee-700);
-    flex-shrink: 0;
-}
-
-.info-list {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px 24px;
-    margin: 0;
-}
-
-    .info-list dt {
-        margin-bottom: 4px;
-        color: var(--muted);
-        font-size: var(--fs-xs);
-    }
-
-    .info-list dd {
-        margin: 0;
-        color: var(--ink);
-        font-weight: 600;
-        overflow-wrap: anywhere;
-    }
-
+/* Ô tích kèm chữ (trang Món) */
 .checkbox-line {
     display: inline-flex;
     align-items: center;
@@ -2874,19 +2756,6 @@ a.user-chip {
         accent-color: var(--coffee-600);
     }
 
-@media (max-width: 650px) {
-    .info-list {
-        grid-template-columns: 1fr;
-    }
-
-    a.user-chip {
-        padding: 0;
-        min-width: 44px;
-        min-height: 44px;
-        justify-content: center;
-    }
-}
-
 
 /* ==========================================================
    SỬA LỖI SAU REVIEW: phân quyền nhân viên
@@ -2903,27 +2772,10 @@ a.user-chip {
     text-align: center;
 }
 
-    .placeholder-page p {
-        max-width: 420px;
-        margin: 0;
-    }
-
-/* Khối người dùng ở cuối menu điện thoại là link tới Tài khoản của tôi */
-a.sidebar-user {
-    border-radius: var(--r-md);
-    min-height: 44px;
-}
-
-    a.sidebar-user:hover {
-        background: var(--coffee-200);
-    }
-
-/* Máy tính bảng: ẩn cột phụ của bảng đơn hàng (Nguồn, Thời gian tạo) để thấy Số nhận món / Thanh toán / Trạng thái */
+/* Máy tính bảng: ẩn cột phụ của bảng đơn hàng (Thời gian tạo) để thấy Số nhận món / Thanh toán / Trạng thái */
 @media (max-width: 1000px) {
     .orders-table th:nth-child(6),
-    .orders-table td:nth-child(6),
-    .orders-table th:nth-child(7),
-    .orders-table td:nth-child(7) {
+    .orders-table td:nth-child(6) {
         display: none;
     }
 }
@@ -2946,6 +2798,11 @@ a.sidebar-user {
 }
 
 /* Nhóm ô chọn trong form (giá theo size, món áp dụng, topping) */
+/* Khoảng cách giữa lưới ô nhập và nhóm phía dưới (trước đây có dòng ghi chú chen giữa) */
+.form-grid + fieldset.field {
+    margin-top: 20px;
+}
+
 fieldset.field {
     margin: 0 0 12px;
     padding: 0;
@@ -3184,11 +3041,6 @@ fieldset.field {
     justify-self: center;
 }
 
-.serving-box .form-note,
-.pay-box .form-note {
-    margin: 0;
-}
-
 /* Hỏi lại ngay trong khung chi tiết (vd. phục vụ khi chưa thanh toán) */
 .confirm-inline {
     display: grid;
@@ -3339,10 +3191,6 @@ fieldset.field {
     border-left-color: var(--danger);
 }
 
-.alert.orders-alert.new-order-alert {
-    border-left-color: var(--coffee-600);
-}
-
 .new-order-text {
     display: flex;
     align-items: center;
@@ -3392,11 +3240,6 @@ fieldset.field {
 
 .orders-table .order-id {
     font-variant-numeric: tabular-nums;
-}
-
-/* Đơn mới chưa xem: vạch nâu bên trái + chữ "Mới", không tô cả dòng */
-.orders-table tr.is-new td:first-child {
-    box-shadow: inset 3px 0 0 var(--coffee-600);
 }
 
 .new-mark {
@@ -3642,11 +3485,6 @@ fieldset.field {
     display: contents;
 }
 
-.clear-filters {
-    align-self: center;
-    white-space: nowrap;
-}
-
 @media (max-width: 1000px) {
     .filters-toggle {
         display: inline-flex;
@@ -3722,34 +3560,35 @@ fieldset.field {
     background: var(--surface-muted);
 }
 
-/* Thông báo đơn mới: đầu trang, nền xanh, nổi rõ */
+/* Thông báo đơn mới: đầu trang, nền CAM — màu báo "đơn mới" quen thuộc trên các app bán hàng / giao đồ ăn.
+   Không trùng nghĩa trạng thái nào (vàng = chờ, xanh dương = chuẩn bị, xanh lá = xong, đỏ = hủy). */
 .alert.orders-alert.new-order-alert {
     margin-bottom: 14px;
-    border: 1px solid var(--info);
-    border-left: 5px solid var(--info);
-    background: var(--info-bg);
+    border: 1px solid var(--orange);
+    border-left: 5px solid var(--orange);
+    background: var(--orange-bg);
     color: var(--ink);
     font-size: var(--fs-md);
 }
 
     .alert.orders-alert.new-order-alert .new-order-text {
-        color: var(--info);
+        color: var(--orange);
     }
 
         .alert.orders-alert.new-order-alert .new-order-text strong {
             color: var(--ink);
         }
 
-/* Đơn mới chưa xem: cùng màu xanh với thông báo */
+/* Đơn mới chưa xem: cùng màu cam với thông báo */
 .orders-table tr.is-new td:first-child {
-    box-shadow: inset 4px 0 0 var(--info);
+    box-shadow: inset 4px 0 0 var(--orange);
 }
 
 .new-mark {
     padding: 1px 6px;
     border-radius: var(--r-sm);
     color: var(--surface);
-    background: var(--info);
+    background: var(--orange);
 }
 
 /* Nút theo việc */
@@ -3862,25 +3701,6 @@ fieldset.field {
             box-shadow: inset -2px 2px 0 var(--coffee-700), inset 0 -2px 0 var(--coffee-700);
         }
 
-/* [5] "Đơn mới" dùng màu TÍM riêng → xanh dương chỉ còn nghĩa "Đang chuẩn bị" */
-.alert.orders-alert.new-order-alert {
-    border-color: var(--purple);
-    border-left-color: var(--purple);
-    background: var(--purple-bg);
-}
-
-    .alert.orders-alert.new-order-alert .new-order-text {
-        color: var(--purple);
-    }
-
-.orders-table tr.is-new td:first-child {
-    box-shadow: inset 4px 0 0 var(--purple);
-}
-
-.new-mark {
-    background: var(--purple);
-}
-
 /* [6] Số tiền dưới nhãn thanh toán — chỉ hiện trên điện thoại (cột Tổng tiền ẩn ở đó) */
 .orders-table .pay-amount {
     display: none;
@@ -3904,8 +3724,703 @@ fieldset.field {
     outline-offset: 2px;
 }
 
-/* [11] Link "Khách đổi sang …" đủ vùng bấm 44px trên màn hình cảm ứng */
-.text-button.switch-pay {
-    min-height: 44px;
-    padding: 0 8px;
+
+/* =========================================================================
+   [7] Trang Đơn hàng — tìm kiếm, lọc thời gian, nút Làm mới, màu đơn mới (12/11/2026)
+   ========================================================================= */
+
+/* (Màu đơn mới: xem khối "Thông báo đơn mới" phía trên — chỉ khai báo một chỗ) */
+
+/* Gợi ý "chỉ nhập số": nổi dưới ô tìm kiếm, không đẩy bố cục */
+.search-hint {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 5;
+    padding: 4px 10px;
+    border-radius: var(--r-sm);
+    background: var(--ink);
+    color: var(--surface);
+    font-size: var(--fs-xs);
+    white-space: nowrap;
+    box-shadow: var(--shadow-md);
+    pointer-events: none;
+}
+
+/* Nút Làm mới (biểu tượng) thay cho chữ "Xóa lọc" */
+.refresh-button {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+    .refresh-button.is-loading svg {
+        animation: refresh-spin 0.8s linear infinite;
+    }
+
+    /* Chấm báo đang có bộ lọc → bấm sẽ bỏ lọc */
+    .refresh-button .filter-dot {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 8px;
+        height: 8px;
+        border-radius: var(--r-pill);
+        background: var(--coffee-600);
+        box-shadow: 0 0 0 2px var(--surface);
+    }
+
+@keyframes refresh-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .refresh-button.is-loading svg {
+        animation: none;
+    }
+}
+
+/* Dòng tóm tắt khoảng thời gian đang lọc */
+.active-range {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 10px 0 0;
+    color: var(--ink-soft);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+}
+
+/* Tổng quan: bảng báo cáo 3–4 cột vừa màn hình hẹp */
+
+@media (max-width: 1000px) {
+    .table-wrap table.report-table {
+        min-width: 0;
+    }
+}
+
+@media (max-width: 650px) {
+    .report-table {
+        white-space: normal;
+    }
+
+        .report-table th,
+        .report-table td {
+            padding: 9px 8px;
+        }
+
+        /* Số tiền giữ trên một dòng */
+        .report-table td:last-child {
+            white-space: nowrap;
+        }
+}
+
+@media (max-width: 1000px) {
+    .refresh-button {
+        width: 44px;
+        height: 44px;
+    }
+}
+
+/* Nút Làm mới giữ hình vuông kể cả trên màn hình hẹp (ghi đè ".filter-row > .btn { flex: 1 }") */
+.filter-row > .btn.refresh-button {
+    flex: 0 0 auto;
+}
+
+/* Màn hình rộng: nút Làm mới ở cuối hàng bộ lọc (trong markup nó đứng cạnh nút "Bộ lọc") */
+@media (min-width: 1001px) {
+    .filter-row > .btn.refresh-button {
+        order: 5;
+    }
+}
+
+/* Màn hình hẹp: nút "Bộ lọc" + nút Làm mới chiếm một hàng riêng, các ô lọc xếp gọn ở hàng dưới */
+@media (max-width: 1000px) {
+    .filter-row > .btn.filters-toggle {
+        flex: 1 1 auto;
+    }
+
+    .filter-row select.date-preset {
+        flex-basis: 100%;
+    }
+}
+
+/* Không ngắt dòng giữa số tiền và "đ" */
+.nowrap {
+    white-space: nowrap;
+}
+
+/* Placeholder dài của ô tìm kiếm: hiện "…" thay vì cắt ngang chữ trên màn hình hẹp */
+.search-field input {
+    text-overflow: ellipsis;
+}
+
+/* Điện thoại: chip "Mới" nằm dưới mã đơn (không đứng cạnh) để cột Mã đơn không phình ra,
+   tránh ép nhãn trạng thái ("Chờ phục vụ", "Chưa thu") xuống 2 dòng */
+@media (max-width: 650px) {
+    .orders-table .new-mark {
+        display: block;
+        width: fit-content;
+        margin: 3px 0 0;
+    }
+}
+
+/* =========================================================================
+   [8] Sắp xếp theo cột (Mã đơn, Tổng tiền) — mẫu W3C APG "Sortable Table":
+   tiêu đề là <button>, mũi tên lên/xuống mờ khi chưa sắp xếp, mũi tên theo chiều đang dùng đậm lên.
+   ========================================================================= */
+.sort-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    margin: -6px -8px;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+    cursor: pointer;
+}
+
+    .sort-button:hover {
+        background: var(--coffee-100);
+    }
+
+    .sort-button:focus-visible {
+        outline: none;
+        box-shadow: var(--focus-ring);
+    }
+
+/* Cột số căn phải: mũi tên vẫn nằm sát chữ */
+.orders-table th.num .sort-button {
+    justify-content: flex-end;
+}
+
+.sort-icon {
+    flex: 0 0 auto;
+    color: var(--muted);
+}
+
+    .sort-icon path {
+        fill: currentColor;
+        opacity: 0.35;
+        transition: opacity var(--ease);
+    }
+
+.sort-button:hover .sort-icon path {
+    opacity: 0.6;
+}
+
+/* Đang sắp xếp: chữ và mũi tên đang dùng đậm màu, mũi tên còn lại mờ hẳn */
+.sort-button.is-sorted {
+    color: var(--coffee-800);
+}
+
+    .sort-button.is-sorted .sort-icon {
+        color: var(--coffee-700);
+    }
+
+.sort-icon.sort-asc .sort-up,
+.sort-icon.sort-desc .sort-down,
+.sort-button:hover .sort-icon.sort-asc .sort-up,
+.sort-button:hover .sort-icon.sort-desc .sort-down {
+    opacity: 1;
+}
+
+.sort-icon.sort-asc .sort-down,
+.sort-icon.sort-desc .sort-up {
+    opacity: 0.18;
+}
+
+@media (max-width: 1000px) {
+    .sort-button {
+        min-height: 44px;
+        margin: -12px -8px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sort-icon path {
+        transition: none;
+    }
+}
+
+/* =========================================================================
+   [9] Ô chọn 2 lựa chọn liền nhau, radio thật bên trong (.choice-picker):
+       hình thức thanh toán ở trang Đơn hàng
+   ========================================================================= */
+.choice-picker {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+    .choice-picker legend {
+        grid-column: 1 / -1;
+        margin-bottom: 6px;
+        padding: 0;
+        color: var(--muted);
+        font-size: var(--fs-xs);
+        font-weight: 600;
+    }
+
+.choice-picker-option {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 6px 10px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--ink-soft);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+    .choice-picker-option:first-of-type {
+        border-radius: var(--r-sm) 0 0 var(--r-sm);
+    }
+
+    .choice-picker-option:last-of-type {
+        margin-left: -1px;
+        border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    }
+
+    .choice-picker-option:hover {
+        background: var(--coffee-50);
+    }
+
+    /* Radio thật vẫn nhận bàn phím (mũi tên trái/phải), chỉ ẩn hình tròn mặc định */
+    .choice-picker-option input {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        margin: 0;
+        cursor: pointer;
+    }
+
+    .choice-picker-option.is-selected {
+        z-index: 1;
+        border-color: var(--coffee-700);
+        background: var(--coffee-100);
+        color: var(--coffee-800);
+        box-shadow: inset 0 0 0 1px var(--coffee-700);
+    }
+
+    .choice-picker-option:focus-within {
+        z-index: 2;
+        box-shadow: var(--focus-ring);
+    }
+
+.choice-picker:disabled .choice-picker-option {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+@media (max-width: 1000px) {
+    .choice-picker-option {
+        min-height: 44px;
+    }
+}
+
+/* Tiêu đề cột không xuống dòng ("Mã đơn" thành 2 dòng trên điện thoại) */
+.sort-button {
+    white-space: nowrap;
+}
+
+/* Nút sắp xếp tổng tiền phụ: chỉ hiện trên điện thoại (cột Tổng tiền bị ẩn ở ≤650px) */
+.sort-button.sort-mobile-only {
+    display: none;
+}
+
+@media (max-width: 650px) {
+    .sort-button.sort-mobile-only {
+        display: flex;
+        width: fit-content;
+        margin: 4px -8px -12px;
+        font-size: var(--fs-xs);
+    }
+}
+
+/* Cảnh báo kho đã thu gọn: 1 dòng bấm được để mở lại danh sách */
+.alert .stock-expand {
+    display: inline-flex;
+    margin-left: 4px;
+    min-height: 32px;
+    font-weight: 700;
+}
+
+/* Tiêu đề danh sách cảnh báo kho khi thông báo phía trên là thông báo khác */
+.alert .stock-heading {
+    display: block;
+    margin-top: 4px;
+    font-size: var(--fs-sm);
+}
+
+@media (max-width: 1000px) {
+    .alert .stock-expand {
+        min-height: 44px;
+    }
+}
+
+/* =========================================================================
+   [10] Chọn khoảng ngày (Từ ngày / Đến ngày + Áp dụng): dòng riêng dưới bộ lọc, nhãn rõ ràng
+   ========================================================================= */
+.custom-range {
+    flex-basis: 100%;
+    order: 10;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px 12px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface-warm);
+}
+
+.range-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--ink-soft);
+}
+
+    .range-field input {
+        height: 40px;
+        min-width: 150px;
+    }
+
+    .range-field input[aria-invalid="true"] {
+        border-color: var(--danger);
+    }
+
+.custom-range .btn {
+    height: 40px;
+}
+
+.range-help {
+    flex-basis: 100%;
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--fs-xs);
+}
+
+    .range-help.is-error {
+        color: var(--danger);
+        font-weight: 600;
+    }
+
+@media (max-width: 1000px) {
+    .custom-range .btn,
+    .range-field input {
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 650px) {
+    .range-field {
+        flex: 1 1 140px;
+    }
+
+        .range-field input {
+            min-width: 0;
+            width: 100%;
+        }
+
+    .custom-range .btn {
+        flex: 1 1 100%;
+    }
+}
+
+/* =========================================================================
+   [11] Trang Kho nguyên liệu: bảng vừa màn hình hẹp, bộ lọc xếp như trang Đơn hàng, ghi chú trong form
+   ========================================================================= */
+
+/* Dòng phụ trong ô (Mức cảnh báo dưới Tồn kho; Đơn hàng / Ghi chú dưới tên nguyên liệu): chỉ hiện khi cột tương ứng bị ẩn */
+.stock-sub {
+    display: none;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: var(--fs-xs);
+    font-weight: 400;
+}
+
+/* Ngắt hàng trong bộ lọc: chỉ dùng ở màn hình hẹp */
+.filter-break {
+    display: none;
+}
+
+
+/* Cảnh báo cần nhập thêm: tên từng nguyên liệu hết / sắp hết + nút "Lọc danh sách" */
+.alert.restock-alert {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 6px 12px;
+}
+
+    .restock-text {
+        flex: 1 1 260px;
+        min-width: 0;
+    }
+
+        .restock-text p {
+            margin: 2px 0 0;
+        }
+
+    .restock-label {
+        margin-right: 4px;   /* Blazor bỏ khoảng trắng sau </span> → "Sắp hết:Bánh…" */
+        font-weight: 600;
+    }
+    /* "Bánh tiramisu còn 3 miếng" không bị tách số với đơn vị; chỉ xuống dòng sau dấu phẩy */
+    .restock-item {
+        white-space: nowrap;
+    }
+
+    /* Nút "Lọc danh sách": vùng bấm đủ lớn (chạm ngón tay ≥ 44px trên màn hình hẹp) */
+    .restock-alert .restock-filter {
+        min-height: 36px;
+        padding: 0 4px;
+    }
+
+/* Danh sách nhận focus bằng code sau khi lọc nhanh: không viền khi focus do chuột */
+.list-panel:focus:not(:focus-visible) {
+    outline: none;
+}
+
+@media (max-width: 1000px) {
+    .restock-alert .restock-filter {
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 1000px) {
+    .table-wrap .inventory-table {
+        min-width: 0;
+    }
+
+    .inventory-table th,
+    .inventory-table td {
+        white-space: normal;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    /* Nguyên liệu: gộp Mức cảnh báo vào ô Tồn kho. Lịch sử: bỏ cột Mã (không đụng ô báo bảng rỗng colspan) */
+    .ingredient-table th:nth-child(4),
+    .ingredient-table td:nth-child(4),
+    .stock-history-table th:nth-child(1),
+    .stock-history-table td:nth-child(1):not(.empty-cell) {
+        display: none;
+    }
+
+    .ingredient-table .stock-sub {
+        display: block;
+    }
+
+    /* Nút "Bộ lọc" + Làm mới một hàng; các ô lọc xuống hàng dưới, chia đôi */
+    .filter-row .filter-break {
+        display: block;
+        flex-basis: 100%;
+        height: 0;
+    }
+
+    .filter-row select.filter-half {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 650px) {
+    /* Nguyên liệu: bỏ cột Mã NL. Lịch sử: Đơn hàng / Ghi chú hiện dưới tên nguyên liệu */
+    .ingredient-table th:nth-child(1),
+    .ingredient-table td:nth-child(1):not(.empty-cell),
+    .stock-history-table th:nth-child(6),
+    .stock-history-table td:nth-child(6),
+    .stock-history-table th:nth-child(7),
+    .stock-history-table td:nth-child(7) {
+        display: none;
+    }
+
+    .stock-history-table .stock-sub {
+        display: block;
+    }
+
+    .inventory-table th,
+    .inventory-table td {
+        padding-left: 6px;
+        padding-right: 6px;
+    }
+
+    .filter-row select.filter-half {
+        flex-basis: 100%;
+    }
+}
+
+/* =========================================================================
+   [12] Trang Món: bảng vừa màn hình hẹp (giống trang Kho), bộ lọc khi tab không có ô lọc, form món
+   ========================================================================= */
+
+/* Ô "Ảnh món" chiếm cả hàng (đường dẫn ảnh dài, không để trống nửa phải) */
+.form-grid > .field-wide {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 1000px) {
+    .table-wrap .products-table {
+        min-width: 0;
+    }
+
+    .products-table th,
+    .products-table td {
+        white-space: normal;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    /* Bảng món: bỏ cột Ảnh, Danh mục hiện dưới tên món (không đụng ô báo bảng rỗng colspan) */
+    .menu-table th:nth-child(2),
+    .menu-table td:nth-child(2):not(.empty-cell),
+    .menu-table th:nth-child(4),
+    .menu-table td:nth-child(4) {
+        display: none;
+    }
+
+    .menu-table .stock-sub {
+        display: block;
+    }
+
+    /* Tab Danh mục (không có nút "Bộ lọc"): ô tìm kiếm và nút Làm mới chung một hàng */
+    .filter-row.no-filters .search-field {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 650px) {
+    /* Điện thoại: bỏ thêm cột Mã món */
+    .menu-table th:nth-child(1),
+    .menu-table td:nth-child(1):not(.empty-cell) {
+        display: none;
+    }
+}
+
+/* Ô tick / nút chọn trong form (size, trạng thái bán): viền focus rõ khi dùng bàn phím
+   (quầng --focus-ring quanh ô 18px quá mờ trên nền trắng) */
+.checkbox-line input:focus-visible {
+    outline: 2px solid var(--coffee-600);
+    outline-offset: 2px;
+}
+
+/* =========================================================================
+   [13] Khuyến mãi / Tài khoản: bảng vừa màn hình hẹp (cùng cách với Kho [11] và Món [12]) —
+   cột phụ bị ẩn được hiện gọn dưới cột chính bằng dòng phụ .stock-sub
+   ========================================================================= */
+@media (max-width: 1000px) {
+    .table-wrap .promo-table,
+    .table-wrap .account-table {
+        min-width: 0;
+    }
+
+    .promo-table th,
+    .promo-table td,
+    .account-table th,
+    .account-table td {
+        white-space: normal;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    /* Khuyến mãi: bỏ Giờ vàng, Số món → hiện dưới mã */
+    .promo-table th:nth-child(5),
+    .promo-table td:nth-child(5),
+    .promo-table th:nth-child(6),
+    .promo-table td:nth-child(6) {
+        display: none;
+    }
+
+    .promo-table .sub-hours {
+        display: block;
+    }
+
+}
+
+@media (max-width: 650px) {
+    /* Khuyến mãi: bỏ Bắt đầu / Kết thúc → khoảng ngày hiện dưới mã */
+    .promo-table th:nth-child(3),
+    .promo-table td:nth-child(3),
+    .promo-table th:nth-child(4),
+    .promo-table td:nth-child(4) {
+        display: none;
+    }
+
+    .promo-table .sub-dates {
+        display: block;
+    }
+
+    /* Tài khoản: bỏ Mã TK, Tên đăng nhập → tên đăng nhập hiện dưới họ tên (không đụng ô báo bảng rỗng colspan) */
+    .account-table th:nth-child(1),
+    .account-table td:nth-child(1):not(.empty-cell),
+    .account-table th:nth-child(3),
+    .account-table td:nth-child(3) {
+        display: none;
+    }
+
+    .account-table .sub-login {
+        display: block;
+    }
+}
+
+/* Khuyến mãi ≤650px: mã dài ("KHAITRUONG10") và nhãn trạng thái được xuống dòng → bảng không cuộn ngang */
+@media (max-width: 650px) {
+    .promo-table td:first-child {
+        overflow-wrap: anywhere;
+    }
+
+    .promo-table .badge {
+        white-space: normal;
+        text-align: center;
+    }
+
+    /* Topping / Danh mục: bỏ cột Mã như các bảng khác (Món, Kho, Tài khoản) */
+    .products-table:not(.menu-table) th:nth-child(1),
+    .products-table:not(.menu-table) td:nth-child(1):not(.empty-cell) {
+        display: none;
+    }
+}
+
+/* Điện thoại: thanh Thêm · Sửa · Xóa (+ nút riêng) xếp lưới 2 cột đều nhau ở mọi trang quản lý */
+@media (max-width: 480px) {
+    /* minmax(0, 1fr): 2 cột luôn bằng nhau dù chữ nút dài ("Thêm nguyên liệu") — chữ dài thì xuống dòng trong nút */
+    .action-bar.crud-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: stretch;   /* nút cùng hàng cao bằng nhau khi một nút xuống 2 dòng */
+    }
+
+        .action-bar.crud-actions .btn {
+            width: 100%;
+            min-width: 0;
+            height: auto;
+            white-space: normal;
+        }
 }

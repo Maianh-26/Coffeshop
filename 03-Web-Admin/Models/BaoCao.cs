@@ -44,7 +44,17 @@ public class GioCaoDiem
     public decimal DoanhThu { get; set; }
 }
 
-/// <summary>Bộ lọc thời gian của trang Tổng quan.</summary>
+/// <summary>
+/// Một mốc trên biểu đồ / một dòng bảng báo cáo của trang Tổng quan (một giờ, một ngày hoặc một tháng).
+/// Moc: nhãn ngắn dưới cột ("15h", "05/11", "11/2026"); MocDayDu: nhãn đầy đủ cho bảng, tooltip và file CSV.
+/// MocPhu: dòng phụ dưới nhãn (ngày, ở cột 00:00 khi biểu đồ theo giờ qua nửa đêm) — mốc có dòng phụ luôn được ghi nhãn.
+/// </summary>
+public sealed record DongBaoCao(string Moc, string MocDayDu, int SoDon, decimal DoanhThu, string? MocPhu = null);
+
+/// <summary>
+/// Khoảng thời gian gửi lên api/v1/bao-cao/*: mốc chính xác tới từng giây.
+/// From = null → không giới hạn đầu; To = null → đến hiện tại.
+/// </summary>
 public class DashboardFilter
 {
     public DateTime? From { get; set; }

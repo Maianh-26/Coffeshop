@@ -81,7 +81,7 @@ public partial class Login
     }
 
     // Trang nhân viên được phép mở (khớp menu nhân viên)
-    private static readonly string[] StaffPages = ["orders", "my-account"];
+    private static readonly string[] StaffPages = ["orders"];
 
     /// <summary>
     /// Trang mở sau khi đăng nhập: trang định mở trước đó (nếu hợp lệ và đúng quyền),

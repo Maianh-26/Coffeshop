@@ -100,28 +100,6 @@ public class MockDatabase
         public bool DangSuDung { get; set; } = true;
     }
 
-    // ------------------------------------------------------------------ Quên mật khẩu (chỉ giả lập)
-    /// <summary>Mã xác minh quên mật khẩu đang chờ: email → thông tin mã.</summary>
-    public Dictionary<string, ResetCode> ResetCodes { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// Nhật ký xin mã theo email (kể cả email không có tài khoản): dùng cho giới hạn gửi lại / số lần mỗi giờ.
-    /// Không bị xóa khi mã hết hạn hay bị hủy → không lách được giới hạn.
-    /// </summary>
-    public Dictionary<string, List<DateTime>> ResetRequestLog { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Token đặt lại mật khẩu (dùng một lần): token → (tên đăng nhập, hết hạn).</summary>
-    public Dictionary<string, (string Username, DateTime ExpiresAt)> ResetTokens { get; } = [];
-
-    public class ResetCode
-    {
-        public string Username { get; init; } = "";
-        public string Code { get; init; } = "";
-        public DateTime ExpiresAt { get; init; }
-        public DateTime SentAt { get; init; }
-        public int FailedAttempts { get; set; }
-    }
-
     // ------------------------------------------------------------------ Khóa tự tăng
     public static int NextId<T>(IEnumerable<T> rows, Func<T, int> id) => rows.Select(id).DefaultIfEmpty(0).Max() + 1;
 

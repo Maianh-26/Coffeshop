@@ -15,9 +15,15 @@ public class OrderService
     }
 
     /// <summary>
-    /// Danh sách đơn (mới nhất trước), có phân trang. Lọc theo trạng thái thanh toán, trạng thái phục vụ
-    /// ([ĐỀ XUẤT] tham số <c>trangThaiPhucVu</c>) và khoảng ngày.
+    /// Danh sách đơn (mặc định mới nhất trước), có phân trang. Lọc theo trạng thái thanh toán, trạng thái phục vụ
+    /// ([ĐỀ XUẤT] tham số <c>trangThaiPhucVu</c>) và thời gian tạo.
     /// </summary>
+    /// <param name="tuNgay">Mốc bắt đầu, gửi CHÍNH XÁC đến giờ phút (vd. "24 giờ qua" = lúc này trừ 24 giờ).</param>
+    /// <param name="denNgay">Ngày kết thúc (tính trọn ngày, tới 23:59:59.997); null = đến hiện tại.</param>
+    /// <param name="sapXep">
+    /// [ĐỀ XUẤT] Sắp xếp toàn bộ danh sách trước khi phân trang: <c>maDonHang</c>, <c>-maDonHang</c>, <c>tongTien</c>,
+    /// <c>-tongTien</c> (dấu "-" = giảm dần); null = mặc định (mới nhất trước). Backend chưa hỗ trợ thì bỏ qua tham số này.
+    /// </param>
     public Task<PagedResult<DonHang>> GetPageAsync(
         int page,
         int limit,
@@ -25,14 +31,16 @@ public class OrderService
         string? trangThaiPhucVu = null,
         DateTime? tuNgay = null,
         DateTime? denNgay = null,
+        string? sapXep = null,
         CancellationToken ct = default) =>
         _api.GetAsync<PagedResult<DonHang>>(Query.Build("api/v1/don-hang",
             ("page", page),
             ("limit", limit),
             ("trangThai", trangThai),
             ("trangThaiPhucVu", trangThaiPhucVu),
-            ("tuNgay", tuNgay?.Date),
-            ("denNgay", Query.EndOfDay(denNgay))), ct);
+            ("tuNgay", tuNgay),
+            ("denNgay", Query.EndOfDay(denNgay)),
+            ("sapXep", sapXep)), ct);
 
     public Task<DonHang> GetAsync(int id, CancellationToken ct = default) =>
         _api.GetAsync<DonHang>($"api/v1/don-hang/{id}", ct);

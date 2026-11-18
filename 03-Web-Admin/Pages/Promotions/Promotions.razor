@@ -8,6 +8,8 @@
 
 <div class="promotions-page">
 
+    @* Thanh lọc chung (như Đơn hàng / Kho / Món): màn hình hẹp gom ô lọc vào nút "Bộ lọc (n)";
+       nút Làm mới bỏ lọc / tìm / sắp xếp, về trang 1 và tải lại *@
     <section class="panel filters-panel">
 
         <div class="filter-row">
@@ -19,60 +21,47 @@
                 <input @bind="search"
                        @bind:event="oninput"
                        @bind:after="Filter"
-                       placeholder="Tìm mã khuyến mãi"
-                       aria-label="Tìm khuyến mãi" />
+                       maxlength="50"
+                       placeholder="Tìm theo mã khuyến mãi…"
+                       aria-label="Tìm khuyến mãi theo mã" />
 
             </div>
 
-            <select aria-label="Lọc trạng thái" @bind="statusFilter" @bind:after="Filter">
-                <option value="">Tất cả trạng thái</option>
-                <option>Đang áp dụng</option>
-                <option>Ngoài khung giờ</option>
-                <option>Chưa bắt đầu</option>
-                <option>Đã kết thúc</option>
-            </select>
-
-            <button class="btn outline"
-                    @onclick="Reset">
-
-                <Icon Name="reset" />
-                Đặt lại
-
+            <button type="button"
+                    class="btn outline filters-toggle"
+                    aria-expanded="@(filtersOpen ? "true" : "false")"
+                    aria-controls="promotion-filters"
+                    @onclick="() => filtersOpen = !filtersOpen">
+                <Icon Name="filter" />
+                Bộ lọc@(ActiveFilterCount > 0 ? $" ({ActiveFilterCount})" : "")
             </button>
+
+            <RefreshButton Active="FiltersActive" Spinning="refreshing" Title="@RefreshTitle" OnClick="RefreshAll" />
+
+            <div id="promotion-filters" class="filter-extra @(filtersOpen ? "open" : "")">
+
+                <span class="filter-break" aria-hidden="true"></span>
+
+                <select class="filter-half" aria-label="Lọc trạng thái" @bind="statusFilter" @bind:after="Filter">
+                    <option value="">Tất cả trạng thái</option>
+                    @foreach (var status in TrangThaiKhuyenMai.Options)
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </select>
+
+            </div>
 
         </div>
 
     </section>
 
-    <section class="panel action-bar">
-
-        <button class="btn primary"
-                @onclick="Add">
-
-            <Icon Name="plus" />
-            Thêm khuyến mãi
-
-        </button>
-
-        <button class="btn outline"
-                disabled="@(Selected is null)"
-                @onclick="Edit">
-
-            <Icon Name="edit" />
-            Sửa
-
-        </button>
-
-        <button class="btn danger-outline"
-                disabled="@(Selected is null)"
-                @onclick="AskDelete">
-
-            <Icon Name="trash" />
-            Xóa
-
-        </button>
-
-    </section>
+    <CrudActions AddLabel="Thêm khuyến mãi"
+                 ItemName="khuyến mãi"
+                 HasSelection="@(Selected is not null)"
+                 OnAdd="Add"
+                 OnEdit="Edit"
+                 OnDelete="AskDelete" />
 
     @if (message is not null)
     {
@@ -93,15 +82,16 @@
 
         <div class="table-wrap">
 
-            <table>
+            @* promo-table: gộp cột phụ trên màn hình hẹp (CSS mục [13]) *@
+            <table class="promo-table">
 
                 <thead>
 
                     <tr>
-                        <th>Mã KM</th>
-                        <th>Giảm giá</th>
-                        <th>Bắt đầu</th>
-                        <th>Kết thúc</th>
+                        <SortHeader Sort="sort" Key="@SortCode" Label="Mã KM" Name="mã khuyến mãi" OnSort="ToggleSort" />
+                        <SortHeader Sort="sort" Key="@SortDiscount" Label="Giảm giá" Name="mức giảm" OnSort="ToggleSort" />
+                        <SortHeader Sort="sort" Key="@SortStart" Label="Bắt đầu" Name="ngày bắt đầu" OnSort="ToggleSort" />
+                        <SortHeader Sort="sort" Key="@SortEnd" Label="Kết thúc" Name="ngày kết thúc" OnSort="ToggleSort" />
                         <th>Giờ vàng</th>
                         <th>Số món</th>
                         <th>Trạng thái</th>
@@ -113,22 +103,29 @@
 
                     @foreach (var item in VisiblePromotions)
                     {
-                        string status = StatusText(item);
+                        string status = TrangThaiKhuyenMai.Of(item, now);
+                        string hours = item.GioBatDau is null ? "Cả ngày" : $"{item.GioBatDau} – {item.GioKetThuc}";
 
-                        <tr class="selectable @(selected == item.MaKhuyenMai ? "selected" : "")"
+                        <tr @key="item.MaKhuyenMai"
+                            class="selectable @(selected == item.MaKhuyenMai ? "selected" : "")"
                             tabindex="0"
                             @onclick="() => selected = item.MaKhuyenMai"
                             @onkeydown="e => SelectKey(e, item.MaKhuyenMai)">
 
-                            <td><strong>@item.Code</strong></td>
+                            <td>
+                                <strong>@item.Code</strong>
+                                @* Màn hình hẹp: cột ngày / giờ vàng / số món bị ẩn → hiện gọn dưới mã *@
+                                <span class="stock-sub sub-dates">@item.NgayBatDau.ToString("dd/MM") – @item.NgayKetThuc.ToString("dd/MM/yyyy")</span>
+                                <span class="stock-sub sub-hours">@hours · @item.SoMonApDung món</span>
+                            </td>
                             <td>@item.PhanTramGiam.ToString("0.##", Vi)%</td>
                             <td>@item.NgayBatDau.ToString("dd/MM/yyyy")</td>
                             <td>@item.NgayKetThuc.ToString("dd/MM/yyyy")</td>
-                            <td>@(item.GioBatDau is null ? "Cả ngày" : $"{item.GioBatDau} – {item.GioKetThuc}")</td>
+                            <td>@hours</td>
                             <td>@item.SoMonApDung</td>
 
                             <td>
-                                <span class="badge @StatusColor(status)">
+                                <span class="badge @TrangThaiKhuyenMai.Color(status)">
                                     @status
                                 </span>
                             </td>
@@ -138,19 +135,11 @@
 
                     @if (VisiblePromotions.Count == 0)
                     {
-                        <tr>
-
-                            <td class="empty-cell" colspan="7">
-
-                                <Icon Name="tag" Size="32" />
-
-                                <p>
-                                    @(loading ? "Đang tải khuyến mãi…" : "Chưa có chương trình khuyến mãi phù hợp.")
-                                </p>
-
-                            </td>
-
-                        </tr>
+                        <EmptyRow Columns="7"
+                                  IconName="tag"
+                                  Text="@EmptyText"
+                                  ShowClear="@(!loading && FiltersActive)"
+                                  OnClear="RefreshAll" />
                     }
 
                 </tbody>
@@ -254,8 +243,6 @@
 
                 </div>
 
-                <p class="form-note">Bỏ trống giờ vàng nếu khuyến mãi áp dụng cả ngày.</p>
-
                 <fieldset class="field">
                     <legend>Món áp dụng (@model.MaTenMons.Count)</legend>
 
@@ -268,24 +255,19 @@
                         <div class="toppings-picker-grid">
                             @foreach (var mon in products)
                             {
-                                var other = mon.KhuyenMai is { } km && km.MaKhuyenMai != model.MaKhuyenMai ? km.Code : null;
-
                                 <label class="topping-checkbox-item">
                                     <input type="checkbox"
                                            checked="@model.MaTenMons.Contains(mon.MaTenMon)"
                                            @onchange="e => ToggleProduct(mon.MaTenMon, e)" />
-                                    <span>
-                                        @mon.TenMon
-                                        @if (other is not null)
-                                        {
-                                            <small class="muted"> (đang thuộc @other)</small>
-                                        }
-                                    </span>
+                                    <span>@mon.TenMon</span>
+                                    @* Dữ liệu (không phải câu giải thích): món đang thuộc khuyến mãi khác → tích sẽ chuyển món sang khuyến mãi này *@
+                                    @if (mon.KhuyenMai is { } km && km.MaKhuyenMai != model.MaKhuyenMai)
+                                    {
+                                        <span class="badge gray" title="Đang thuộc khuyến mãi @km.Code">@km.Code</span>
+                                    }
                                 </label>
                             }
                         </div>
-
-                        <p class="form-note">Mỗi món chỉ thuộc một khuyến mãi — chọn món đang thuộc khuyến mãi khác sẽ chuyển món sang khuyến mãi này.</p>
                     }
                 </fieldset>
 
@@ -317,12 +299,6 @@
         {
             <p>Xóa khuyến mãi <strong>@target.Code</strong>?</p>
 
-            <p class="form-note">
-                @(target.SoMonApDung > 0
-                    ? $"{target.SoMonApDung} món đang áp dụng sẽ được gỡ khuyến mãi và trở về giá gốc."
-                    : "Khuyến mãi chưa gắn với món nào.")
-            </p>
-
             @if (error is not null)
             {
                 <p class="alert error" role="alert">@error</p>
@@ -335,7 +311,7 @@
                 </button>
 
                 <button class="btn danger" disabled="@saving" @onclick="Delete">
-                    @(saving ? "Đang xóa…" : "Xóa khuyến mãi")
+                    @(saving ? "Đang xóa…" : "Xóa")
                 </button>
 
             </div>
@@ -362,6 +338,17 @@
 
     private string search = "";
     private string statusFilter = "";
+    private bool filtersOpen;       // màn hình hẹp: khung bộ lọc đang mở
+    private bool refreshing;        // đang tải lại do bấm nút Làm mới
+
+    private readonly ColumnSort sort = new();
+    private const string SortCode = "code";
+    private const string SortDiscount = "discount";
+    private const string SortStart = "start";
+    private const string SortEnd = "end";
+
+    /// <summary>Mốc thời gian để tính trạng thái (đặt lại mỗi lần tải danh sách).</summary>
+    private DateTime now = DateTime.Now;
     private int? selected;
     private int page = 1;
     private const int PageSize = 10;
@@ -376,7 +363,8 @@
 
     private KhuyenMaiForm model = new();
 
-    private KhuyenMai? Selected => promotions.FirstOrDefault(p => p.MaKhuyenMai == selected);
+    // Chỉ tính dòng đang thấy: khuyến mãi bị lọc / ở trang khác không còn được "chọn" ngầm cho nút Sửa / Xóa
+    private KhuyenMai? Selected => VisiblePromotions.FirstOrDefault(p => p.MaKhuyenMai == selected);
 
     private string DialogTitle => dialog switch
     {
@@ -385,10 +373,31 @@
         _ => ""
     };
 
-    private IEnumerable<KhuyenMai> FilteredPromotions =>
-        promotions.Where(p =>
-            (search == "" || p.Code.Contains(search, StringComparison.OrdinalIgnoreCase))
-            && (statusFilter == "" || StatusText(p) == statusFilter));
+    private int ActiveFilterCount => statusFilter != "" ? 1 : 0;
+
+    // Đang lọc / tìm / sắp xếp khác mặc định → nút Làm mới có chấm báo
+    private bool FiltersActive => ActiveFilterCount > 0 || search.Trim() != "" || sort.Active;
+
+    private string RefreshTitle => FiltersActive ? "Làm mới và bỏ lọc, xem toàn bộ khuyến mãi" : "Làm mới danh sách khuyến mãi";
+
+    private string EmptyText =>
+        loading ? "Đang tải dữ liệu…"
+        : FiltersActive ? "Không có khuyến mãi khớp bộ lọc."
+        : "Chưa có khuyến mãi.";
+
+    private IEnumerable<KhuyenMai> FilteredPromotions
+    {
+        get
+        {
+            string term = SearchText.Fold(search);
+
+            return sort.Apply(
+                promotions.Where(p =>
+                    SearchText.Contains(p.Code, term)
+                    && (statusFilter == "" || TrangThaiKhuyenMai.Of(p, now) == statusFilter)),
+                (SortCode, p => p.Code), (SortDiscount, p => p.PhanTramGiam), (SortStart, p => p.NgayBatDau), (SortEnd, p => p.NgayKetThuc));
+        }
+    }
 
     private List<KhuyenMai> VisiblePromotions =>
         FilteredPromotions
@@ -397,26 +406,6 @@
             .ToList();
 
     private int Pages => Math.Max(1, (int)Math.Ceiling(FilteredPromotions.Count() / (double)PageSize));
-
-    /// <summary>
-    /// DangApDung do backend tính (ngày + khung giờ); các trạng thái còn lại suy ra từ ngày.
-    /// </summary>
-    private static string StatusText(KhuyenMai p)
-    {
-        var now = DateTime.Now;
-
-        if (p.DangApDung) return "Đang áp dụng";
-        if (now > p.NgayKetThuc) return "Đã kết thúc";
-        if (now < p.NgayBatDau) return "Chưa bắt đầu";
-        return "Ngoài khung giờ";
-    }
-
-    private static string StatusColor(string status) => status switch
-    {
-        "Đang áp dụng" => "green",
-        "Đã kết thúc" => "gray",
-        _ => "yellow"
-    };
 
     protected override Task OnInitializedAsync() => Load();
 
@@ -428,6 +417,7 @@
         try
         {
             promotions = await PromotionApi.GetAllAsync(pageCts.Token);
+            now = DateTime.Now;
             page = Math.Clamp(page, 1, Pages);
         }
         catch (ApiException ex)
@@ -478,11 +468,33 @@
 
     private void Filter() => page = 1;
 
-    private void Reset()
+    private void ToggleSort(string key)
+    {
+        sort.Toggle(key);
+        page = 1;
+    }
+
+    /// <summary>Nút Làm mới: bỏ mọi bộ lọc / tìm kiếm / sắp xếp, về trang 1 và tải lại.</summary>
+    private async Task RefreshAll()
     {
         search = "";
         statusFilter = "";
+        sort.Reset();
         page = 1;
+        message = null;
+
+        if (refreshing || loading) return;
+
+        refreshing = true;
+
+        try
+        {
+            await Load();
+        }
+        finally
+        {
+            refreshing = false;
+        }
     }
 
     private void Move(int direction)
