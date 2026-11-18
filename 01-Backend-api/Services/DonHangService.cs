@@ -28,6 +28,33 @@ public class DonHangService(AppDbContext db)
     public async Task<DonHang> DatMon(DatMonRequest req, int? maNhanVien)
     {
         var now = DateTime.Now;
+        var chiTiets = await DungChiTiet(req, now);
+        var donHang = new DonHang
+        {
+            MaNguoiDung = maNhanVien,
+            PhuongThucThanhToan = req.PhuongThucThanhToan ?? "CASH",
+            TrangThaiThanhToan = TrangThais.Pending,
+            ThoiGianTao = now,
+            ChiTiets = chiTiets,
+            TongTien = TinhTongTien(chiTiets),
+        };
+        db.DonHangs.Add(donHang);
+        await db.SaveChangesAsync();
+        return await Tim(donHang.MaDonHang);
+    }
+
+    private static decimal TinhTongTien(IEnumerable<ChiTietDonHang> chiTiets) =>
+        chiTiets.Sum(c => (c.DonGiaBan + c.Toppings.Sum(t => t.DonGiaTopping)) * c.SoLuong);
+
+    /// <summary>
+    /// Dựng danh sách chi tiết đơn từ request (dùng chung cho đặt món và sửa món). Không ghi DB.
+    ///  - kiểm tra món/size/topping còn bán → 404 / 422 (MON_NGUNG_BAN, MON_HET_HANG, SIZE_KHONG_AP_DUNG, TOPPING_HET_HANG),
+    ///  - áp khuyến mãi của món tại <paramref name="thoiDiemGia"/> (đặt món: bây giờ; sửa món: giờ tạo đơn),
+    ///  - kiểm tra đủ nguyên liệu theo CongThucMon → 422 HET_NGUYEN_LIEU,
+    ///  - snapshot tên món + size, tên & giá topping.
+    /// </summary>
+    private async Task<List<ChiTietDonHang>> DungChiTiet(DatMonRequest req, DateTime thoiDiemGia)
+    {
         var maCtms = req.ChiTiet.Select(c => c.MaChiTietMon!.Value).Distinct().ToList();
         var maToppings = req.ChiTiet.SelectMany(c => c.Toppings ?? new()).Distinct().ToList();
 
@@ -47,14 +74,7 @@ public class DonHangService(AppDbContext db)
             foreach (var c in ct) canDung[c.MaNguyenLieu] = canDung.GetValueOrDefault(c.MaNguyenLieu) + c.LuongSuDung * soLuong;
         }
 
-        var donHang = new DonHang
-        {
-            MaNguoiDung = maNhanVien,
-            PhuongThucThanhToan = req.PhuongThucThanhToan ?? "CASH",
-            TrangThaiThanhToan = TrangThais.Pending,
-            ThoiGianTao = now,
-        };
-
+        var chiTiets = new List<ChiTietDonHang>();
         foreach (var dong in req.ChiTiet)
         {
             if (!ctms.TryGetValue(dong.MaChiTietMon!.Value, out var ctm))
@@ -73,7 +93,7 @@ public class DonHangService(AppDbContext db)
             {
                 MaChiTietMon = ctm.MaChiTietMon,
                 TenMonLuu = $"{mon.TenMon} - {ctm.KichThuoc?.TenKichThuoc ?? ctm.MaKichThuoc}",
-                DonGiaBan = Mapping.GiaSauGiam(ctm.GiaBan, mon.KhuyenMai, now),
+                DonGiaBan = Mapping.GiaSauGiam(ctm.GiaBan, mon.KhuyenMai, thoiDiemGia),
                 SoLuong = soLuong,
                 GhiChu = dong.GhiChu,
             };
@@ -86,7 +106,7 @@ public class DonHangService(AppDbContext db)
                 chiTiet.Toppings.Add(new ChiTietDonHangTopping { MaTopping = tp.MaTopping, TenToppingLuu = tp.TenTopping, DonGiaTopping = tp.GiaThem });
                 Cong(tp.CongThucs, soLuong);
             }
-            donHang.ChiTiets.Add(chiTiet);
+            chiTiets.Add(chiTiet);
         }
 
         // Kiểm tra tồn kho (thông minh: chặn đơn không thể pha chế ngay từ lúc đặt)
@@ -97,11 +117,49 @@ public class DonHangService(AppDbContext db)
             .Select(kv => new { tenNguyenLieu = nls[kv.Key].TenNguyenLieu, canDung = kv.Value, conTon = nls[kv.Key].SoLuongTon, donViTinh = nls[kv.Key].DonViTinh })
             .ToList();
         if (thieu.Count > 0) throw ApiException.Unprocessable("HET_NGUYEN_LIEU", "Không đủ nguyên liệu để pha chế đơn này", thieu);
+        return chiTiets;
+    }
 
-        donHang.TongTien = donHang.ChiTiets.Sum(c => (c.DonGiaBan + c.Toppings.Sum(t => t.DonGiaTopping)) * c.SoLuong);
-        db.DonHangs.Add(donHang);
+    // ------------------------------------------------------------------ SỬA MÓN
+    private const string KhongSuaDuoc = "Chỉ sửa được đơn chưa thanh toán, chưa hủy và chưa phục vụ";
+
+    /// <summary>
+    /// PUT /don-hang/{id}: thay TOÀN BỘ món của đơn PENDING chưa SERVED, tính lại TongTien.
+    /// Kiểm tra giống đặt món; giá khuyến mãi theo giờ tạo đơn; không trừ kho;
+    /// giữ nguyên người tạo, giờ tạo, số nhận món, trạng thái phục vụ.
+    /// </summary>
+    public async Task<DonHang> SuaMon(int id, DatMonRequest req)
+    {
+        var don = await Tim(id);
+        if (don.TrangThaiThanhToan != TrangThais.Pending || don.TrangThaiPhucVu == TrangThaiPhucVus.Served)
+            throw ApiException.Conflict(KhongSuaDuoc);
+
+        // Kiểm tra & dựng món mới TRƯỚC khi ghi: lỗi 404/422 thì đơn cũ giữ nguyên
+        var chiTiets = await DungChiTiet(req, don.ThoiGianTao);
+        var tongTien = TinhTongTien(chiTiets);
+        var phuongThuc = req.PhuongThucThanhToan ?? don.PhuongThucThanhToan;
+        db.ChangeTracker.Clear();
+
+        await using var tx = await db.Database.BeginTransactionAsync();
+        // Câu ghi ĐẦU TIÊN là cập nhật có điều kiện trên dòng DonHang: vừa kiểm tra lại trạng thái, vừa giữ khóa dòng
+        // tới khi commit → sp_ThanhToanVaTruKho chạy cùng lúc phải chờ, rồi trừ kho theo món MỚI (hoặc ta nhận 409 nếu thanh toán xong trước).
+        var soDong = await db.DonHangs
+            .Where(d => d.MaDonHang == id && d.TrangThaiThanhToan == TrangThais.Pending && d.TrangThaiPhucVu != TrangThaiPhucVus.Served)
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.TongTien, tongTien).SetProperty(d => d.PhuongThucThanhToan, phuongThuc));
+        if (soDong == 0) throw ApiException.Conflict(KhongSuaDuoc); // tx chưa commit → tự rollback khi dispose
+
+        // Không có ON DELETE CASCADE: xóa topping của các dòng → xóa dòng → thêm dòng mới
+        await db.ChiTietDonHangToppings
+            .Where(t => db.ChiTietDonHangs.Any(c => c.MaChiTietDon == t.MaChiTietDon && c.MaDonHang == id))
+            .ExecuteDeleteAsync();
+        await db.ChiTietDonHangs.Where(c => c.MaDonHang == id).ExecuteDeleteAsync();
+        foreach (var c in chiTiets) c.MaDonHang = id;
+        db.ChiTietDonHangs.AddRange(chiTiets);
         await db.SaveChangesAsync();
-        return await Tim(donHang.MaDonHang);
+        await tx.CommitAsync();
+
+        db.ChangeTracker.Clear();
+        return await Tim(id);
     }
 
     // ------------------------------------------------------------------ THANH TOÁN

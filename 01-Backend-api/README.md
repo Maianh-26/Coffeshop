@@ -137,9 +137,10 @@ Lần chạy đầu, nếu bảng `NguoiDung` trống, API tự thêm **dữ li�
 | | `GET /don-hang` · `GET /don-hang/{id}` · `POST /don-hang/{id}/thanh-toan` | 👤 | + **sp_ThanhToanVaTruKho** |
 | | `POST /don-hang/{id}/huy` | 👑 | |
 | | `PUT /don-hang/{id}/so-nhan-mon` · `PUT /don-hang/{id}/trang-thai-phuc-vu` | 👤 | DonHang.SoNhanMon, DonHang.TrangThaiPhucVu |
+| | `PUT /don-hang/{id}` (sửa món đơn chưa thu tiền) · `GET /don-hang?sapXep=&timKiem=` | 👤 | DonHang, ChiTietDonHang, ChiTietDonHang_Topping |
 | Kho | `GET /nguyen-lieu` · `GET /nguyen-lieu/{id}` · `POST …/nhap-kho` · `POST …/xuat-huy` · `GET /lich-su-kho` | 👑 | NguyenLieu, LichSuKho |
 | | `POST /nguyen-lieu` · `PATCH, DELETE /nguyen-lieu/{id}` | 👑 | |
-| Báo cáo | `GET /bao-cao/doanh-thu` · `/bao-cao/mon-ban-chay` · `/bao-cao/gio-cao-diem` | 👑 | DonHang |
+| Báo cáo | `GET /bao-cao/doanh-thu` · `/bao-cao/mon-ban-chay` · `/bao-cao/topping-ban-chay` · `/bao-cao/gio-cao-diem` | 👑 | DonHang |
 
 JSON vào/ra chi tiết của **từng** endpoint: xem Swagger `/docs` (có ví dụ) hoặc `CoffeeShop.Api.http`.
 

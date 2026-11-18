@@ -542,6 +542,17 @@ paths:
           in: query
           description: Lọc theo trạng thái phục vụ; luôn loại đơn đã hủy (CANCELLED)
           schema: { $ref: '#/components/schemas/TrangThaiPhucVu' }
+        - name: sapXep
+          in: query
+          description: |
+            Sắp xếp toàn bộ danh sách TRƯỚC khi phân trang ("-" = giảm dần). Cùng `tongTien` thì đơn mới hơn
+            (`maDonHang` lớn hơn) đứng trước. Bỏ trống = mặc định: `thoiGianTao` giảm dần rồi `maDonHang` giảm dần.
+          schema: { type: string, enum: [maDonHang, -maDonHang, tongTien, -tongTien] }
+        - name: timKiem
+          in: query
+          description: Chuỗi chữ số — khớp đơn có **mã bắt đầu bằng** chuỗi này **hoặc** `soNhanMon` **bằng đúng** số này
+          schema: { type: string, pattern: '^[0-9]{1,10}$' }
+          example: '18'
         - $ref: '#/components/parameters/TuNgay'
         - $ref: '#/components/parameters/DenNgay'
       responses:
@@ -565,6 +576,40 @@ paths:
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/DonHang' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Đơn hàng]
+      summary: Sửa món của đơn chưa thanh toán, chưa phục vụ (NhanVien, QuanLy)
+      description: |
+        Body **giống hệt** `POST /don-hang`. `chiTiet` **thay toàn bộ** danh sách món cũ; `phuongThucThanhToan = null` → giữ nguyên.
+        - Chỉ khi đơn `PENDING` và `trangThaiPhucVu` khác `SERVED`, ngược lại **409**.
+        - Kiểm tra món / size / topping / tồn kho **giống lúc đặt món**, cùng mã lỗi (404, 422).
+        - Giá khuyến mãi áp theo **giờ tạo đơn** (`thoiGianTao`), không theo giờ sửa.
+        - Không trừ kho (kho chỉ trừ khi thanh toán). Giữ nguyên người tạo, giờ tạo, số nhận món, trạng thái phục vụ.
+        - Sửa và thanh toán cùng lúc: thanh toán chờ sửa xong rồi trừ kho theo món mới.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DatMonRequest' }
+            example:
+              phuongThucThanhToan: null
+              chiTiet:
+                - { maChiTietMon: 3, soLuong: 1, ghiChu: 'Ít đá', toppings: [3] }
+      responses:
+        '200': { description: 'Đã sửa — tongTien đã tính lại', content: { application/json: { schema: { $ref: '#/components/schemas/DonHang' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Đơn đã thanh toán / đã hủy / đã phục vụ
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: CONFLICT, message: 'Chỉ sửa được đơn chưa thanh toán, chưa hủy và chưa phục vụ' } }
+        '422':
+          description: Món ngừng bán / hết hàng / size không áp dụng / topping hết / thiếu nguyên liệu (giống POST /don-hang)
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
 
   /don-hang/{id}/thanh-toan:
     post:
@@ -808,7 +853,28 @@ paths:
                     maTenMon: { type: integer }
                     tenMon: { type: string }
                     soLuong: { type: integer }
-                    doanhThu: { type: number }
+                    doanhThu: { type: number, description: 'Tiền món = Σ donGiaBan × soLuong (không gồm topping)' }
+                    doanhThuTopping: { type: number, description: 'Σ donGiaTopping × soLuong của các dòng món này' }
+                    tongDoanhThu: { type: number, description: 'doanhThu + doanhThuTopping' }
+
+  /bao-cao/topping-ban-chay:
+    get:
+      tags: [Báo cáo]
+      summary: Topping bán chạy — đơn PAID, lọc theo giờ thu tiền
+      description: '`soLuong` = tổng số ly có gọi topping; `doanhThu` = Σ donGiaTopping × số ly. Gom theo mã topping, `tenTopping` là tên hiện tại.'
+      parameters:
+        - $ref: '#/components/parameters/TuNgay'
+        - $ref: '#/components/parameters/DenNgay'
+        - { name: soLuong, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 10 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ToppingBanChay' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /bao-cao/gio-cao-diem:
     get:
@@ -1198,12 +1264,20 @@ components:
         tenNguyenLieu: { type: string }
         maDonHang: { type: integer, nullable: true }
         maNguoiDung: { type: integer, nullable: true }
+        tenNguoiDung: { type: string, nullable: true, example: Chủ quán, description: 'Họ tên người thực hiện; null với dòng TieuHaoTheoDon do hệ thống ghi' }
         loaiGiaoDich: { type: string, enum: [NhapHang, XuatHuy, TieuHaoTheoDon] }
         soLuongThayDoi: { type: number, example: -40 }
         thoiGian: { type: string, format: date-time }
         ghiChu: { type: string, nullable: true }
 
     # ---------------------------------------------------------- Báo cáo
+    ToppingBanChay:
+      type: object
+      properties:
+        maTopping: { type: integer, example: 1 }
+        tenTopping: { type: string, example: Trân châu }
+        soLuong: { type: integer, example: 37, description: Tổng số ly có gọi topping }
+        doanhThu: { type: number, example: 185000 }
     BaoCaoDoanhThu:
       type: object
       properties:

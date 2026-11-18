@@ -122,6 +122,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.SoLuongThayDoi).HasColumnType("decimal(12,2)");
             e.Property(x => x.ThoiGian).HasColumnType("datetime");
             e.HasOne(x => x.NguyenLieu).WithMany().HasForeignKey(x => x.MaNguyenLieu);
+            e.HasOne(x => x.NguoiDung).WithMany().HasForeignKey(x => x.MaNguoiDung); // FK_LichSuKho_NguoiDung (đã có trong DB)
         });
     }
 }

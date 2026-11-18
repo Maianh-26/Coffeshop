@@ -368,6 +368,41 @@ Content-Type: application/json
 GET {{host}}/don-hang?trangThaiPhucVu=PREPARING
 Authorization: Bearer {{tokenNV}}
 
+### ------------------------------------------------------------ SỬA MÓN, SẮP XẾP, TÌM KIẾM
+### 8.15 Sửa món đơn 9 (PENDING, chưa SERVED): thay TOÀN BỘ món, tổng tiền tính lại, giá KM theo giờ tạo đơn.
+###      phuongThucThanhToan = null → giữ nguyên. Đơn đã thanh toán / hủy / SERVED → 409; món hết → 422.
+PUT {{host}}/don-hang/9
+Authorization: Bearer {{tokenNV}}
+Content-Type: application/json
+
+{
+  "phuongThucThanhToan": null,
+  "chiTiet": [
+    { "maChiTietMon": 3, "soLuong": 2, "ghiChu": "Ít đá", "toppings": [3] }
+  ]
+}
+
+### 8.16 Sửa đơn đã thanh toán → 409 CONFLICT
+PUT {{host}}/don-hang/1
+Authorization: Bearer {{tokenNV}}
+Content-Type: application/json
+
+{
+  "chiTiet": [ { "maChiTietMon": 3, "soLuong": 1 } ]
+}
+
+### 8.17 Sắp xếp theo tổng tiền giảm dần (sắp trên toàn bộ danh sách trước khi phân trang)
+GET {{host}}/don-hang?sapXep=-tongTien&page=1&limit=10
+Authorization: Bearer {{tokenNV}}
+
+### 8.18 Tìm đơn: mã bắt đầu bằng "1" HOẶC số nhận món = 1
+GET {{host}}/don-hang?timKiem=1
+Authorization: Bearer {{tokenNV}}
+
+### 8.19 sapXep sai giá trị → 400 VALIDATION_ERROR
+GET {{host}}/don-hang?sapXep=ngay
+Authorization: Bearer {{tokenNV}}
+
 ### ============================================================ 9. KHO
 ### Tồn kho + dự báo số ngày còn dùng
 GET {{host}}/nguyen-lieu
@@ -409,9 +444,13 @@ Content-Type: application/json
   "ghiChu": "Sữa hết hạn"
 }
 
-### Nhật ký kho
+### Nhật ký kho — dòng TieuHaoTheoDon có tenNguoiDung = null (hệ thống ghi)
 GET {{host}}/lich-su-kho?loaiGiaoDich=TieuHaoTheoDon&limit=20
-Authorization: Bearer {{tokenNV}}
+Authorization: Bearer {{tokenQL}}
+
+### Nhật ký nhập hàng — có tenNguoiDung (người nhập)
+GET {{host}}/lich-su-kho?loaiGiaoDich=NhapHang&limit=20
+Authorization: Bearer {{tokenQL}}
 
 ### ============================================================ 10. BÁO CÁO (QuanLy)
 ### Doanh thu theo GIỜ THU TIỀN (thoiGianThanhToan): đơn tạo 23:50 thu 00:10 hôm sau → tính hôm sau.
@@ -429,6 +468,14 @@ Authorization: Bearer {{tokenQL}}
 
 ###
 GET {{host}}/bao-cao/mon-ban-chay?soLuong=5
+Authorization: Bearer {{tokenQL}}
+
+### Topping bán chạy (đơn PAID theo giờ thu tiền): soLuong = số ly có gọi topping
+GET {{host}}/bao-cao/topping-ban-chay?tuNgay=2026-11-01T00:00:00&denNgay=2026-11-30T23:59:59&soLuong=5
+Authorization: Bearer {{tokenQL}}
+
+### soLuong ngoài 1–50 → 400
+GET {{host}}/bao-cao/topping-ban-chay?soLuong=0
 Authorization: Bearer {{tokenQL}}
 
 ###

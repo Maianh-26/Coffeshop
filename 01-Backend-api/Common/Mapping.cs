@@ -48,8 +48,10 @@ public static class Mapping
     public static CongThucDongDto ToDto(this CongThucMon c) =>
         new(c.MaCongThuc, c.MaNguyenLieu, c.NguyenLieu?.TenNguyenLieu ?? "", c.NguyenLieu?.DonViTinh ?? "", c.LuongSuDung);
 
+    /// <summary>Cần Include: NguyenLieu, NguoiDung.</summary>
     public static LichSuKhoDto ToDto(this LichSuKho l) =>
         new(l.MaLichSu, l.MaNguyenLieu, l.NguyenLieu?.TenNguyenLieu ?? "", l.MaDonHang, l.MaNguoiDung,
+            l.NguoiDung?.HoTen,
             l.LoaiGiaoDich, l.SoLuongThayDoi, l.ThoiGian, l.GhiChu);
 
     /// <summary>Cần Include: NguoiDung, NguoiThu, ChiTiets.Toppings (dùng DonHangService.Query()).</summary>

@@ -165,6 +165,7 @@ public class LichSuKho
     public DateTime ThoiGian { get; set; }
     public string? GhiChu { get; set; }
     public NguyenLieu? NguyenLieu { get; set; }
+    public NguoiDung? NguoiDung { get; set; }            // Người thực hiện (null: TieuHaoTheoDon do hệ thống ghi)
 }
 
 // ============================================================ HẰNG SỐ

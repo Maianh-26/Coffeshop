@@ -83,7 +83,7 @@ public class KhoController(AppDbContext db, KhoService kho) : ControllerBase
     [HttpGet("lich-su-kho")]
     public async Task<Paged<LichSuKhoDto>> LichSu([FromQuery] LichSuKhoQuery q)
     {
-        var query = db.LichSuKhos.Include(l => l.NguyenLieu).AsQueryable();
+        var query = db.LichSuKhos.AsNoTracking().Include(l => l.NguyenLieu).Include(l => l.NguoiDung).AsQueryable();
         if (q.MaNguyenLieu is { } nl) query = query.Where(l => l.MaNguyenLieu == nl);
         if (q.LoaiGiaoDich is not null) query = query.Where(l => l.LoaiGiaoDich == q.LoaiGiaoDich);
         if (q.TuNgay is { } tu) query = query.Where(l => l.ThoiGian >= tu);
