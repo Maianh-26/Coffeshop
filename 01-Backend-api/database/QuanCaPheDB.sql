@@ -35,10 +35,17 @@ CREATE TABLE NguoiDung (
     TenDangNhap VARCHAR(50) NOT NULL UNIQUE,
     MatKhau VARCHAR(255) NOT NULL, -- Mật khẩu băm (BCrypt/Argon2)[cite: 6]
     HoTen NVARCHAR(100) NOT NULL,
-    Email VARCHAR(100) NOT NULL UNIQUE, -- Khôi phục mật khẩu[cite: 6]
+    Email VARCHAR(100) NULL,  -- Không bắt buộc; duy nhất khi có giá trị (UX_NguoiDung_Email bên dưới)
     VaiTro NVARCHAR(50) NOT NULL DEFAULT N'NhanVien', -- 'QuanLy' (Chủ quán) hoặc 'NhanVien' (Thu ngân/Pha chế)
-    TrangThai BIT NOT NULL DEFAULT 1 -- 1: Hoạt động, 0: Khóa tài khoản
+    TrangThai BIT NOT NULL DEFAULT 1, -- 1: Hoạt động, 0: Khóa tài khoản
+    DaXoa BIT NOT NULL CONSTRAINT DF_NguoiDung_DaXoa DEFAULT 0 -- 1: Đã xóa (xóa mềm: TenDangNhap → '<cũ>#xoa<id>', Email → NULL)
 );
+-- Email duy nhất khi có giá trị (nhiều tài khoản không có email). Cần QUOTED_IDENTIFIER ON (sqlcmd -I).
+CREATE UNIQUE NONCLUSTERED INDEX UX_NguoiDung_Email ON NguoiDung (Email) WHERE Email IS NOT NULL;
+-- DB tạo mới không có tài khoản "xóa tạm" cũ → đánh dấu sẵn để patch DongBoWebAdmin_20261118.sql
+-- không bao giờ chuyển tài khoản bị khóa (PATCH trangThai=false) thành đã xóa.
+EXEC sys.sp_addextendedproperty @name = N'DongBo_Dot3_DaChuyenTaiKhoanKhoa', @value = N'DB tạo mới — không cần chuyển',
+    @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'NguoiDung';
 
 -- ----------------------------------------------------------------------------
 -- KHỐI 2: DANH MỤC, TÊN MÓN, KÍCH CỠ, TOPPING & KHUYẾN MÃI

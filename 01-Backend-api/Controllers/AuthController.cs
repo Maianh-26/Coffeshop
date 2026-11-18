@@ -22,7 +22,9 @@ public class AuthController(AppDbContext db, TokenService tokens) : ControllerBa
     public async Task<DangNhapResponse> DangNhap(DangNhapRequest req)
     {
         var user = await db.NguoiDungs.FirstOrDefaultAsync(u => u.TenDangNhap == req.TenDangNhap);
-        if (user is null || !Passwords.Verify(req.MatKhau, user.MatKhau))
+        // Tài khoản đã xóa trả giống hệt sai mật khẩu (không tiết lộ tài khoản từng tồn tại).
+        // Kiểm tra DaXoa trước TrangThai vì tài khoản đã xóa cũng có TrangThai = 0.
+        if (user is null || user.DaXoa || !Passwords.Verify(req.MatKhau, user.MatKhau))
             throw new ApiException(401, "UNAUTHORIZED", "Tên đăng nhập hoặc mật khẩu không đúng");
         if (!user.TrangThai) throw ApiException.Forbidden("Tài khoản đã bị khóa, liên hệ quản lý");
         var (token, hetHan) = tokens.Create(user);
@@ -47,7 +49,7 @@ public class AuthController(AppDbContext db, TokenService tokens) : ControllerBa
     private async Task<NguoiDung> HienTai()
     {
         var user = await db.NguoiDungs.FindAsync(User.MaNguoiDung());
-        if (user is null || !user.TrangThai) throw new ApiException(401, "UNAUTHORIZED", "Tài khoản không còn hoạt động");
+        if (user is null || user.DaXoa || !user.TrangThai) throw new ApiException(401, "UNAUTHORIZED", "Tài khoản không còn hoạt động");
         return user;
     }
 }

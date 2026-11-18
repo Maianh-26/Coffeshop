@@ -54,8 +54,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/DangNhapResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: Tài khoản bị khóa (TrangThai = 0), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { description: 'Sai tên đăng nhập / mật khẩu, hoặc tài khoản đã bị xóa (trả giống hệt sai mật khẩu)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { description: Tài khoản bị khóa (TrangThai = 0, chưa xóa), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /auth/toi:
     get:
@@ -84,7 +84,7 @@ paths:
   /nguoi-dung:
     get:
       tags: [Người dùng]
-      summary: Danh sách tài khoản
+      summary: Danh sách tài khoản (không gồm tài khoản đã xóa)
       parameters:
         - { name: vaiTro, in: query, schema: { $ref: '#/components/schemas/VaiTro' } }
         - { name: trangThai, in: query, schema: { type: boolean } }
@@ -95,12 +95,16 @@ paths:
     post:
       tags: [Người dùng]
       summary: Tạo tài khoản nhân viên — mật khẩu được băm BCrypt
+      description: |
+        `email` không bắt buộc: bỏ trường hoặc gửi `null` (server cũng chấp nhận chuỗi rỗng như không có email).
+        Tên đăng nhập của tài khoản đã xóa được giải phóng → tạo lại được cùng tên.
+        409 khi trùng tên đăng nhập hoặc trùng email (không phân biệt hoa thường).
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/NguoiDungTaoRequest' }
-            example: { tenDangNhap: thungan2, matKhau: '123456', hoTen: 'Nguyễn Văn B', email: 'b@coffee.vn', vaiTro: NhanVien }
+            example: { tenDangNhap: thungan2, matKhau: '123456', hoTen: 'Nguyễn Văn B', vaiTro: NhanVien }
       responses:
         '201': { description: Đã tạo, content: { application/json: { schema: { $ref: '#/components/schemas/NguoiDung' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -111,13 +115,36 @@ paths:
     parameters: [{ $ref: '#/components/parameters/Id' }]
     get:
       tags: [Người dùng]
-      summary: Chi tiết tài khoản
+      summary: Chi tiết tài khoản (tài khoản đã xóa → 404)
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/NguoiDung' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Người dùng]
+      summary: Xóa tài khoản (xóa mềm, giải phóng tên đăng nhập)
+      description: |
+        Đặt `DaXoa = 1`, `TrangThai = 0`, `Email = NULL`, đổi `TenDangNhap` thành `<tên cũ>#xoa<id>`
+        (cắt bớt tên cũ nếu dài) để **tạo lại được tài khoản cùng tên đăng nhập**.
+        Giữ `HoTen` → đơn hàng / lịch sử kho cũ vẫn hiện đúng tên người tạo / thu tiền.
+        Tài khoản đã xóa không còn trong danh sách, không đăng nhập được (401), token cũ bị 401 ngay.
+        Khác với khóa (`PATCH trangThai=false`): khóa vẫn hiện trong danh sách và mở lại được.
+      responses:
+        '204': { description: Đã xóa }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Xóa chính mình hoặc xóa Quản lý cuối cùng còn hoạt động
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: CONFLICT, message: Không thể xóa tài khoản của chính mình } }
     patch:
       tags: [Người dùng]
-      summary: Sửa thông tin / đổi vai trò / khóa tài khoản / đặt lại mật khẩu
+      summary: Sửa thông tin / đổi vai trò / khóa tài khoản / đặt lại mật khẩu (tài khoản đã xóa → 404)
+      description: |
+        Đổi vai trò hoặc khóa tài khoản: token đang dùng của tài khoản đó bị 401 ngay ở request kế tiếp
+        (phải đăng nhập lại để nhận quyền mới).
       requestBody:
         required: true
         content:
@@ -816,7 +843,7 @@ components:
 
   responses:
     BadRequest: { description: Dữ liệu không hợp lệ (VALIDATION_ERROR / BAD_REQUEST), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-    Unauthorized: { description: Chưa đăng nhập / token sai, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthorized: { description: 'Chưa đăng nhập / token sai / hết hạn, hoặc tài khoản của token đã bị xóa, bị khóa hay đổi vai trò (phải đăng nhập lại)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Forbidden: { description: Không đủ quyền, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     NotFound: { description: Không tìm thấy, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Conflict: { description: Xung đột trạng thái / trùng dữ liệu, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
@@ -863,9 +890,9 @@ components:
         maNguoiDung: { type: integer, example: 1 }
         tenDangNhap: { type: string, example: quanly }
         hoTen: { type: string, example: Chủ quán }
-        email: { type: string, example: quanly@coffee.vn }
+        email: { type: string, nullable: true, example: quanly@coffee.vn, description: 'null = không có email' }
         vaiTro: { $ref: '#/components/schemas/VaiTro' }
-        trangThai: { type: boolean, description: 'true = hoạt động, false = bị khóa' }
+        trangThai: { type: boolean, description: 'true = hoạt động, false = bị khóa (tài khoản đã xóa không được trả về)' }
     DoiMatKhauRequest:
       type: object
       required: [matKhauCu, matKhauMoi]
@@ -874,12 +901,12 @@ components:
         matKhauMoi: { type: string, minLength: 6 }
     NguoiDungTaoRequest:
       type: object
-      required: [tenDangNhap, matKhau, hoTen, email, vaiTro]
+      required: [tenDangNhap, matKhau, hoTen, vaiTro]
       properties:
         tenDangNhap: { type: string, pattern: '^[a-zA-Z0-9_.]{3,50}$' }
         matKhau: { type: string, minLength: 6 }
         hoTen: { type: string, maxLength: 100 }
-        email: { type: string, format: email, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 100, nullable: true, description: 'Không bắt buộc — bỏ trường hoặc gửi null nếu không có email. (Server nới lỏng thêm: chuỗi rỗng cũng được coi là không có email, ngoài schema)' }
         vaiTro: { $ref: '#/components/schemas/VaiTro' }
     NguoiDungCapNhatRequest:
       type: object

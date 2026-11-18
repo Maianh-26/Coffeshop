@@ -47,7 +47,7 @@ Content-Type: application/json
 GET {{host}}/nguoi-dung?vaiTro=NhanVien
 Authorization: Bearer {{tokenQL}}
 
-###
+### Tạo tài khoản — email KHÔNG bắt buộc (bỏ trường, null hoặc "" đều được)
 POST {{host}}/nguoi-dung
 Authorization: Bearer {{tokenQL}}
 Content-Type: application/json
@@ -56,17 +56,48 @@ Content-Type: application/json
   "tenDangNhap": "thungan2",
   "matKhau": "123456",
   "hoTen": "Nguyễn Văn B",
-  "email": "b@coffee.vn",
   "vaiTro": "NhanVien"
 }
 
-### Khóa tài khoản (trangThai = false)
+### Tạo tài khoản có email (trùng email, kể cả khác hoa thường → 409)
+POST {{host}}/nguoi-dung
+Authorization: Bearer {{tokenQL}}
+Content-Type: application/json
+
+{
+  "tenDangNhap": "thungan3",
+  "matKhau": "123456",
+  "hoTen": "Trần Thị C",
+  "email": "c@coffee.vn",
+  "vaiTro": "NhanVien"
+}
+
+### Xóa tài khoản (xóa mềm) → 204. Tên đăng nhập được giải phóng: tạo lại "thungan2" được ngay.
+### Token cũ của tài khoản bị xóa → 401 ở mọi API. Gọi lần 2 → 404.
+DELETE {{host}}/nguoi-dung/3
+Authorization: Bearer {{tokenQL}}
+
+### Tự xóa chính mình → 409 CONFLICT
+DELETE {{host}}/nguoi-dung/1
+Authorization: Bearer {{tokenQL}}
+
+### Khóa tài khoản (trangThai = false) — vẫn hiện trong danh sách, mở lại được; token cũ bị 401 ngay
+### (Web Admin không dùng khóa, chỉ dùng Xóa)
 PATCH {{host}}/nguoi-dung/3
 Authorization: Bearer {{tokenQL}}
 Content-Type: application/json
 
 {
   "trangThai": false
+}
+
+### Đổi vai trò → token cũ của tài khoản đó bị 401, phải đăng nhập lại để nhận quyền mới
+PATCH {{host}}/nguoi-dung/3
+Authorization: Bearer {{tokenQL}}
+Content-Type: application/json
+
+{
+  "vaiTro": "QuanLy"
 }
 
 ### ============================================================ 3. DANH MỤC & KÍCH THƯỚC

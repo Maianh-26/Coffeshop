@@ -121,7 +121,7 @@ Lần chạy đầu, nếu bảng `NguoiDung` trống, API tự thêm **dữ li�
 |---|---|---|---|
 | Hệ thống | `GET /health` | 🌐 | |
 | Xác thực | `POST /auth/dang-nhap` · `GET /auth/toi` · `POST /auth/doi-mat-khau` | 🌐/👤 | NguoiDung |
-| Người dùng | `GET, POST /nguoi-dung` · `GET, PATCH /nguoi-dung/{id}` | 👑 | NguoiDung |
+| Người dùng | `GET, POST /nguoi-dung` · `GET, PATCH, DELETE /nguoi-dung/{id}` (DELETE = xóa mềm, giải phóng tên đăng nhập) | 👑 | NguoiDung |
 | Danh mục | `GET /danh-muc` · `GET /danh-muc/{id}` | 🌐 | DanhMuc |
 | | `POST /danh-muc` · `PUT, DELETE /danh-muc/{id}` | 👑 | |
 | Kích thước | `GET /kich-thuoc` 🌐 · `POST /kich-thuoc` · `PUT, DELETE /kich-thuoc/{ma}` 👑 | | KichThuoc |

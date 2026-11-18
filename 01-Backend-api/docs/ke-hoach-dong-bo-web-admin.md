@@ -134,7 +134,7 @@ Chỉ làm khi chủ quán xác nhận. Hợp đồng đã đủ chi tiết, ư�
 - [x] Đợt 0: script patch khung, G1 middleware (18/11/2026, reviewer PASS)
 - [x] Đợt 1: A1, A2, A3, A5 (`trangThaiPhucVu`), sp tạo lại với `QUOTED_IDENTIFIER ON` (18/11/2026, reviewer PASS)
 - [x] Đợt 2: A6, C1 (18/11/2026, reviewer PASS)
-- [ ] Đợt 3: B1, B2, G2, G4, G5
+- [x] Đợt 3: B1, B2, G2 (kiểm cả vai trò), G4, G5 + chuyển tài khoản `TrangThai = 0` cũ thành đã xóa (18/11/2026, reviewer PASS, security-review không có finding)
 - [ ] Đợt 4: A4, A5 (`sapXep`, `timKiem`), C2a, C2b, C3
 - [ ] `QuanCaPheDB.sql` cập nhật cho DB tạo mới sau mỗi đợt
 - [ ] `openapi.yaml` + `CoffeeShop.Api.http` sau mỗi đợt

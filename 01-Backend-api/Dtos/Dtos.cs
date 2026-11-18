@@ -40,7 +40,20 @@ public class DangNhapRequest
     [Required, MinLength(1)] public string MatKhau { get; set; } = "";
 }
 
-public record NguoiDungDto(int MaNguoiDung, string TenDangNhap, string HoTen, string Email, string VaiTro, bool TrangThai);
+public record NguoiDungDto(int MaNguoiDung, string TenDangNhap, string HoTen, string? Email, string VaiTro, bool TrangThai);
+
+/// <summary>
+/// Email không bắt buộc: null, chuỗi rỗng hoặc toàn khoảng trắng đều hợp lệ (= không có email);
+/// có giá trị thì phải đúng định dạng email.
+/// </summary>
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class EmailHoacTrongAttribute : ValidationAttribute
+{
+    private static readonly EmailAddressAttribute Email = new();
+    public EmailHoacTrongAttribute() : base("Email không hợp lệ") { }
+    public override bool IsValid(object? value) =>
+        value is null || value is string s && (string.IsNullOrWhiteSpace(s) || Email.IsValid(s.Trim()));
+}
 public record DangNhapResponse(string Token, DateTime HetHan, NguoiDungDto NguoiDung);
 
 public class DoiMatKhauRequest
@@ -54,7 +67,8 @@ public class NguoiDungTaoRequest
     [Required, RegularExpression("^[a-zA-Z0-9_.]{3,50}$")] public string TenDangNhap { get; set; } = "";
     [Required, StringLength(100, MinimumLength = 6)] public string MatKhau { get; set; } = "";
     [Required, StringLength(100, MinimumLength = 1)] public string HoTen { get; set; } = "";
-    [Required, EmailAddress, StringLength(100)] public string Email { get; set; } = "";
+    /// <summary>Không bắt buộc (null / "" = không có email)</summary>
+    [EmailHoacTrong, StringLength(100)] public string? Email { get; set; }
     [Required, AllowedValues("QuanLy", "NhanVien")] public string VaiTro { get; set; } = "NhanVien";
 }
 

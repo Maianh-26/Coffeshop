@@ -8,9 +8,11 @@ public class NguoiDung
     public string TenDangNhap { get; set; } = "";
     public string MatKhau { get; set; } = "";          // BCrypt hash
     public string HoTen { get; set; } = "";
-    public string Email { get; set; } = "";
+    public string? Email { get; set; }                   // Không bắt buộc; duy nhất khi có giá trị
     public string VaiTro { get; set; } = VaiTros.NhanVien;
     public bool TrangThai { get; set; } = true;          // true: hoạt động, false: bị khóa
+    /// <summary>Xóa mềm: không hiện, không đăng nhập; TenDangNhap đã đổi thành "&lt;cũ&gt;#xoa&lt;id&gt;", Email = null.</summary>
+    public bool DaXoa { get; set; }
 }
 
 // ============================================================ KHỐI 2: MENU
