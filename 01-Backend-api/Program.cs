@@ -13,6 +13,8 @@ var config = builder.Configuration;
 var jwt = config.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
 if (jwt.Secret.Length < 32) throw new InvalidOperationException("Jwt:Secret phải dài tối thiểu 32 ký tự (appsettings.json)");
 builder.Services.AddSingleton(jwt);
+// Đánh dấu trong HttpContext.Items: token bị từ chối vì tài khoản không còn hiệu lực (để trả message rõ ràng)
+const string PhienHetHieuLuc = "CoffeeShop.PhienHetHieuLuc";
 
 // ---------------------------------------------------------------- Database: SQL Server — QuanCaPheDB
 builder.Services.AddDbContext<AppDbContext>(o =>
@@ -50,10 +52,29 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         // 401/403 cũng trả JSON đúng định dạng lỗi chung
         o.Events = new JwtBearerEvents
         {
+            // Token hợp lệ về chữ ký vẫn bị từ chối nếu tài khoản đã bị xóa / khóa, hoặc vai trò trong token
+            // khác vai trò hiện tại (bị hạ / nâng quyền) → 401, client đăng nhập lại để nhận quyền mới.
+            // Một truy vấn khóa chính mỗi request có token; endpoint ẩn danh (tablet đặt món) không bị chặn.
+            OnTokenValidated = async ctx =>
+            {
+                var maNguoiDung = ctx.Principal?.MaNguoiDung();
+                var vaiTro = ctx.Principal?.FindFirst("role")?.Value;
+                var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                var conHieuLuc = maNguoiDung is { } id && vaiTro is not null && await db.NguoiDungs.AsNoTracking()
+                    .AnyAsync(u => u.MaNguoiDung == id && u.TrangThai && !u.DaXoa && u.VaiTro == vaiTro);
+                if (!conHieuLuc)
+                {
+                    ctx.HttpContext.Items[PhienHetHieuLuc] = true;
+                    ctx.Fail("Tài khoản đã bị xóa, bị khóa hoặc đổi vai trò");
+                }
+            },
             OnChallenge = ctx =>
             {
                 ctx.HandleResponse();
-                return ErrorHandlingMiddleware.Write(ctx.HttpContext, 401, "UNAUTHORIZED", "Chưa đăng nhập hoặc token không hợp lệ");
+                return ErrorHandlingMiddleware.Write(ctx.HttpContext, 401, "UNAUTHORIZED",
+                    ctx.HttpContext.Items.ContainsKey(PhienHetHieuLuc)
+                        ? "Phiên đăng nhập không còn hiệu lực (tài khoản đã bị xóa, bị khóa hoặc đổi vai trò). Vui lòng đăng nhập lại."
+                        : "Chưa đăng nhập hoặc token không hợp lệ");
             },
             OnForbidden = ctx =>
                 ErrorHandlingMiddleware.Write(ctx.HttpContext, 403, "FORBIDDEN", "Bạn không có quyền thực hiện thao tác này"),

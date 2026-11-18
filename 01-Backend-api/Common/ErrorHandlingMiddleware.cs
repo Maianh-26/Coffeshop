@@ -17,7 +17,7 @@ public class ErrorHandlingMiddleware(RequestDelegate next, ILogger<ErrorHandling
         {
             await Write(ctx, ex.Status, ex.Code, ex.Message, ex.Details);
         }
-        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE") == true)
+        catch (DbUpdateException ex) when (DbErrors.LaTrungKhoa(ex))
         {
             await Write(ctx, 409, "CONFLICT", "Dữ liệu bị trùng (mã/tên/email đã tồn tại)");
         }

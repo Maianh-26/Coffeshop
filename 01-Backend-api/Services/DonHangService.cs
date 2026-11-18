@@ -10,6 +10,7 @@ public class DonHangService(AppDbContext db)
 {
     public IQueryable<DonHang> Query() => db.DonHangs
         .Include(d => d.NguoiDung)
+        .Include(d => d.NguoiThu)
         .Include(d => d.ChiTiets).ThenInclude(c => c.Toppings)
         .AsSplitQuery();
 
@@ -104,8 +105,12 @@ public class DonHangService(AppDbContext db)
     }
 
     // ------------------------------------------------------------------ THANH TOÁN
-    /// <summary>Cập nhật phương thức rồi gọi stored procedure sp_ThanhToanVaTruKho (đổi PAID + trừ kho + ghi LichSuKho).</summary>
-    public async Task<ThanhToanResponse> ThanhToan(int id, ThanhToanRequest req)
+    /// <summary>
+    /// Cập nhật phương thức rồi gọi stored procedure sp_ThanhToanVaTruKho
+    /// (đổi PAID + ghi giờ thu tiền, người thu tiền + trừ kho + ghi LichSuKho, cùng một transaction).
+    /// </summary>
+    /// <param name="maNguoiThu">Người đang đăng nhập bấm thu tiền (lấy từ token, không nhận từ client).</param>
+    public async Task<ThanhToanResponse> ThanhToan(int id, ThanhToanRequest req, int? maNguoiThu)
     {
         var don = await Tim(id);
         if (don.TrangThaiThanhToan != TrangThais.Pending)
@@ -117,7 +122,7 @@ public class DonHangService(AppDbContext db)
         await db.SaveChangesAsync();
         try
         {
-            await db.Database.ExecuteSqlInterpolatedAsync($"EXEC sp_ThanhToanVaTruKho @MaDonHang = {id}");
+            await db.Database.ExecuteSqlInterpolatedAsync($"EXEC sp_ThanhToanVaTruKho @MaDonHang = {id}, @MaNguoiThu = {maNguoiThu}");
         }
         catch (SqlException ex)
         {
@@ -133,6 +138,91 @@ public class DonHangService(AppDbContext db)
             .ToListAsync();
         var tienThua = req.TienKhachDua is { } t ? t - daThanhToan.TongTien : 0;
         return new ThanhToanResponse(daThanhToan.ToDto(), tienThua, canhBao);
+    }
+
+    // ------------------------------------------------------------------ PHỤC VỤ TẠI QUẦY
+    /// <summary>Đơn đang giữ số = có số + chưa phục vụ xong + chưa hủy (trùng điều kiện index UX_DonHang_SoNhanMon_DangGiu).</summary>
+    private IQueryable<DonHang> DonDangGiuSo(int soNhanMon) => db.DonHangs.AsNoTracking().Where(d =>
+        d.SoNhanMon == soNhanMon
+        && (d.TrangThaiPhucVu == TrangThaiPhucVus.Waiting || d.TrangThaiPhucVu == TrangThaiPhucVus.Preparing)
+        && d.TrangThaiThanhToan != TrangThais.Cancelled);
+
+    private static ApiException SoDangDung(int so, int maDonGiu) => new(409, "SO_NHAN_MON_DANG_DUNG",
+        $"Số {so} đang được dùng cho đơn #{maDonGiu} (chưa phục vụ xong). Hãy chọn số khác.",
+        new { soNhanMon = so, maDonHangDangGiu = maDonGiu });
+
+    /// <summary>
+    /// Gán / đổi / bỏ (null) số nhận món. Chỉ khi đơn chưa phục vụ xong và chưa hủy.
+    /// Kiểm tra trùng trước, và vẫn bắt lỗi unique index cho trường hợp hai máy gán cùng số cùng lúc.
+    /// </summary>
+    public async Task<DonHang> GanSoNhanMon(int id, int? soNhanMon)
+    {
+        var don = await Tim(id);
+        if (don.TrangThaiThanhToan == TrangThais.Cancelled || don.TrangThaiPhucVu == TrangThaiPhucVus.Served)
+            throw ApiException.Conflict("Đơn đã phục vụ hoặc đã hủy, không đổi được số nhận món");
+        if (don.SoNhanMon == soNhanMon) return don; // gửi lại đúng số đang có → không tính là trùng
+
+        if (soNhanMon is { } so)
+        {
+            var maDonGiu = await DonDangGiuSo(so).Where(d => d.MaDonHang != id).Select(d => (int?)d.MaDonHang).FirstOrDefaultAsync();
+            if (maDonGiu is { } ma) throw SoDangDung(so, ma);
+        }
+
+        // Cập nhật có điều kiện: máy khác vừa chuyển SERVED / hủy đơn giữa lúc kiểm tra và lúc ghi → 0 dòng → 409
+        int soDong;
+        try
+        {
+            soDong = await db.DonHangs
+                .Where(d => d.MaDonHang == id && d.TrangThaiPhucVu != TrangThaiPhucVus.Served && d.TrangThaiThanhToan != TrangThais.Cancelled)
+                .ExecuteUpdateAsync(s => s.SetProperty(d => d.SoNhanMon, soNhanMon));
+        }
+        catch (SqlException ex) when (soNhanMon is not null && DbErrors.LaTrungKhoa(ex))
+        {
+            // Hai máy gán cùng số cùng lúc: unique index lọc chặn máy thứ hai
+            var soTrung = soNhanMon.Value;
+            var ma = await DonDangGiuSo(soTrung).Where(d => d.MaDonHang != id).Select(d => (int?)d.MaDonHang).FirstOrDefaultAsync();
+            throw ma is { } m ? SoDangDung(soTrung, m) : ApiException.Conflict($"Số {soTrung} đang được dùng cho đơn khác. Hãy chọn số khác.");
+        }
+        if (soDong == 0) throw ApiException.Conflict("Đơn đã phục vụ hoặc đã hủy, không đổi được số nhận món");
+
+        db.ChangeTracker.Clear();
+        return await Tim(id);
+    }
+
+    private static string TenPhucVu(string trangThai) => trangThai switch
+    {
+        TrangThaiPhucVus.Waiting => "Chờ chuẩn bị",
+        TrangThaiPhucVus.Preparing => "Đang chuẩn bị",
+        TrangThaiPhucVus.Served => "Đã phục vụ",
+        _ => trangThai,
+    };
+
+    /// <summary>Chỉ cho bước kế tiếp: WAITING → PREPARING → SERVED (không bỏ bước, không lùi). Không phụ thuộc thanh toán.</summary>
+    public async Task<DonHang> DoiTrangThaiPhucVu(int id, string trangThaiMoi)
+    {
+        var don = await Tim(id);
+        if (don.TrangThaiThanhToan == TrangThais.Cancelled) throw ApiException.Conflict("Đơn đã bị hủy");
+
+        var hienTai = don.TrangThaiPhucVu;
+        var buocKe = hienTai switch
+        {
+            TrangThaiPhucVus.Waiting => TrangThaiPhucVus.Preparing,
+            TrangThaiPhucVus.Preparing => TrangThaiPhucVus.Served,
+            _ => null,
+        };
+        if (trangThaiMoi != buocKe)
+            throw ApiException.Conflict(hienTai == TrangThaiPhucVus.Waiting && trangThaiMoi == TrangThaiPhucVus.Served
+                ? "Đơn chưa bắt đầu chuẩn bị, không thể xác nhận đã phục vụ"
+                : $"Đơn đang ở trạng thái {TenPhucVu(hienTai)}, không chuyển sang {TenPhucVu(trangThaiMoi)} được");
+
+        // Cập nhật có điều kiện: hai máy bấm cùng lúc thì chỉ một máy thành công
+        var soDong = await db.DonHangs
+            .Where(d => d.MaDonHang == id && d.TrangThaiPhucVu == hienTai && d.TrangThaiThanhToan != TrangThais.Cancelled)
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.TrangThaiPhucVu, trangThaiMoi));
+        if (soDong == 0) throw ApiException.Conflict("Đơn vừa được cập nhật ở máy khác, hãy tải lại");
+
+        db.ChangeTracker.Clear();
+        return await Tim(id);
     }
 
     // ------------------------------------------------------------------ HỦY / HOÀN TIỀN

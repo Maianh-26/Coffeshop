@@ -47,7 +47,7 @@ Content-Type: application/json
 GET {{host}}/nguoi-dung?vaiTro=NhanVien
 Authorization: Bearer {{tokenQL}}
 
-###
+### Tạo tài khoản — email KHÔNG bắt buộc (bỏ trường, null hoặc "" đều được)
 POST {{host}}/nguoi-dung
 Authorization: Bearer {{tokenQL}}
 Content-Type: application/json
@@ -56,17 +56,48 @@ Content-Type: application/json
   "tenDangNhap": "thungan2",
   "matKhau": "123456",
   "hoTen": "Nguyễn Văn B",
-  "email": "b@coffee.vn",
   "vaiTro": "NhanVien"
 }
 
-### Khóa tài khoản (trangThai = false)
+### Tạo tài khoản có email (trùng email, kể cả khác hoa thường → 409)
+POST {{host}}/nguoi-dung
+Authorization: Bearer {{tokenQL}}
+Content-Type: application/json
+
+{
+  "tenDangNhap": "thungan3",
+  "matKhau": "123456",
+  "hoTen": "Trần Thị C",
+  "email": "c@coffee.vn",
+  "vaiTro": "NhanVien"
+}
+
+### Xóa tài khoản (xóa mềm) → 204. Tên đăng nhập được giải phóng: tạo lại "thungan2" được ngay.
+### Token cũ của tài khoản bị xóa → 401 ở mọi API. Gọi lần 2 → 404.
+DELETE {{host}}/nguoi-dung/3
+Authorization: Bearer {{tokenQL}}
+
+### Tự xóa chính mình → 409 CONFLICT
+DELETE {{host}}/nguoi-dung/1
+Authorization: Bearer {{tokenQL}}
+
+### Khóa tài khoản (trangThai = false) — vẫn hiện trong danh sách, mở lại được; token cũ bị 401 ngay
+### (Web Admin không dùng khóa, chỉ dùng Xóa)
 PATCH {{host}}/nguoi-dung/3
 Authorization: Bearer {{tokenQL}}
 Content-Type: application/json
 
 {
   "trangThai": false
+}
+
+### Đổi vai trò → token cũ của tài khoản đó bị 401, phải đăng nhập lại để nhận quyền mới
+PATCH {{host}}/nguoi-dung/3
+Authorization: Bearer {{tokenQL}}
+Content-Type: application/json
+
+{
+  "vaiTro": "QuanLy"
 }
 
 ### ============================================================ 3. DANH MỤC & KÍCH THƯỚC
@@ -258,6 +289,8 @@ GET {{host}}/don-hang/1
 Authorization: Bearer {{tokenNV}}
 
 ### 8.6 Thanh toán → gọi sp_ThanhToanVaTruKho (PAID + trừ kho + ghi LichSuKho)
+###     Kết quả donHang có thoiGianThanhToan (lúc thu), maNguoiThu / tenNguoiThu (= tài khoản nhân viên đang đăng nhập).
+###     Gọi lại lần 2 trên cùng đơn → 409 CONFLICT (đơn không còn PENDING).
 POST {{host}}/don-hang/1/thanh-toan
 Authorization: Bearer {{tokenNV}}
 Content-Type: application/json
@@ -275,6 +308,65 @@ Content-Type: application/json
 {
   "lyDoHuy": "Khách đổi ý"
 }
+
+### ------------------------------------------------------------ PHỤC VỤ TẠI QUẦY (số nhận món + trạng thái phục vụ)
+### 8.8 Gán số nhận món 18 cho đơn 8 (đơn chưa phục vụ xong, chưa hủy)
+PUT {{host}}/don-hang/8/so-nhan-mon
+Authorization: Bearer {{tokenNV}}
+Content-Type: application/json
+
+{
+  "soNhanMon": 18
+}
+
+### 8.9 Gán tiếp số 18 cho đơn 9 → 409 SO_NHAN_MON_DANG_DUNG (details.maDonHangDangGiu = 8)
+PUT {{host}}/don-hang/9/so-nhan-mon
+Authorization: Bearer {{tokenNV}}
+Content-Type: application/json
+
+{
+  "soNhanMon": 18
+}
+
+### 8.10 Bỏ số nhận món của đơn 9
+PUT {{host}}/don-hang/9/so-nhan-mon
+Authorization: Bearer {{tokenNV}}
+Content-Type: application/json
+
+{
+  "soNhanMon": null
+}
+
+### 8.11 Đơn 8: WAITING → PREPARING
+PUT {{host}}/don-hang/8/trang-thai-phuc-vu
+Authorization: Bearer {{tokenNV}}
+Content-Type: application/json
+
+{
+  "trangThaiPhucVu": "PREPARING"
+}
+
+### 8.12 Đơn 9 đang WAITING mà chuyển thẳng SERVED → 409 CONFLICT (không được bỏ bước)
+PUT {{host}}/don-hang/9/trang-thai-phuc-vu
+Authorization: Bearer {{tokenNV}}
+Content-Type: application/json
+
+{
+  "trangThaiPhucVu": "SERVED"
+}
+
+### 8.13 Đơn 8: PREPARING → SERVED (số 18 được giải phóng, đơn khác dùng lại được)
+PUT {{host}}/don-hang/8/trang-thai-phuc-vu
+Authorization: Bearer {{tokenNV}}
+Content-Type: application/json
+
+{
+  "trangThaiPhucVu": "SERVED"
+}
+
+### 8.14 Danh sách đơn đang chuẩn bị (tự loại đơn đã hủy)
+GET {{host}}/don-hang?trangThaiPhucVu=PREPARING
+Authorization: Bearer {{tokenNV}}
 
 ### ============================================================ 9. KHO
 ### Tồn kho + dự báo số ngày còn dùng
@@ -322,7 +414,17 @@ GET {{host}}/lich-su-kho?loaiGiaoDich=TieuHaoTheoDon&limit=20
 Authorization: Bearer {{tokenNV}}
 
 ### ============================================================ 10. BÁO CÁO (QuanLy)
+### Doanh thu theo GIỜ THU TIỀN (thoiGianThanhToan): đơn tạo 23:50 thu 00:10 hôm sau → tính hôm sau.
+### tongSoDon / soDonChoThanhToan / soDonHuy theo giờ tạo đơn; soDonHoanTien theo gioHoanTien.
 GET {{host}}/bao-cao/doanh-thu?tuNgay=2026-11-01T00:00:00&denNgay=2026-11-30T23:59:59
+Authorization: Bearer {{tokenQL}}
+
+### Doanh thu trọn một ngày (web gửi denNgay = 23:59:59.997)
+GET {{host}}/bao-cao/doanh-thu?tuNgay=2026-11-18T00:00:00&denNgay=2026-11-18T23:59:59.997
+Authorization: Bearer {{tokenQL}}
+
+### Sai định dạng ngày → 400 VALIDATION_ERROR
+GET {{host}}/bao-cao/doanh-thu?tuNgay=hom-qua
 Authorization: Bearer {{tokenQL}}
 
 ###

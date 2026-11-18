@@ -11,7 +11,8 @@ CoffeeShop.Api/                   ← Thư mục gốc của project (mở thư 
 ├── database/
 │   ├── QuanCaPheDB.sql           ← Script tạo CSDL (đã sửa 1 lỗi UNIQUE, xem mục 6)
 │   ├── BoSoBan_ThuTuHienThi.sql  ← Chạy 1 lần nếu DB cũ còn cột SoBan / ThuTuHienThi
-│   └── FixCongThucUnique.sql     ← Chỉ dùng nếu DB đã tạo từ bản script gốc
+│   ├── FixCongThucUnique.sql     ← Chỉ dùng nếu DB đã tạo từ bản script gốc
+│   └── DongBoWebAdmin_20261118.sql ← Chạy cho DB đã tạo trước 18/11/2026 (số nhận món, trạng thái phục vụ…)
 ├── Data/                         ← Entity ánh xạ 1-1 với các bảng + DbContext + dữ liệu mẫu
 ├── Dtos/                         ← JSON đầu vào / đầu ra (khớp openapi.yaml)
 ├── Services/                     ← Nghiệp vụ: đặt món, thanh toán (gọi stored procedure), kho, gợi ý
@@ -38,6 +39,14 @@ sqlcmd -S .\SQLEXPRESS -E -C -I -f 65001 -i database\QuanCaPheDB.sql
 > ⚠️ Script **xóa và tạo lại** `QuanCaPheDB` nếu đã tồn tại. Có dữ liệu thật thì sao lưu trước.
 > Nếu DB của bạn đã tạo từ **bản script gốc** và không muốn xóa → chỉ chạy:
 > `sqlcmd -S .\SQLEXPRESS -E -C -I -i database\FixCongThucUnique.sql`
+>
+> DB đã có dữ liệu, tạo trước 18/11/2026 → chạy thêm patch đồng bộ Web Admin (giữ dữ liệu, chạy lại nhiều lần không sao).
+> **Bắt buộc có `-I`**, thiếu thì thanh toán sẽ lỗi vì index lọc:
+> `sqlcmd -S .\SQLEXPRESS -E -C -I -f 65001 -i database\DongBoWebAdmin_20261118.sql`
+>
+> ⚠️ Bảng `DonHang` có **index lọc**: mọi lệnh SQL tay ghi vào `DonHang` (UPDATE/INSERT/DELETE) phải chạy với
+> `SET QUOTED_IDENTIFIER ON`. `sqlcmd` mặc định là OFF → luôn thêm `-I`; SSMS mặc định ON nên không cần.
+> Thiếu thiết lập này lệnh sẽ báo lỗi *"UPDATE failed because the following SET options have incorrect settings: 'QUOTED_IDENTIFIER'"*.
 
 ### Bước 3. Kiểm tra chuỗi kết nối
 Mở `CoffeeShop.Api/appsettings.json`:
@@ -112,7 +121,7 @@ Lần chạy đầu, nếu bảng `NguoiDung` trống, API tự thêm **dữ li�
 |---|---|---|---|
 | Hệ thống | `GET /health` | 🌐 | |
 | Xác thực | `POST /auth/dang-nhap` · `GET /auth/toi` · `POST /auth/doi-mat-khau` | 🌐/👤 | NguoiDung |
-| Người dùng | `GET, POST /nguoi-dung` · `GET, PATCH /nguoi-dung/{id}` | 👑 | NguoiDung |
+| Người dùng | `GET, POST /nguoi-dung` · `GET, PATCH, DELETE /nguoi-dung/{id}` (DELETE = xóa mềm, giải phóng tên đăng nhập) | 👑 | NguoiDung |
 | Danh mục | `GET /danh-muc` · `GET /danh-muc/{id}` | 🌐 | DanhMuc |
 | | `POST /danh-muc` · `PUT, DELETE /danh-muc/{id}` | 👑 | |
 | Kích thước | `GET /kich-thuoc` 🌐 · `POST /kich-thuoc` · `PUT, DELETE /kich-thuoc/{ma}` 👑 | | KichThuoc |
@@ -127,6 +136,7 @@ Lần chạy đầu, nếu bảng `NguoiDung` trống, API tự thêm **dữ li�
 | Đơn hàng | `POST /don-hang` | 🌐 | DonHang, ChiTietDonHang, ChiTietDonHang_Topping |
 | | `GET /don-hang` · `GET /don-hang/{id}` · `POST /don-hang/{id}/thanh-toan` | 👤 | + **sp_ThanhToanVaTruKho** |
 | | `POST /don-hang/{id}/huy` | 👑 | |
+| | `PUT /don-hang/{id}/so-nhan-mon` · `PUT /don-hang/{id}/trang-thai-phuc-vu` | 👤 | DonHang.SoNhanMon, DonHang.TrangThaiPhucVu |
 | Kho | `GET /nguyen-lieu` · `GET /nguyen-lieu/{id}` · `POST …/nhap-kho` · `POST …/xuat-huy` · `GET /lich-su-kho` | 👑 | NguyenLieu, LichSuKho |
 | | `POST /nguyen-lieu` · `PATCH, DELETE /nguyen-lieu/{id}` | 👑 | |
 | Báo cáo | `GET /bao-cao/doanh-thu` · `/bao-cao/mon-ban-chay` · `/bao-cao/gio-cao-diem` | 👑 | DonHang |

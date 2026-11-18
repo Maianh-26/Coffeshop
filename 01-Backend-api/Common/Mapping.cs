@@ -52,9 +52,12 @@ public static class Mapping
         new(l.MaLichSu, l.MaNguyenLieu, l.NguyenLieu?.TenNguyenLieu ?? "", l.MaDonHang, l.MaNguoiDung,
             l.LoaiGiaoDich, l.SoLuongThayDoi, l.ThoiGian, l.GhiChu);
 
+    /// <summary>Cần Include: NguoiDung, NguoiThu, ChiTiets.Toppings (dùng DonHangService.Query()).</summary>
     public static DonHangDto ToDto(this DonHang d, bool kemChiTiet = true) =>
         new(d.MaDonHang, d.MaNguoiDung, d.NguoiDung?.HoTen, d.TongTien, d.PhuongThucThanhToan,
             d.TrangThaiThanhToan, d.ThoiGianTao, d.LyDoHuy, d.DaHoanTien, d.GioHoanTien,
+            d.SoNhanMon, d.TrangThaiPhucVu,
+            d.ThoiGianThanhToan, d.MaNguoiThu, d.NguoiThu?.HoTen,
             kemChiTiet
                 ? d.ChiTiets.OrderBy(c => c.MaChiTietDon).Select(c => new ChiTietDonDto(
                     c.MaChiTietDon, c.MaChiTietMon, c.TenMonLuu, c.DonGiaBan, c.SoLuong, c.GhiChu,
