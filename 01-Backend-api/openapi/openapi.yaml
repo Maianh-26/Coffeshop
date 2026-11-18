@@ -511,6 +511,10 @@ paths:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Limit'
         - { name: trangThai, in: query, schema: { $ref: '#/components/schemas/TrangThaiThanhToan' } }
+        - name: trangThaiPhucVu
+          in: query
+          description: Lọc theo trạng thái phục vụ; luôn loại đơn đã hủy (CANCELLED)
+          schema: { $ref: '#/components/schemas/TrangThaiPhucVu' }
         - $ref: '#/components/parameters/TuNgay'
         - $ref: '#/components/parameters/DenNgay'
       responses:
@@ -523,6 +527,7 @@ paths:
                 properties:
                   data: { type: array, items: { $ref: '#/components/schemas/DonHang' } }
                   meta: { $ref: '#/components/schemas/PhanTrang' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /don-hang/{id}:
@@ -539,8 +544,9 @@ paths:
       tags: [Đơn hàng]
       summary: Thanh toán (NhanVien, QuanLy) — gọi sp_ThanhToanVaTruKho
       description: |
-        Cập nhật `phuongThucThanhToan`, sau đó `EXEC sp_ThanhToanVaTruKho @MaDonHang`:
-        đơn → **PAID**, trừ NguyenLieu theo CongThucMon (món + topping), ghi LichSuKho `TieuHaoTheoDon`.
+        Cập nhật `phuongThucThanhToan`, sau đó `EXEC sp_ThanhToanVaTruKho @MaDonHang, @MaNguoiThu`:
+        đơn → **PAID**, ghi `thoiGianThanhToan` = lúc thu và `maNguoiThu` = người đang đăng nhập,
+        trừ NguyenLieu theo CongThucMon (món + topping), ghi LichSuKho `TieuHaoTheoDon` — tất cả trong một transaction.
         Response kèm `canhBaoKho` = các nguyên liệu đang dưới mức cảnh báo sau khi trừ.
       parameters: [{ $ref: '#/components/parameters/Id' }]
       requestBody:
@@ -572,6 +578,68 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+
+  /don-hang/{id}/so-nhan-mon:
+    put:
+      tags: [Đơn hàng]
+      summary: Gán / đổi / bỏ số nhận món (NhanVien, QuanLy)
+      description: |
+        Số trên bảng gỗ đưa khách (1–50). Gửi `soNhanMon: null` để bỏ số
+        (lưu ý: body `{}` không có trường `soNhanMon` cũng được hiểu là **bỏ số**).
+        Một số chỉ thuộc **một đơn đang giữ số** (`trangThaiPhucVu` WAITING/PREPARING và chưa hủy).
+        Đơn chuyển SERVED hoặc bị hủy thì số tự giải phóng (vẫn lưu trên đơn để tra cứu).
+        Gửi lại đúng số đơn đang có → 200. Đơn đã SERVED / CANCELLED → 409 CONFLICT.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SoNhanMonRequest' }
+            example: { soNhanMon: 18 }
+      responses:
+        '200': { description: Đã cập nhật, content: { application/json: { schema: { $ref: '#/components/schemas/DonHang' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Số đang được đơn khác giữ (SO_NHAN_MON_DANG_DUNG) hoặc đơn đã phục vụ / đã hủy (CONFLICT)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error:
+                  code: SO_NHAN_MON_DANG_DUNG
+                  message: 'Số 18 đang được dùng cho đơn #12 (chưa phục vụ xong). Hãy chọn số khác.'
+                  details: { soNhanMon: 18, maDonHangDangGiu: 12 }
+
+  /don-hang/{id}/trang-thai-phuc-vu:
+    put:
+      tags: [Đơn hàng]
+      summary: Chuyển trạng thái phục vụ (NhanVien, QuanLy)
+      description: |
+        Chỉ cho đúng bước kế tiếp: **WAITING → PREPARING → SERVED** (không bỏ bước, không lùi).
+        Độc lập với thanh toán: không bắt buộc thu tiền trước khi phục vụ. Đơn đã hủy → 409.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TrangThaiPhucVuRequest' }
+            example: { trangThaiPhucVu: PREPARING }
+      responses:
+        '200': { description: Đã cập nhật, content: { application/json: { schema: { $ref: '#/components/schemas/DonHang' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Đơn đã hủy / chuyển sai bước
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error:
+                  code: CONFLICT
+                  message: Đơn chưa bắt đầu chuẩn bị, không thể xác nhận đã phục vụ
 
   # ================================================================ KHO
   /nguyen-lieu:
@@ -680,7 +748,13 @@ paths:
   /bao-cao/doanh-thu:
     get:
       tags: [Báo cáo]
-      summary: Doanh thu — chỉ tính đơn PAID
+      summary: Doanh thu — chỉ tính đơn PAID, theo giờ thu tiền
+      description: |
+        Mỗi số liệu lọc theo mốc thời gian riêng (`tuNgay` so sánh `>=`, `denNgay` so sánh `<=`):
+        - `doanhThu`, `soDonDaThanhToan`, `giaTriDonTrungBinh`, `theoPhuongThuc`, `theoNgay` → **`thoiGianThanhToan`** của đơn PAID
+          (đơn tạo 23:50, thu tiền 00:10 hôm sau → tính vào hôm sau).
+        - `tongSoDon`, `soDonChoThanhToan`, `soDonHuy` → `thoiGianTao`.
+        - `soDonHoanTien` → `gioHoanTien`.
       parameters: [{ $ref: '#/components/parameters/TuNgay' }, { $ref: '#/components/parameters/DenNgay' }]
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/BaoCaoDoanhThu' } } } }
@@ -689,7 +763,7 @@ paths:
   /bao-cao/mon-ban-chay:
     get:
       tags: [Báo cáo]
-      summary: Món bán chạy
+      summary: Món bán chạy — đơn PAID, lọc theo giờ thu tiền
       parameters:
         - $ref: '#/components/parameters/TuNgay'
         - $ref: '#/components/parameters/DenNgay'
@@ -712,7 +786,7 @@ paths:
   /bao-cao/gio-cao-diem:
     get:
       tags: [Báo cáo]
-      summary: Số đơn & doanh thu theo 24 giờ — xếp ca, chọn giờ vàng
+      summary: Số đơn & doanh thu theo 24 giờ (giờ thu tiền) — xếp ca, chọn giờ vàng
       parameters: [{ $ref: '#/components/parameters/TuNgay' }, { $ref: '#/components/parameters/DenNgay' }]
       responses:
         '200':
@@ -768,6 +842,7 @@ components:
     VaiTro: { type: string, enum: [QuanLy, NhanVien] }
     TrangThaiThanhToan: { type: string, enum: [PENDING, PAID, CANCELLED] }
     PhuongThucThanhToan: { type: string, enum: [CASH, QR_TRANSFER] }
+    TrangThaiPhucVu: { type: string, enum: [WAITING, PREPARING, SERVED], description: 'Độc lập với trạng thái thanh toán; mặc định WAITING' }
 
     # ---------------------------------------------------------- NguoiDung
     DangNhapRequest:
@@ -990,6 +1065,11 @@ components:
         lyDoHuy: { type: string, nullable: true }
         daHoanTien: { type: boolean }
         gioHoanTien: { type: string, format: date-time, nullable: true }
+        soNhanMon: { type: integer, minimum: 1, maximum: 50, nullable: true, example: 18, description: 'Số trên bảng gỗ đưa khách; null = chưa nhập' }
+        trangThaiPhucVu: { $ref: '#/components/schemas/TrangThaiPhucVu' }
+        thoiGianThanhToan: { type: string, format: date-time, nullable: true, example: '2026-11-18T08:25:41', description: 'Lúc chuyển PAID; null khi chưa thu. Hủy đơn đã PAID (hoàn tiền) vẫn giữ' }
+        maNguoiThu: { type: integer, nullable: true, example: 2, description: 'Người bấm thu tiền; null với đơn cũ hoặc thu tự động' }
+        tenNguoiThu: { type: string, nullable: true, example: Nguyễn Văn Nhân Viên }
         chiTiet:
           type: array
           items:
@@ -1036,6 +1116,17 @@ components:
       required: [lyDoHuy]
       properties:
         lyDoHuy: { type: string, maxLength: 255 }
+    SoNhanMonRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        soNhanMon: { type: integer, minimum: 1, maximum: 50, nullable: true, description: 'null = bỏ số' }
+    TrangThaiPhucVuRequest:
+      type: object
+      additionalProperties: false
+      required: [trangThaiPhucVu]
+      properties:
+        trangThaiPhucVu: { type: string, enum: [PREPARING, SERVED] }
 
     # ---------------------------------------------------------- Kho
     NguyenLieu:

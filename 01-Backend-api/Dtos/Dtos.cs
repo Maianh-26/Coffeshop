@@ -250,13 +250,29 @@ public record DonHangDto(
     int MaDonHang, int? MaNguoiDung, string? TenNhanVien, decimal TongTien,
     string PhuongThucThanhToan, string TrangThaiThanhToan, DateTime ThoiGianTao,
     string? LyDoHuy, bool DaHoanTien, DateTime? GioHoanTien,
+    int? SoNhanMon, string TrangThaiPhucVu,
+    DateTime? ThoiGianThanhToan, int? MaNguoiThu, string? TenNguoiThu,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<ChiTietDonDto>? ChiTiet);
 
 public class DonHangQuery : PageQuery
 {
     [AllowedValues("PENDING", "PAID", "CANCELLED", null)] public string? TrangThai { get; set; }
+    /// <summary>Lọc theo trạng thái phục vụ (luôn loại đơn CANCELLED)</summary>
+    [AllowedValues("WAITING", "PREPARING", "SERVED", null)] public string? TrangThaiPhucVu { get; set; }
     public DateTime? TuNgay { get; set; }
     public DateTime? DenNgay { get; set; }
+}
+
+/// <summary>PUT /don-hang/{id}/so-nhan-mon — null = bỏ số</summary>
+public class SoNhanMonRequest
+{
+    [Range(1, 50)] public int? SoNhanMon { get; set; }
+}
+
+/// <summary>PUT /don-hang/{id}/trang-thai-phuc-vu — chỉ bước kế tiếp</summary>
+public class TrangThaiPhucVuRequest
+{
+    [Required, AllowedValues("PREPARING", "SERVED")] public string TrangThaiPhucVu { get; set; } = "";
 }
 
 public class ThanhToanRequest

@@ -28,6 +28,8 @@ public class DonHangController(DonHangService service) : ControllerBase
     {
         var query = service.Query();
         if (q.TrangThai is not null) query = query.Where(d => d.TrangThaiThanhToan == q.TrangThai);
+        if (q.TrangThaiPhucVu is not null)
+            query = query.Where(d => d.TrangThaiPhucVu == q.TrangThaiPhucVu && d.TrangThaiThanhToan != TrangThais.Cancelled);
         if (q.TuNgay is { } tu) query = query.Where(d => d.ThoiGianTao >= tu);
         if (q.DenNgay is { } den) query = query.Where(d => d.ThoiGianTao <= den);
         var total = await query.CountAsync();
@@ -39,11 +41,21 @@ public class DonHangController(DonHangService service) : ControllerBase
     [HttpGet("{id:int}"), Authorize(Roles = VaiTros.TatCa)]
     public async Task<DonHangDto> ChiTiet(int id) => (await service.Tim(id)).ToDto();
 
-    /// <summary>POST /don-hang/{id}/thanh-toan — gọi sp_ThanhToanVaTruKho (PAID + trừ kho + ghi LichSuKho)</summary>
+    /// <summary>POST /don-hang/{id}/thanh-toan — gọi sp_ThanhToanVaTruKho (PAID + giờ/người thu tiền + trừ kho + ghi LichSuKho)</summary>
     [HttpPost("{id:int}/thanh-toan"), Authorize(Roles = VaiTros.TatCa)]
-    public Task<ThanhToanResponse> ThanhToan(int id, ThanhToanRequest req) => service.ThanhToan(id, req);
+    public Task<ThanhToanResponse> ThanhToan(int id, ThanhToanRequest req) => service.ThanhToan(id, req, User.MaNguoiDung());
 
     /// <summary>POST /don-hang/{id}/huy — quản lý hủy đơn (đơn đã PAID sẽ được đánh dấu hoàn tiền)</summary>
     [HttpPost("{id:int}/huy"), Authorize(Roles = VaiTros.QuanLy)]
     public async Task<DonHangDto> Huy(int id, HuyDonRequest req) => (await service.Huy(id, req.LyDoHuy)).ToDto();
+
+    /// <summary>PUT /don-hang/{id}/so-nhan-mon — gán / đổi / bỏ số trên bảng gỗ đưa khách</summary>
+    [HttpPut("{id:int}/so-nhan-mon"), Authorize(Roles = VaiTros.TatCa)]
+    public async Task<DonHangDto> SoNhanMon(int id, SoNhanMonRequest req) =>
+        (await service.GanSoNhanMon(id, req.SoNhanMon)).ToDto();
+
+    /// <summary>PUT /don-hang/{id}/trang-thai-phuc-vu — WAITING → PREPARING → SERVED</summary>
+    [HttpPut("{id:int}/trang-thai-phuc-vu"), Authorize(Roles = VaiTros.TatCa)]
+    public async Task<DonHangDto> TrangThaiPhucVu(int id, TrangThaiPhucVuRequest req) =>
+        (await service.DoiTrangThaiPhucVu(id, req.TrangThaiPhucVu)).ToDto();
 }

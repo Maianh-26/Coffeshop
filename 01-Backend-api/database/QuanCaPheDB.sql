@@ -3,6 +3,13 @@
 -- CƠ SỞ DỮ LIỆU: QuanCaPheDB (Cập nhật: Bảng TenMon & KhuyenMai nối vào TenMon)
 -- ============================================================================
 
+-- Bắt buộc cho index lọc của DonHang (và CongThucMon nếu đã chạy FixCongThucUnique.sql)
+-- và để sp_ThanhToanVaTruKho được tạo với QUOTED_IDENTIFIER ON.
+-- Vẫn nên chạy bằng sqlcmd -I.
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 USE master;
 GO
 
@@ -102,8 +109,22 @@ CREATE TABLE DonHang (
     LyDoHuy NVARCHAR(255) NULL,   -- Quản lý hủy đơn[cite: 6]
     DaHoanTien BIT NOT NULL DEFAULT 0, --[cite: 6]
     GioHoanTien DATETIME NULL,    --[cite: 6]
-    CONSTRAINT FK_DonHang_NguoiDung FOREIGN KEY (MaNguoiDung) REFERENCES NguoiDung(MaNguoiDung)
+    SoNhanMon INT NULL,           -- Số trên bảng gỗ đưa khách (1–50), NULL = chưa nhập
+    TrangThaiPhucVu VARCHAR(20) NOT NULL CONSTRAINT DF_DonHang_TrangThaiPhucVu DEFAULT 'WAITING', -- 'WAITING' → 'PREPARING' → 'SERVED' (độc lập với thanh toán)
+    ThoiGianThanhToan DATETIME NULL, -- Lúc chuyển PAID (sp_ThanhToanVaTruKho ghi); NULL khi chưa thu. Báo cáo doanh thu lọc theo cột này
+    MaNguoiThu INT NULL,             -- Người bấm thu tiền; NULL nếu thu tự động
+    CONSTRAINT FK_DonHang_NguoiDung FOREIGN KEY (MaNguoiDung) REFERENCES NguoiDung(MaNguoiDung),
+    CONSTRAINT FK_DonHang_NguoiThu FOREIGN KEY (MaNguoiThu) REFERENCES NguoiDung(MaNguoiDung),
+    CONSTRAINT CK_DonHang_SoNhanMon CHECK (SoNhanMon IS NULL OR SoNhanMon BETWEEN 1 AND 50),
+    CONSTRAINT CK_DonHang_TrangThaiPhucVu CHECK (TrangThaiPhucVu IN ('WAITING', 'PREPARING', 'SERVED'))
 );
+
+-- "Đơn đang giữ số": mỗi số nhận món chỉ thuộc một đơn chưa phục vụ xong và chưa hủy.
+-- Đơn SERVED / CANCELLED rơi khỏi điều kiện lọc → số tự giải phóng. Cần QUOTED_IDENTIFIER ON (sqlcmd -I).
+CREATE UNIQUE NONCLUSTERED INDEX UX_DonHang_SoNhanMon_DangGiu ON DonHang (SoNhanMon)
+    WHERE SoNhanMon IS NOT NULL AND TrangThaiPhucVu IN ('WAITING', 'PREPARING') AND TrangThaiThanhToan <> 'CANCELLED';
+CREATE NONCLUSTERED INDEX IX_DonHang_TrangThaiPhucVu ON DonHang (TrangThaiPhucVu, ThoiGianTao DESC);
+CREATE NONCLUSTERED INDEX IX_DonHang_ThoiGianThanhToan ON DonHang (ThoiGianThanhToan) WHERE ThoiGianThanhToan IS NOT NULL;
 
 CREATE TABLE ChiTietDonHang (
     MaChiTietDon INT IDENTITY(1,1) PRIMARY KEY,
@@ -176,7 +197,8 @@ GO
 -- STORED PROCEDURE TỰ ĐỘNG TRỪ KHO KHI ĐƠN HÀNG THANH TOÁN (PAID)
 -- ----------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE sp_ThanhToanVaTruKho
-    @MaDonHang INT
+    @MaDonHang INT,
+    @MaNguoiThu INT = NULL -- Người bấm thu tiền (API truyền người đang đăng nhập)
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -191,9 +213,11 @@ BEGIN
             RETURN;
         END
 
-        -- 2. Cập nhật trạng thái đơn hàng sang PAID
-        UPDATE DonHang 
-        SET TrangThaiThanhToan = 'PAID'
+        -- 2. Cập nhật trạng thái đơn hàng sang PAID + ghi giờ thu tiền, người thu tiền
+        UPDATE DonHang
+        SET TrangThaiThanhToan = 'PAID',
+            ThoiGianThanhToan = GETDATE(),
+            MaNguoiThu = @MaNguoiThu
         WHERE MaDonHang = @MaDonHang;
 
         -- 3. Bảng tạm gom định mức nguyên liệu cần trừ

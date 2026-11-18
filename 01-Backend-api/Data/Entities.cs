@@ -98,8 +98,13 @@ public class DonHang
     public string? LyDoHuy { get; set; }
     public bool DaHoanTien { get; set; }
     public DateTime? GioHoanTien { get; set; }
+    public int? SoNhanMon { get; set; }                  // Số trên bảng gỗ đưa khách (1–50), null = chưa nhập
+    public string TrangThaiPhucVu { get; set; } = TrangThaiPhucVus.Waiting; // WAITING → PREPARING → SERVED
+    public DateTime? ThoiGianThanhToan { get; set; }    // Lúc chuyển PAID — do sp_ThanhToanVaTruKho ghi
+    public int? MaNguoiThu { get; set; }                 // Người bấm thu tiền (null: đơn cũ / thu tự động)
 
-    public NguoiDung? NguoiDung { get; set; }
+    public NguoiDung? NguoiDung { get; set; }            // Người tạo đơn (MaNguoiDung)
+    public NguoiDung? NguoiThu { get; set; }             // Người thu tiền (MaNguoiThu)
     public List<ChiTietDonHang> ChiTiets { get; set; } = new();
 }
 
@@ -173,6 +178,14 @@ public static class TrangThais
     public const string Pending = "PENDING";
     public const string Paid = "PAID";
     public const string Cancelled = "CANCELLED";
+}
+
+/// <summary>Trạng thái phục vụ — độc lập với trạng thái thanh toán. Chỉ đi tiến từng bước.</summary>
+public static class TrangThaiPhucVus
+{
+    public const string Waiting = "WAITING";
+    public const string Preparing = "PREPARING";
+    public const string Served = "SERVED";
 }
 
 public static class LoaiGiaoDichs

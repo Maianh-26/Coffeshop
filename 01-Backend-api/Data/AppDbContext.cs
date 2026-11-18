@@ -81,7 +81,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.TrangThaiThanhToan).HasMaxLength(20).IsUnicode(false);
             e.Property(x => x.ThoiGianTao).HasColumnType("datetime");
             e.Property(x => x.GioHoanTien).HasColumnType("datetime");
+            e.Property(x => x.TrangThaiPhucVu).HasMaxLength(20).IsUnicode(false);
+            e.Property(x => x.ThoiGianThanhToan).HasColumnType("datetime");
+            // Hai FK cùng trỏ tới NguoiDung → khai báo rõ từng cặp navigation/cột
             e.HasOne(x => x.NguoiDung).WithMany().HasForeignKey(x => x.MaNguoiDung);
+            e.HasOne(x => x.NguoiThu).WithMany().HasForeignKey(x => x.MaNguoiThu);
             e.HasMany(x => x.ChiTiets).WithOne().HasForeignKey(c => c.MaDonHang);
         });
 
