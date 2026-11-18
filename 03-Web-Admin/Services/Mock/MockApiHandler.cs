@@ -199,7 +199,7 @@ public class MockApiHandler : HttpMessageHandler
                 RequireAdmin(user);
                 return Ok(Cancel(FindDonHang(Id(id)), Read<HuyDonRequest>(body)));
 
-            // [ĐỀ XUẤT — backend chưa có] sửa đơn, số nhận món, trạng thái phục vụ
+            // Sửa đơn, số nhận món, trạng thái phục vụ
             case ["don-hang", var id] when put:
                 RequireUser(user);
                 return Ok(UpdateOrder(FindDonHang(Id(id)), Read<DatMonRequest>(body)));
@@ -316,21 +316,25 @@ public class MockApiHandler : HttpMessageHandler
 
                 if (!System.Text.RegularExpressions.Regex.IsMatch(req.TenDangNhap, "^[a-zA-Z0-9_.]{3,50}$")
                     || req.MatKhau.Length is < 6 or > 100
-                    || string.IsNullOrWhiteSpace(req.HoTen) || !req.Email.Contains('@')
+                    || string.IsNullOrWhiteSpace(req.HoTen)
                     || req.VaiTro is not (Roles.Admin or Roles.Staff))
                 {
                     throw Invalid();
                 }
 
+                // Email không bắt buộc: null / rỗng = không có email; có giá trị thì phải hợp lệ và không trùng
+                string? email = string.IsNullOrWhiteSpace(req.Email) ? null : req.Email.Trim().ToLowerInvariant();
+                if (email is not null && !email.Contains('@')) throw Invalid();
+
                 if (_db.NguoiDungs.Any(u => u.TenDangNhap == req.TenDangNhap)) throw Conflict("Tên đăng nhập đã tồn tại");
-                if (_db.NguoiDungs.Any(u => u.Email.Equals(req.Email, StringComparison.OrdinalIgnoreCase))) throw Conflict("Email đã được sử dụng");
+                if (email is not null && _db.NguoiDungs.Any(u => email.Equals(u.Email, StringComparison.OrdinalIgnoreCase))) throw Conflict("Email đã được sử dụng");
 
                 var user = new NguoiDung
                 {
                     MaNguoiDung = NextId(_db.NguoiDungs, u => u.MaNguoiDung),
                     TenDangNhap = req.TenDangNhap,
                     HoTen = req.HoTen,
-                    Email = req.Email.ToLowerInvariant(),
+                    Email = email,
                     VaiTro = req.VaiTro,
                     TrangThai = true
                 };
@@ -348,7 +352,7 @@ public class MockApiHandler : HttpMessageHandler
                 if (req.VaiTro is not (null or Roles.Admin or Roles.Staff) || req.MatKhauMoi is { Length: < 6 or > 100 }) throw Invalid();
                 if (user.MaNguoiDung == me.MaNguoiDung && (req.TrangThai == false || req.VaiTro == Roles.Staff))
                     throw Conflict("Không thể tự khóa hoặc tự hạ quyền tài khoản của chính mình");
-                if (req.Email is not null && _db.NguoiDungs.Any(u => u.Email.Equals(req.Email, StringComparison.OrdinalIgnoreCase) && u.MaNguoiDung != user.MaNguoiDung))
+                if (req.Email is not null && _db.NguoiDungs.Any(u => req.Email.Equals(u.Email, StringComparison.OrdinalIgnoreCase) && u.MaNguoiDung != user.MaNguoiDung))
                     throw Conflict("Email đã được sử dụng");
 
                 user.HoTen = req.HoTen ?? user.HoTen;
@@ -357,6 +361,22 @@ public class MockApiHandler : HttpMessageHandler
                 user.TrangThai = req.TrangThai ?? user.TrangThai;
                 if (req.MatKhauMoi is not null) _db.MatKhaus[user.TenDangNhap] = req.MatKhauMoi;
                 return Ok(user);
+            }
+
+            case [_, var id] when m == HttpMethod.Delete:
+            {
+                // Backend xóa mềm (DaXoa, đổi tên đăng nhập) — mock xóa hẳn khỏi danh sách: kết quả nhìn từ web như nhau
+                // (không còn trong danh sách, tạo lại được cùng tên đăng nhập, token cũ bị 401)
+                var user = FindNguoiDung(Id(id));
+
+                if (user.MaNguoiDung == me.MaNguoiDung) throw Conflict("Không thể xóa tài khoản của chính mình");
+                if (user.VaiTro == Roles.Admin && user.TrangThai
+                    && !_db.NguoiDungs.Any(u => u.MaNguoiDung != user.MaNguoiDung && u.VaiTro == Roles.Admin && u.TrangThai))
+                    throw Conflict("Phải còn ít nhất một tài khoản Quản lý");
+
+                _db.NguoiDungs.Remove(user);
+                _db.MatKhaus.Remove(user.TenDangNhap);
+                return NoContent();
             }
         }
 
@@ -809,7 +829,7 @@ public class MockApiHandler : HttpMessageHandler
             list = list.Where(d => d.TrangThaiThanhToan == status);
         }
 
-        // [ĐỀ XUẤT] lọc theo trạng thái phục vụ — không tính đơn đã hủy
+        // Lọc theo trạng thái phục vụ — không tính đơn đã hủy
         if (q.TryGetValue("trangThaiPhucVu", out var serving) && serving != "")
         {
             if (serving is not (TrangThaiPhucVus.Waiting or TrangThaiPhucVus.Preparing or TrangThaiPhucVus.Served)) throw Invalid();
@@ -819,7 +839,16 @@ public class MockApiHandler : HttpMessageHandler
         if (Date(q, "tuNgay") is { } from) list = list.Where(d => d.ThoiGianTao >= from);
         if (Date(q, "denNgay") is { } to) list = list.Where(d => d.ThoiGianTao <= to);
 
-        // [ĐỀ XUẤT] sapXep: sắp xếp toàn bộ danh sách TRƯỚC khi phân trang ("-" = giảm dần).
+        // timKiem: mã đơn BẮT ĐẦU BẰNG chuỗi số, HOẶC số nhận món BẰNG ĐÚNG số đó
+        if (q.TryGetValue("timKiem", out var term) && term != "")
+        {
+            if (term.Length > 10 || !term.All(char.IsAsciiDigit)) throw Invalid();
+            int? so = int.TryParse(term, out int n) ? n : null;
+            list = list.Where(d => d.MaDonHang.ToString(CultureInfo.InvariantCulture).StartsWith(term, StringComparison.Ordinal)
+                                   || (so is not null && d.SoNhanMon == so));
+        }
+
+        // sapXep: sắp xếp toàn bộ danh sách TRƯỚC khi phân trang ("-" = giảm dần).
         // Hòa giá trị (cùng tổng tiền) thì đơn mới hơn đứng trước để thứ tự giữa các trang ổn định.
         IOrderedEnumerable<DonHang> sorted = (q.GetValueOrDefault("sapXep") ?? "") switch
         {
@@ -854,7 +883,7 @@ public class MockApiHandler : HttpMessageHandler
         return order;
     }
 
-    /// <summary>[ĐỀ XUẤT] PUT don-hang/{id}: thay toàn bộ món, tính lại tổng. Chỉ khi chưa thanh toán và chưa phục vụ.</summary>
+    /// <summary>PUT don-hang/{id}: thay toàn bộ món, tính lại tổng. Chỉ khi chưa thanh toán và chưa phục vụ.</summary>
     private DonHang UpdateOrder(DonHang order, DatMonRequest req)
     {
         if (!order.CoTheSua)
@@ -867,7 +896,7 @@ public class MockApiHandler : HttpMessageHandler
         return order;
     }
 
-    /// <summary>[ĐỀ XUẤT] PUT don-hang/{id}/so-nhan-mon: số 1–50, không trùng với đơn khác đang phục vụ.</summary>
+    /// <summary>PUT don-hang/{id}/so-nhan-mon: số 1–50, không trùng với đơn khác đang phục vụ.</summary>
     private DonHang SetPickupNumber(DonHang order, SoNhanMonRequest req)
     {
         if (req.SoNhanMon is { } n && (n < SoNhanMons.Min || n > SoNhanMons.Max))
@@ -886,7 +915,7 @@ public class MockApiHandler : HttpMessageHandler
         return order;
     }
 
-    /// <summary>[ĐỀ XUẤT] PUT don-hang/{id}/trang-thai-phuc-vu: lần lượt từng bước WAITING → PREPARING → SERVED.</summary>
+    /// <summary>PUT don-hang/{id}/trang-thai-phuc-vu: lần lượt từng bước WAITING → PREPARING → SERVED.</summary>
     private static DonHang SetServingStatus(DonHang order, TrangThaiPhucVuRequest req)
     {
         int Rank(string s) => s switch
@@ -1030,6 +1059,7 @@ public class MockApiHandler : HttpMessageHandler
 
         order.PhuongThucThanhToan = req.PhuongThucThanhToan;
         order.TrangThaiThanhToan = TrangThaiDon.Paid;
+        order.ThoiGianThanhToan = now;   // backend còn ghi người thu (maNguoiThu) — web không dùng nên mock bỏ qua
 
         return new ThanhToanResponse
         {
@@ -1238,13 +1268,13 @@ public class MockApiHandler : HttpMessageHandler
 
     private HttpResponseMessage? Report(string report, Dictionary<string, string> q)
     {
-        IEnumerable<DonHang> orders = _db.DonHangs;
+        // Giống backend (C1): số đơn tạo / chờ / hủy lọc theo giờ TẠO; doanh thu, món / topping bán chạy, giờ cao điểm
+        // lọc và gom theo giờ THU TIỀN; số đơn hoàn tiền theo giờ hoàn tiền.
         DateTime? from = Date(q, "tuNgay"), to = Date(q, "denNgay");
-        if (from is { } f) orders = orders.Where(d => d.ThoiGianTao >= f);
-        if (to is { } t) orders = orders.Where(d => d.ThoiGianTao <= t);
+        bool InRange(DateTime? x) => x is { } v && (from is null || v >= from) && (to is null || v <= to);
 
-        var all = orders.ToList();
-        var paid = all.Where(d => d.TrangThaiThanhToan == TrangThaiDon.Paid).ToList();
+        var all = _db.DonHangs.Where(d => InRange(d.ThoiGianTao)).ToList();
+        var paid = _db.DonHangs.Where(d => d.TrangThaiThanhToan == TrangThaiDon.Paid && InRange(PaidAt(d))).ToList();
 
         switch (report)
         {
@@ -1258,11 +1288,11 @@ public class MockApiHandler : HttpMessageHandler
                     SoDonDaThanhToan = paid.Count,
                     SoDonChoThanhToan = all.Count(d => d.TrangThaiThanhToan == TrangThaiDon.Pending),
                     SoDonHuy = all.Count(d => d.TrangThaiThanhToan == TrangThaiDon.Cancelled),
-                    SoDonHoanTien = all.Count(d => d.DaHoanTien),
+                    SoDonHoanTien = _db.DonHangs.Count(d => d.DaHoanTien && InRange(d.GioHoanTien)),
                     DoanhThu = revenue,
                     GiaTriDonTrungBinh = paid.Count == 0 ? 0 : Math.Round(revenue / paid.Count, 0),
                     TheoPhuongThuc = paid.GroupBy(d => d.PhuongThucThanhToan).ToDictionary(g => g.Key, g => g.Sum(d => d.TongTien)),
-                    TheoNgay = paid.GroupBy(d => DateOnly.FromDateTime(d.ThoiGianTao)).OrderBy(g => g.Key)
+                    TheoNgay = paid.GroupBy(d => DateOnly.FromDateTime(PaidAt(d))).OrderBy(g => g.Key)
                         .Select(g => new DoanhThuNgay { Ngay = g.Key, SoDon = g.Count(), DoanhThu = g.Sum(d => d.TongTien) })
                         .ToList()
                 });
@@ -1280,14 +1310,34 @@ public class MockApiHandler : HttpMessageHandler
                         MaTenMon = g.Key,
                         TenMon = g.First().Mon!.TenMon,
                         SoLuong = g.Sum(x => x.Line.SoLuong),
-                        DoanhThu = g.Sum(x => x.Line.DonGiaBan * x.Line.SoLuong)
+                        DoanhThu = g.Sum(x => x.Line.DonGiaBan * x.Line.SoLuong),
+                        DoanhThuTopping = g.Sum(x => x.Line.Toppings.Sum(t => t.DonGiaTopping) * x.Line.SoLuong),
+                        TongDoanhThu = g.Sum(x => (x.Line.DonGiaBan + x.Line.Toppings.Sum(t => t.DonGiaTopping)) * x.Line.SoLuong)
                     })
                     .OrderByDescending(x => x.SoLuong).ThenByDescending(x => x.DoanhThu)
                     .Take(top)
                     .ToList());
 
+            case "topping-ban-chay":
+                int topToppings = Int(q, "soLuong") ?? 10;
+                if (topToppings is < 1 or > 50) throw Invalid();
+                return Ok(paid
+                    .SelectMany(d => d.ChiTiet ?? [])
+                    .SelectMany(c => c.Toppings.Select(t => (Topping: t, c.SoLuong)))
+                    .GroupBy(x => x.Topping.MaTopping)
+                    .Select(g => new ToppingBanChay
+                    {
+                        MaTopping = g.Key,
+                        TenTopping = _db.Toppings.FirstOrDefault(t => t.MaTopping == g.Key)?.TenTopping ?? g.First().Topping.TenToppingLuu,
+                        SoLuong = g.Sum(x => x.SoLuong),
+                        DoanhThu = g.Sum(x => x.Topping.DonGiaTopping * x.SoLuong)
+                    })
+                    .OrderByDescending(x => x.SoLuong).ThenByDescending(x => x.DoanhThu)
+                    .Take(topToppings)
+                    .ToList());
+
             case "gio-cao-diem":
-                var byHour = paid.GroupBy(d => d.ThoiGianTao.Hour).ToDictionary(g => g.Key);
+                var byHour = paid.GroupBy(d => PaidAt(d).Hour).ToDictionary(g => g.Key);
                 return Ok(Enumerable.Range(0, 24)
                     .Select(h => byHour.TryGetValue(h, out var g)
                         ? new GioCaoDiem { Gio = h, SoDon = g.Count(), DoanhThu = g.Sum(d => d.TongTien) }
@@ -1297,6 +1347,9 @@ public class MockApiHandler : HttpMessageHandler
 
         return null;
     }
+
+    /// <summary>Giờ thu tiền; đơn mẫu cũ chưa có thì coi bằng giờ tạo (giống script backfill của backend).</summary>
+    private static DateTime PaidAt(DonHang d) => d.ThoiGianThanhToan ?? d.ThoiGianTao;
 
     // ==================================================================
     // TIỆN ÍCH

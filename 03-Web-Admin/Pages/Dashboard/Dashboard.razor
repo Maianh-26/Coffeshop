@@ -322,7 +322,7 @@
                         <td>@rank</td>
                         <td>@item.TenMon</td>
                         <td>@item.SoLuong</td>
-                        <td>@Money(item.DoanhThu)</td>
+                        <td>@Money(item.DoanhThuGomTopping)</td>
                     </tr>
                 }
 
@@ -331,6 +331,59 @@
                     <tr>
                         <td colspan="4" class="empty-cell">
                             Chưa có món nào được bán trong khoảng thời gian này.
+                        </td>
+                    </tr>
+                }
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+<section class="panel report-panel">
+
+    <h2>Topping bán chạy</h2>
+
+    <div class="table-wrap">
+
+        <table class="report-table">
+
+            <thead>
+
+                <tr>
+                    <th>#</th>
+                    <th>Topping</th>
+                    <th>Số ly</th>
+                    <th>Doanh thu</th>
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                @for (int i = 0; i < bestToppings.Count; i++)
+                {
+                    var item = bestToppings[i];
+                    int rank = i + 1;
+
+                    <tr @key="item.MaTopping">
+                        <td>@rank</td>
+                        <td>@item.TenTopping</td>
+                        <td>@item.SoLuong</td>
+                        <td>@Money(item.DoanhThu)</td>
+                    </tr>
+                }
+
+                @if (bestToppings.Count == 0)
+                {
+                    <tr>
+                        <td colspan="4" class="empty-cell">
+                            @(toppingReportSupported
+                                ? "Chưa có topping nào được bán trong khoảng thời gian này."
+                                : "Máy chủ chưa hỗ trợ báo cáo topping.")
                         </td>
                     </tr>
                 }

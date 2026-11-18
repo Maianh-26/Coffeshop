@@ -43,6 +43,8 @@ public partial class Dashboard : IDisposable
     // ---- Dữ liệu
     private BaoCaoDoanhThu? report;
     private List<MonBanChay> bestSellers = [];
+    private List<ToppingBanChay> bestToppings = [];
+    private bool toppingReportSupported = true;     // false khi backend cũ chưa có bao-cao/topping-ban-chay (404)
     private List<DongBaoCao> points = [];           // mọi mốc của biểu đồ, kể cả mốc không có doanh thu
     private ChartScale scale = ChartScale.Day;
     private AxisScale axis = AxisScale.For(0);
@@ -210,15 +212,17 @@ public partial class Dashboard : IDisposable
         {
             var revenueTask = Reports.GetRevenueAsync(current, token);
             var bestTask = Reports.GetBestSellersAsync(current, 5, token);
+            var toppingTask = BestToppingsOrEmpty(current, token);
             var hoursTask = hourly ? Reports.GetPeakHoursAsync(current, token) : Task.FromResult(new List<GioCaoDiem>());
 
-            await Task.WhenAll(revenueTask, bestTask, hoursTask);
+            await Task.WhenAll(revenueTask, bestTask, toppingTask, hoursTask);
 
             // Lượt này đã bị lượt mới thay thế → không ghi đè dữ liệu của lượt mới
             token.ThrowIfCancellationRequested();
 
             report = await revenueTask;
             bestSellers = await bestTask;
+            bestToppings = await toppingTask;
 
             (scale, points) = hourly
                 ? (ChartScale.Hour, HourPoints(current.From!.Value, await hoursTask))
@@ -239,6 +243,24 @@ public partial class Dashboard : IDisposable
         finally
         {
             if (!token.IsCancellationRequested) loading = false;
+        }
+    }
+
+    /// <summary>
+    /// Topping bán chạy. Backend cũ chưa có route này (404) → bảng trống, không làm hỏng cả trang báo cáo.
+    /// </summary>
+    private async Task<List<ToppingBanChay>> BestToppingsOrEmpty(DashboardFilter filter, CancellationToken token)
+    {
+        try
+        {
+            var list = await Reports.GetBestToppingsAsync(filter, 5, token);
+            toppingReportSupported = true;
+            return list;
+        }
+        catch (ApiException ex) when (ex.Status is 404 or 405)
+        {
+            toppingReportSupported = false;
+            return [];
         }
     }
 
@@ -318,7 +340,7 @@ public partial class Dashboard : IDisposable
 
         try
         {
-            await Exporter.ExportExcelAsync(report, TableRows.ToList(), ColumnTitle, bestSellers, range);
+            await Exporter.ExportExcelAsync(report, TableRows.ToList(), ColumnTitle, bestSellers, bestToppings, range);
             exportOpen = false;
         }
         catch (JSException ex)

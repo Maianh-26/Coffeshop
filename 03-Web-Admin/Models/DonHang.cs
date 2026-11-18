@@ -2,8 +2,9 @@ namespace CoffeeShop.Admin.Models;
 
 // ==========================================================
 // Đơn hàng — api/v1/don-hang
-// Backend chỉ có trạng thái THANH TOÁN: PENDING → PAID, hoặc CANCELLED.
-// (Chưa có bước "tiếp nhận / pha chế / hoàn thành" — đã đề xuất với nhóm backend.)
+// Hai loại trạng thái độc lập: THANH TOÁN (PENDING → PAID, hoặc CANCELLED)
+// và PHỤC VỤ (WAITING → PREPARING → SERVED). Hợp đồng: docs/hop-dong-api-bo-sung.md.
+// Backend còn trả maNguoiThu / tenNguoiThu nhưng web KHÔNG dùng (chủ quán: không hiện tên người).
 // ==========================================================
 
 public class DonHang
@@ -26,16 +27,20 @@ public class DonHang
     public string? LyDoHuy { get; set; }
     public bool DaHoanTien { get; set; }
     public DateTime? GioHoanTien { get; set; }
+
+    /// <summary>Lúc chuyển PAID (giờ thu tiền); null khi chưa thu. Báo cáo doanh thu tính theo mốc này.</summary>
+    public DateTime? ThoiGianThanhToan { get; set; }
+
     public List<ChiTietDon>? ChiTiet { get; set; }
 
     /// <summary>
-    /// [ĐỀ XUẤT — backend chưa có] Số trên bảng gỗ nhân viên đưa cho khách (1–50). null = chưa nhập.
+    /// Số trên bảng gỗ nhân viên đưa cho khách (1–50). null = chưa nhập.
     /// Số bị khóa khi đơn chưa phục vụ xong; giải phóng khi đơn "Đã phục vụ" hoặc bị hủy (đơn vẫn giữ số để tra cứu).
     /// </summary>
     public int? SoNhanMon { get; set; }
 
     /// <summary>
-    /// [ĐỀ XUẤT — backend chưa có] "WAITING" | "PREPARING" | "SERVED". null (backend cũ) = WAITING.
+    /// "WAITING" | "PREPARING" | "SERVED". null (backend cũ) = WAITING.
     /// </summary>
     public string? TrangThaiPhucVu { get; set; }
 
@@ -96,13 +101,13 @@ public class DongDatMonRequest
     public List<int>? Toppings { get; set; }
 }
 
-/// <summary>[ĐỀ XUẤT] PUT api/v1/don-hang/{id}/so-nhan-mon — null = bỏ số.</summary>
+/// <summary>PUT api/v1/don-hang/{id}/so-nhan-mon — null = bỏ số.</summary>
 public class SoNhanMonRequest
 {
     public int? SoNhanMon { get; set; }
 }
 
-/// <summary>[ĐỀ XUẤT] PUT api/v1/don-hang/{id}/trang-thai-phuc-vu</summary>
+/// <summary>PUT api/v1/don-hang/{id}/trang-thai-phuc-vu</summary>
 public class TrangThaiPhucVuRequest
 {
     public string TrangThaiPhucVu { get; set; } = "";
@@ -214,7 +219,7 @@ public static class PhuongThucThanhToans
 }
 
 /// <summary>
-/// [ĐỀ XUẤT — backend chưa có] Trạng thái phục vụ món — MỘT nơi duy nhất cho các chuỗi này.
+/// Trạng thái phục vụ món — MỘT nơi duy nhất cho các chuỗi này.
 /// "Đã hủy" lấy từ trạng thái thanh toán CANCELLED.
 /// </summary>
 public static class TrangThaiPhucVus

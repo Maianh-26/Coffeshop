@@ -16,13 +16,16 @@ public class OrderService
 
     /// <summary>
     /// Danh sách đơn (mặc định mới nhất trước), có phân trang. Lọc theo trạng thái thanh toán, trạng thái phục vụ
-    /// ([ĐỀ XUẤT] tham số <c>trangThaiPhucVu</c>) và thời gian tạo.
+    /// (<c>trangThaiPhucVu</c>, luôn loại đơn đã hủy) và thời gian tạo.
     /// </summary>
+    /// <param name="timKiem">
+    /// Chuỗi chữ số (≤ 10 ký tự): mã đơn BẮT ĐẦU BẰNG chuỗi này hoặc số nhận món BẰNG ĐÚNG số này. null = không tìm.
+    /// </param>
     /// <param name="tuNgay">Mốc bắt đầu, gửi CHÍNH XÁC đến giờ phút (vd. "24 giờ qua" = lúc này trừ 24 giờ).</param>
     /// <param name="denNgay">Ngày kết thúc (tính trọn ngày, tới 23:59:59.997); null = đến hiện tại.</param>
     /// <param name="sapXep">
-    /// [ĐỀ XUẤT] Sắp xếp toàn bộ danh sách trước khi phân trang: <c>maDonHang</c>, <c>-maDonHang</c>, <c>tongTien</c>,
-    /// <c>-tongTien</c> (dấu "-" = giảm dần); null = mặc định (mới nhất trước). Backend chưa hỗ trợ thì bỏ qua tham số này.
+    /// Sắp xếp toàn bộ danh sách trước khi phân trang: <c>maDonHang</c>, <c>-maDonHang</c>, <c>tongTien</c>,
+    /// <c>-tongTien</c> (dấu "-" = giảm dần); null = mặc định (mới nhất trước). Backend cũ bỏ qua tham số này.
     /// </param>
     public Task<PagedResult<DonHang>> GetPageAsync(
         int page,
@@ -32,6 +35,7 @@ public class OrderService
         DateTime? tuNgay = null,
         DateTime? denNgay = null,
         string? sapXep = null,
+        string? timKiem = null,
         CancellationToken ct = default) =>
         _api.GetAsync<PagedResult<DonHang>>(Query.Build("api/v1/don-hang",
             ("page", page),
@@ -40,7 +44,8 @@ public class OrderService
             ("trangThaiPhucVu", trangThaiPhucVu),
             ("tuNgay", tuNgay),
             ("denNgay", Query.EndOfDay(denNgay)),
-            ("sapXep", sapXep)), ct);
+            ("sapXep", sapXep),
+            ("timKiem", string.IsNullOrEmpty(timKiem) ? null : timKiem)), ct);
 
     public Task<DonHang> GetAsync(int id, CancellationToken ct = default) =>
         _api.GetAsync<DonHang>($"api/v1/don-hang/{id}", ct);
@@ -58,19 +63,19 @@ public class OrderService
         _api.PostAsync<ThanhToanResponse>($"api/v1/don-hang/{id}/thanh-toan", request, ct);
 
     /// <summary>
-    /// [ĐỀ XUẤT] Sửa món của đơn chưa thanh toán / chưa phục vụ (thay toàn bộ danh sách món, backend tính lại tổng tiền).
+    /// Sửa món của đơn chưa thanh toán / chưa phục vụ (thay toàn bộ danh sách món, backend tính lại tổng tiền).
     /// </summary>
     public Task<DonHang> UpdateAsync(int id, DatMonRequest request, CancellationToken ct = default) =>
         _api.PutAsync<DonHang>($"api/v1/don-hang/{id}", request, ct);
 
     /// <summary>
-    /// [ĐỀ XUẤT] Gán / đổi / bỏ số nhận món. 409 SO_NHAN_MON_DANG_DUNG khi số đang dùng cho đơn khác chưa phục vụ xong.
+    /// Gán / đổi / bỏ số nhận món. 409 SO_NHAN_MON_DANG_DUNG khi số đang dùng cho đơn khác chưa phục vụ xong.
     /// </summary>
     public Task<DonHang> SetPickupNumberAsync(int id, int? soNhanMon, CancellationToken ct = default) =>
         _api.PutAsync<DonHang>($"api/v1/don-hang/{id}/so-nhan-mon", new SoNhanMonRequest { SoNhanMon = soNhanMon }, ct);
 
     /// <summary>
-    /// [ĐỀ XUẤT] Đổi trạng thái phục vụ: WAITING → PREPARING → SERVED. SERVED giải phóng số nhận món.
+    /// Đổi trạng thái phục vụ: WAITING → PREPARING → SERVED. SERVED giải phóng số nhận món.
     /// </summary>
     public Task<DonHang> SetServingStatusAsync(int id, string trangThaiPhucVu, CancellationToken ct = default) =>
         _api.PutAsync<DonHang>($"api/v1/don-hang/{id}/trang-thai-phuc-vu",
