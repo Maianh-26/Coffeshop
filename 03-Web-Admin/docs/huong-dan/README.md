@@ -8,11 +8,11 @@ Bộ tài liệu này giúp trả lời nhanh câu hỏi kiểu **"Nút này em 
 
 | # | Tài liệu | Màn hình | Trạng thái |
 |---|----------|----------|------------|
-| 1 | [01-dang-nhap.md](01-dang-nhap.md) | Đăng nhập, Quên mật khẩu (3 bước), Đăng xuất, phân quyền | ✅ |
+| 1 | [01-dang-nhap.md](01-dang-nhap.md) | Đăng nhập, Đăng xuất, phân quyền | ✅ |
 | 2 | [02-tong-quan.md](02-tong-quan.md) | Tổng quan (bộ lọc ngày, thống kê, biểu đồ, xuất báo cáo) | ✅ |
 | 3 | [03-don-hang.md](03-don-hang.md) | Đơn hàng (lọc, chi tiết, tiếp nhận, thanh toán, tạo/sửa/hủy, Tablet) | ✅ |
 | 4 | [04-mon.md](04-mon.md) | Món (Món / Danh mục / Topping & Size, ảnh, công thức) | ✅ |
-| 5–11 | *(sẽ viết tiếp)* | Kho nguyên liệu, Khuyến mãi, Tài khoản, Tài khoản của tôi, Khung trang (sidebar/header), Mock API, CSS & giao diện | ⏳ |
+| 5–11 | *(sẽ viết tiếp)* | Kho nguyên liệu, Khuyến mãi, Tài khoản, Khung trang (sidebar/header), Mock API, CSS & giao diện | ⏳ |
 
 ---
 
@@ -34,7 +34,7 @@ Trình duyệt (Blazor WASM)
 - **`Program.cs`** đăng ký mọi service (dòng 56–66) và chọn API giả hay thật (dòng 19–46, đọc `wwwroot/appsettings.json` → `Api:UseMock`).
 - **Bấm nút** trong `.razor` → gọi **hàm C#** (cùng tên trong `@code` hoặc `.razor.cs`) → (nếu có) gọi **Service** → **HttpClient** → `AuthHeaderHandler` → **MockApiHandler** (hoặc backend thật).
 
-> ⚠️ Hiện tại **chỉ luồng Đăng nhập / Quên mật khẩu / Tài khoản của tôi** thật sự gọi Service → API.
+> ⚠️ Hiện tại **chỉ luồng Đăng nhập** thật sự gọi Service → API.
 > Các trang Tổng quan, Đơn hàng, Món… **đang dùng dữ liệu mẫu viết sẵn trong trang** (chưa nối Service). Mỗi tài liệu đều ghi rõ điểm này để trả lời đúng.
 
 ---
@@ -55,7 +55,6 @@ URL `/orders` → tìm `@page "/orders"` → ra `Pages/Orders/Orders.razor`. B�
 | URL | File giao diện | File logic | Quyền |
 |-----|----------------|-----------|-------|
 | `/login` | `Pages/Authentication/Login.razor` | `Login.razor.cs` | Ai cũng vào |
-| `/forgot-password` | `Pages/Authentication/ForgotPassword.razor` | `ForgotPassword.razor.cs` | Ai cũng vào |
 | `/` | `Pages/Dashboard/Dashboard.razor` | `Dashboard.razor.cs` | Admin |
 | `/orders` | `Pages/Orders/Orders.razor` | khối `@code` trong cùng file (từ dòng 789) | Admin + Nhân viên |
 | `/products` | `Pages/Products/Products.razor` | `Products.razor.cs` | Admin |

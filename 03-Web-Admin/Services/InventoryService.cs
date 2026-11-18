@@ -25,8 +25,8 @@ public class InventoryService
         _api.PatchAsync<NguyenLieu>($"api/v1/nguyen-lieu/{id}", request, ct);
 
     /// <summary>
-    /// Xóa mềm: nguyên liệu chuyển sang "Ngừng sử dụng". Trang Kho hiện không gọi (đổi trạng thái qua hộp thoại Sửa,
-    /// PATCH dangSuDung); giữ lại để khớp API của backend.
+    /// Nút Xóa của trang Kho. Backend xóa mềm: nguyên liệu chuyển sang "Ngừng sử dụng" (vẫn hiện trong bảng,
+    /// giữ lịch sử kho và công thức món). Dùng lại: Sửa → Trạng thái "Đang sử dụng".
     /// </summary>
     public Task DeleteAsync(int id, CancellationToken ct = default) =>
         _api.DeleteAsync($"api/v1/nguyen-lieu/{id}", ct);

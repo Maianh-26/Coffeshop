@@ -1,0 +1,28 @@
+@* Tiêu đề cột sắp xếp được (dùng chung các trang danh sách). Trạng thái cho trình đọc màn hình nằm ở aria-sort của th;
+   trang giữ ColumnSort và đổi chiều trong OnSort (component không tự sửa tham số). *@
+
+<th class="@Class" aria-sort="@Sort.AriaSort(Key)">
+    <button type="button"
+            class="sort-button @(Sort.Is(Key) ? "is-sorted" : "")"
+            title="@Sort.Title(Key, Name ?? Label.ToLowerInvariant())"
+            @onclick="() => OnSort.InvokeAsync(Key)">
+        @Label
+        <SortIcon Direction="@Sort.Direction(Key)" />
+    </button>
+</th>
+
+@code {
+    [Parameter, EditorRequired] public ColumnSort Sort { get; set; } = default!;
+
+    /// <summary>Mã cột (truyền lại cho OnSort).</summary>
+    [Parameter, EditorRequired] public string Key { get; set; } = "";
+
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    /// <summary>Tên cột trong câu gợi ý ("giá bán", "tồn kho"…); mặc định = Label viết thường.</summary>
+    [Parameter] public string? Name { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+
+    [Parameter] public EventCallback<string> OnSort { get; set; }
+}

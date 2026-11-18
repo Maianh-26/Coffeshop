@@ -85,20 +85,24 @@ public static class TinhTrangKho
     };
 }
 
-/// <summary>Bộ lọc trạng thái sử dụng của nguyên liệu — chuỗi dùng trong trang Kho.</summary>
+/// <summary>
+/// Bộ lọc trạng thái sử dụng của nguyên liệu — chuỗi dùng trong trang Kho.
+/// Mặc định hiện tất cả (kể cả ngừng sử dụng) để kiểm tra dữ liệu dễ hơn — giống trang Món.
+/// </summary>
 public static class LocSuDung
 {
-    public const string DangSuDung = "";          // mặc định
+    public const string TatCa = "";               // mặc định
+    public const string DangSuDung = "active";
     public const string NgungSuDung = "stopped";
-    public const string TatCa = "all";
 
-    public static readonly string[] Options = [DangSuDung, NgungSuDung, TatCa];
+    /// <summary>Lựa chọn của ô lọc (sau ô "Tất cả trạng thái").</summary>
+    public static readonly string[] Options = [DangSuDung, NgungSuDung];
 
     public static string Label(string loc) => loc switch
     {
+        DangSuDung => "Đang sử dụng",
         NgungSuDung => "Ngừng sử dụng",
-        TatCa => "Mọi trạng thái sử dụng",
-        _ => "Đang sử dụng"
+        _ => "Tất cả trạng thái"
     };
 }
 

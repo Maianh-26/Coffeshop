@@ -1,4 +1,6 @@
-# 1. Đăng nhập · Quên mật khẩu · Đăng xuất · Phân quyền
+# 1. Đăng nhập · Đăng xuất · Phân quyền
+
+> **Cập nhật 18/11/2026:** đã **bỏ** luồng Quên mật khẩu (trang `/forgot-password`, mã xác minh qua email) và trang **Tài khoản của tôi** (`/my-account`). Quán chỉ dùng vài tài khoản: ai quên mật khẩu thì chủ quán đặt lại ở trang **Tài khoản** (Sửa → Đặt lại mật khẩu) hoặc lấy lại trực tiếp trong CSDL. Tên + vai trò ở header chỉ để hiển thị, bấm vào không mở trang nào. Form tài khoản không còn ô Email.
 
 ← [Mục lục](README.md)
 
@@ -18,14 +20,13 @@ Tài khoản thử (mật khẩu đều là `123456`, khai báo ở `Services/Mo
 | Khung trang (logo bên trái) | `Layout/AuthLayout.razor` + `Components/Brand.razor` | Logo `wwwroot/images/logo.png` |
 | Dữ liệu form | `Models/AuthenticationModels.cs` | `LoginRequest` (+ thông báo lỗi), `LoginResponse` |
 | Ô nhập cập nhật khi gõ | `Components/InputTextLive.razor` | Thay cho `InputText` thường |
-| Gọi API | `Services/AuthenticationService.cs` | `LoginAsync`, `RequestResetCodeAsync`, … |
+| Gọi API | `Services/AuthenticationService.cs` | `LoginAsync`, `LogoutAsync`, `GetMyAccountAsync` |
 | Lưu phiên đăng nhập | `Services/Auth/TokenAuthenticationStateProvider.cs` | Lưu vào `sessionStorage` |
 | Gắn token vào request | `Services/Auth/AuthHeaderHandler.cs` | Header `Authorization: Bearer …` |
 | Trạng thái dùng chung | `Services/AppState.cs` | Token, họ tên, vai trò |
-| API giả | `Services/Mock/MockApiHandler.cs` | `Login` (dòng 149), quên mật khẩu (dòng 192–325) |
+| API giả | `Services/Mock/MockApiHandler.cs` | `Login` |
 | Chặn trang khi chưa đăng nhập | `App.razor`, `Pages/_Imports.razor`, `Components/RedirectToLogin.razor` | |
 | Vai trò | `Utilities/Roles.cs` | `"Admin"`, `"Nhân viên"` |
-| Quên mật khẩu | `Pages/Authentication/ForgotPassword.razor` + `.razor.cs` | 3 bước |
 | CSS | `wwwroot/css/app.css` | `.auth-shell` 992, `.auth-card` 1033, `.password-field` 1058, `.auth-submit` 1077 |
 
 ---
@@ -88,7 +89,7 @@ Tài khoản thử (mật khẩu đều là `123456`, khai báo ở `Services/Mo
 
 ```
 Pages/_Imports.razor:3        @attribute [Authorize]          → MỌI trang trong Pages/ đều cần đăng nhập
-Login.razor:3, ForgotPassword.razor:3  [AllowAnonymous]       → 2 trang công khai
+Login.razor:3                 [AllowAnonymous]                → trang công khai duy nhất
 Dashboard.razor:2, Products.razor:2    [Authorize(Roles="Admin")] → chỉ chủ quán
 ```
 
@@ -130,45 +131,7 @@ Dashboard.razor:2, Products.razor:2    [Authorize(Roles="Admin")] → chỉ ch�
 
 ---
 
-## 1.7. Quên mật khẩu (3 bước)
-
-Link "Quên mật khẩu?" ở `Login.razor:75` mở `/forgot-password`. Trang dùng biến `step` (enum `Step { Email, Code, NewPassword, Done }`, `ForgotPassword.razor.cs:15`), và `switch (step)` trong `.razor` quyết định vẽ bước nào.
-
-```
-Bước 1 — Email                     Bước 2 — Mã 6 số                    Bước 3 — Mật khẩu mới
-ForgotPassword.razor:16            ForgotPassword.razor:51             ForgotPassword.razor:126
-  nút "Gửi mã xác minh" (43)         nút "Xác minh" (100)                nút "Lưu mật khẩu mới" (174)
-        │ OnValidSubmit="SendCode"         │ OnValidSubmit="VerifyCode"        │ OnValidSubmit="SavePassword"
-        ▼                                  ▼                                   ▼
-  .razor.cs:90 SendCode()            .razor.cs:169 VerifyCode()          .razor.cs:212 SavePassword()
-        ▼                                  ▼                                   ▼
-  AuthenticationService.cs:106       AuthenticationService.cs:117        AuthenticationService.cs:129
-  POST api/auth/forgot-password      POST api/auth/verify-reset-code     POST api/auth/reset-password
-        ▼                                  ▼                                   ▼
-  MockApiHandler.cs:192              MockApiHandler.cs:261               MockApiHandler.cs:301
-  (sinh mã, chờ 60 giây mới cho gửi lại)   (đúng → trả resetToken)      (đổi mật khẩu, token chỉ dùng 1 lần)
-                                                                               ▼
-                                                                   Step.Done (182) → "Quay lại đăng nhập"
-```
-
-| Chi tiết | Ở đâu |
-|----------|-------|
-| Kiểm tra email đúng định dạng | `[EmailAddress]` ở `Models/PasswordResetModels.cs:15–16` |
-| Mã phải đúng 6 số | `[RegularExpression(@"^\d{6}$")]` ở `PasswordResetModels.cs:42–43` |
-| Dán "677 137" vẫn nhận | `NormalizeCode()` lọc chỉ giữ chữ số, `.razor.cs:163` |
-| Mật khẩu mới ≥ 6 ký tự, nhập lại phải khớp | `[StringLength(MinimumLength = 6)]`, `[Compare]` ở `PasswordResetModels.cs:60–65` |
-| Đếm ngược "Gửi lại sau N giây" | `StartCountdown`/`RunCountdownAsync`, `.razor.cs:248–276`; cập nhật giao diện bằng `InvokeAsync(StateHasChanged)` |
-| Nút "Đổi email", "Gửi lại mã" | `ChangeEmail` (`.razor.cs:149`), `ResendCode` (`.razor.cs:143`) |
-| Hộp "Chế độ giả lập" hiện mã | Chỉ hiện khi `Api:UseMock = true` (`.razor.cs:46, 131`). Backend thật gửi mã qua Gmail, không trả mã về |
-| Nhập sai nhiều lần / mã hết hạn | Máy chủ trả `errorCode` → khóa ô nhập (`codeLocked`), `.razor.cs:190–195` |
-| Rời trang thì dừng đếm ngược | `Dispose()`, `.razor.cs:286` (class có `: IDisposable`) |
-| Quy tắc phía máy chủ (giả) | Mã sống 10 phút, gửi lại sau 60 giây, tối đa 5 lần/giờ, token 15 phút: `MockApiHandler.cs:181–185` |
-
-> Thầy hỏi *"Gửi mail ở đâu?"*: "Web admin **không** gửi mail. Việc gửi mã qua Gmail là của backend (team backend), vì mật khẩu Gmail không được nằm trong code chạy trên trình duyệt. Web admin chỉ gọi API `forgot-password`."
-
----
-
-## 1.8. Giao diện (CSS) của 2 trang này
+## 1.7. Giao diện (CSS) của trang đăng nhập
 
 | Phần | Class | Dòng trong `app.css` |
 |------|-------|----------------------|
@@ -179,16 +142,15 @@ ForgotPassword.razor:16            ForgotPassword.razor:51             ForgotPas
 | Ô mật khẩu + nút mắt | `.password-field` | 1058 (màu nâu của nút mắt ở ~2449) |
 | Nút Đăng nhập rộng hết thẻ | `.auth-submit` | 1077 |
 | Ẩn nút mắt của Edge / nền khi tự điền | `input::-ms-reveal`, `input:-webkit-autofill` | 2433, 2440 |
-| "Bước 1/3", chú thích, nút quay lại | `.auth-step`, `.auth-intro`, `.auth-back` | 2634, 2641, 2684 |
 | Điện thoại: logo thành dải ngang phía trên | `@media (max-width: 650px)` | tìm `.auth-shell` trong khối media |
 
 ---
 
-## 1.9. Tìm nhanh
+## 1.8. Tìm nhanh
 
 | Muốn tìm | Gõ Ctrl+Shift+F |
 |----------|-----------------|
-| Chữ trên nút | `Đăng nhập`, `Gửi mã xác minh`, `Quên mật khẩu?` |
-| Hàm xử lý | `HandleLogin`, `SendCode`, `VerifyCode`, `SavePassword` |
-| API | `api/auth/login`, `api/auth/forgot-password` |
+| Chữ trên nút | `Đăng nhập`, `Đăng xuất` |
+| Hàm xử lý | `HandleLogin`, `Logout` |
+| API | `api/v1/auth/dang-nhap` |
 | Câu báo lỗi | `Sai tên đăng nhập hoặc mật khẩu` (ra cả mock lẫn service) |

@@ -1,0 +1,51 @@
+@* Thanh thao tác chung của mọi trang quản lý: Thêm · Sửa · Xóa (cùng thứ tự, cùng kiểu nút),
+   sau đó là các nút riêng của từng trang (ChildContent: Công thức, Nhập / xuất hủy…).
+   Sửa / Xóa chỉ bật khi đã chọn một dòng trong bảng. *@
+
+<section class="panel action-bar crud-actions">
+
+    <button type="button" class="btn primary" @onclick="OnAdd">
+        <Icon Name="plus" />
+        @AddLabel
+    </button>
+
+    <button type="button"
+            class="btn outline"
+            disabled="@(!HasSelection)"
+            title="@(HasSelection ? null : $"Chọn một {ItemName} trong bảng để sửa")"
+            @onclick="OnEdit">
+        <Icon Name="edit" />
+        Sửa
+    </button>
+
+    <button type="button"
+            class="btn danger-outline"
+            disabled="@(!HasSelection || DeleteBlockedReason is not null)"
+            title="@(!HasSelection ? $"Chọn một {ItemName} trong bảng để xóa" : DeleteBlockedReason)"
+            @onclick="OnDelete">
+        <Icon Name="trash" />
+        Xóa
+    </button>
+
+    @ChildContent
+
+</section>
+
+@code {
+    /// <summary>Chữ nút Thêm, ví dụ "Thêm món".</summary>
+    [Parameter, EditorRequired] public string AddLabel { get; set; } = "";
+
+    /// <summary>Tên loại bản ghi trong câu gợi ý: "món", "nguyên liệu", "tài khoản"…</summary>
+    [Parameter, EditorRequired] public string ItemName { get; set; } = "";
+
+    [Parameter] public bool HasSelection { get; set; }
+
+    /// <summary>Lý do không xóa được dòng đang chọn (hiện ở title, nút bị khóa); null = xóa được.</summary>
+    [Parameter] public string? DeleteBlockedReason { get; set; }
+
+    [Parameter] public EventCallback OnAdd { get; set; }
+    [Parameter] public EventCallback OnEdit { get; set; }
+    [Parameter] public EventCallback OnDelete { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}
