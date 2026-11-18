@@ -60,17 +60,7 @@
                 Bộ lọc@(ActiveFilterCount > 0 ? $" ({ActiveFilterCount})" : "")
             </button>
 
-            <button type="button"
-                    class="btn outline refresh-button @(refreshing ? "is-loading" : "")"
-                    title="@RefreshTitle"
-                    aria-label="@RefreshTitle"
-                    @onclick="RefreshAll">
-                <Icon Name="reset" Size="18" />
-                @if (FiltersActive)
-                {
-                    <span class="filter-dot" aria-hidden="true"></span>
-                }
-            </button>
+            <RefreshButton Active="FiltersActive" Spinning="refreshing" Title="@RefreshTitle" OnClick="RefreshAll" />
 
             <div id="inventory-filters" class="filter-extra @(filtersOpen ? "open" : "")">
 
@@ -144,6 +134,7 @@
                     <span class="filter-break" aria-hidden="true"></span>
 
                     <select class="filter-half" aria-label="Lọc trạng thái sử dụng" @bind="usageFilter" @bind:after="ApplyIngredientFilter">
+                        <option value="@LocSuDung.TatCa">@LocSuDung.Label(LocSuDung.TatCa)</option>
                         @foreach (var u in LocSuDung.Options)
                         {
                             <option value="@u">@LocSuDung.Label(u)</option>
@@ -189,20 +180,19 @@
 
     </section>
 
-    @* Lịch sử kho chỉ để xem: phiếu nhập / xuất hủy tạo ở tab Nguyên liệu (trước đây 2 tab có 2 nút mở cùng một hộp thoại) *@
+    @* Thanh thao tác chung Thêm · Sửa · Xóa + nút riêng Nhập / xuất hủy.
+       Lịch sử kho chỉ để xem (phiếu nhập / xuất hủy tạo ở tab Nguyên liệu) nên không có thanh thao tác. *@
     @if (!transactionTab)
     {
-        <section class="panel action-bar">
-
-            <button class="btn primary"
-                    @onclick="Add">
-
-                <Icon Name="plus" />
-                Thêm nguyên liệu
-
-            </button>
-
-            <button class="btn outline"
+        <CrudActions AddLabel="Thêm nguyên liệu"
+                     ItemName="nguyên liệu"
+                     HasSelection="@(Selected is not null)"
+                     DeleteBlockedReason="@(Selected is { DangSuDung: false } ? "Đã ngừng sử dụng — chọn Sửa để dùng lại" : null)"
+                     OnAdd="Add"
+                     OnEdit="Edit"
+                     OnDelete="AskDelete">
+            <button type="button"
+                    class="btn outline"
                     title="@(Selected switch
                     {
                         { DangSuDung: true } s => $"Tạo phiếu nhập / xuất hủy cho {s.TenNguyenLieu}",
@@ -210,23 +200,10 @@
                         _ => "Tạo phiếu nhập hàng hoặc xuất hủy"
                     })"
                     @onclick="Transact">
-
                 <Icon Name="box" />
                 Nhập / xuất hủy
-
             </button>
-
-            <button class="btn outline"
-                    disabled="@(Selected is null)"
-                    title="@(Selected is null ? "Chọn một nguyên liệu trong bảng để sửa" : null)"
-                    @onclick="Edit">
-
-                <Icon Name="edit" />
-                Sửa
-
-            </button>
-
-        </section>
+        </CrudActions>
     }
 
     @if (message is not null)
@@ -282,7 +259,7 @@
                 }
             </div>
             @* Ẩn "Lọc danh sách" chỉ khi danh sách đang hiện ĐÚNG các nguyên liệu được đếm *@
-            @if (!(stockFilter == TinhTrangKho.CanNhapFilter && search.Trim() == "" && usageFilter == LocSuDung.DangSuDung))
+            @if (!(stockFilter == TinhTrangKho.CanNhapFilter && search.Trim() == ""))
             {
                 <button type="button" class="text-button restock-filter" @onclick="ShowNeedRestock">Lọc danh sách</button>
             }
@@ -314,9 +291,9 @@
                     else
                     {
                         <tr>
-                            <th>Mã NL</th>
+                            <SortHeader Sort="sort" Key="@SortId" Label="Mã NL" Name="mã nguyên liệu" OnSort="ToggleSort" />
                             <th>Tên nguyên liệu</th>
-                            <th>Tồn kho</th>
+                            <SortHeader Sort="sort" Key="@SortStock" Label="Tồn kho" OnSort="ToggleSort" />
                             <th>Mức cảnh báo</th>
                             <th>Tình trạng</th>
                         </tr>
@@ -390,17 +367,10 @@
 
                     @if (ItemCount == 0)
                     {
-                        <tr>
-
-                            <td class="empty-cell" colspan="@(transactionTab ? 7 : 5)">
-
-                                <Icon Name="box" Size="32" />
-
-                                <p>@EmptyText</p>
-
-                            </td>
-
-                        </tr>
+                        <EmptyRow Columns="@(transactionTab ? 7 : 5)"
+                                  Text="@EmptyText"
+                                  ShowClear="@(!loading && FiltersActive)"
+                                  OnClear="RefreshAll" />
                     }
 
                 </tbody>
@@ -494,8 +464,7 @@
 
                     @if (editingIngredient)
                     {
-                        @* Trạng thái: ô sổ xuống (Đang sử dụng / Ngừng sử dụng) theo yêu cầu chủ quán,
-                           thay cho ô tích và nút "Ngừng sử dụng" riêng trên thanh công cụ (trùng chức năng) *@
+                        @* Trạng thái: ô sổ xuống (Đang sử dụng / Ngừng sử dụng) theo yêu cầu chủ quán — mẫu chung cho mọi form Sửa *@
                         <div class="field">
                             <label for="i-status">Trạng thái</label>
                             <InputSelect id="i-status"
@@ -530,6 +499,23 @@
                 </div>
 
             </EditForm>
+        }
+
+        @if (dialog == "delete" && Selected is { } target)
+        {
+            <p>Xóa nguyên liệu <strong>@target.TenNguyenLieu</strong>?</p>
+
+            @if (error is not null)
+            {
+                <p class="alert error" role="alert">@error</p>
+            }
+
+            <div class="modal-footer">
+                <button class="btn outline" disabled="@saving" @onclick="Close">Hủy</button>
+                <button class="btn danger" disabled="@saving" @onclick="Delete">
+                    @(saving ? "Đang xóa…" : "Xóa")
+                </button>
+            </div>
         }
 
         @if (dialog == "transaction")
@@ -631,7 +617,10 @@
 
     // Bộ lọc tab Nguyên liệu (lọc tại chỗ — danh sách nguyên liệu ít)
     private string search = "";
-    private string usageFilter = LocSuDung.DangSuDung;
+    private string usageFilter = LocSuDung.TatCa;   // mặc định hiện cả nguyên liệu ngừng sử dụng
+    private readonly ColumnSort sort = new();
+    private const string SortId = "id";
+    private const string SortStock = "stock";
     private string stockFilter = "";
 
     // Bộ lọc tab Lịch sử kho (lọc ở máy chủ, có phân trang)
@@ -651,7 +640,6 @@
 
     private string dialog = "";
     private bool editingIngredient;
-    private bool editingWasActive;   // trạng thái sử dụng lúc mở hộp thoại Sửa (để báo "đã ngừng" / "sử dụng lại")
     private bool loading;
     private bool refreshing;
     private bool saving;
@@ -685,6 +673,7 @@
     {
         "ingredient" => editingIngredient ? "Sửa nguyên liệu" : "Thêm nguyên liệu",
         "transaction" => "Phiếu nhập hàng / xuất hủy",
+        "delete" => "Xóa nguyên liệu",
         _ => ""
     };
 
@@ -692,35 +681,39 @@
 
     private int ActiveFilterCount => transactionTab
         ? (appliedPreset != DatePresets.All ? 1 : 0) + (historyIngredient > 0 ? 1 : 0) + (historyType != "" ? 1 : 0)
-        : (usageFilter != LocSuDung.DangSuDung ? 1 : 0) + (stockFilter != "" ? 1 : 0);
+        : (usageFilter != LocSuDung.TatCa ? 1 : 0) + (stockFilter != "" ? 1 : 0);
 
     // Đang lọc / tìm khác mặc định → nút Làm mới có chấm báo (bấm sẽ đưa về mặc định)
-    private bool FiltersActive => ActiveFilterCount > 0 || (!transactionTab && search.Trim() != "");
+    private bool FiltersActive => ActiveFilterCount > 0 || (!transactionTab && (search.Trim() != "" || sort.Active));
 
     private string RefreshTitle => transactionTab
         ? (FiltersActive ? "Làm mới và bỏ lọc, xem toàn bộ lịch sử kho" : "Làm mới lịch sử kho")
-        : (FiltersActive ? "Làm mới và bỏ lọc, xem nguyên liệu đang sử dụng" : "Làm mới danh sách nguyên liệu");
+        : (FiltersActive ? "Làm mới và bỏ lọc, xem toàn bộ nguyên liệu" : "Làm mới danh sách nguyên liệu");
 
     private IEnumerable<NguyenLieu> FilteredIngredients
     {
         get
         {
-            string term = search.Trim();
+            // Tìm không phân biệt dấu (giống trang Món): "duong" ra "Đường", "sua" ra "Sữa đặc"
+            string term = SearchText.Fold(search);
 
-            return ingredients.Where(i =>
+            var list = ingredients.Where(i =>
                 (term == ""
                  || i.MaNguyenLieu.ToString(System.Globalization.CultureInfo.InvariantCulture).Contains(term, StringComparison.Ordinal)
-                 || i.TenNguyenLieu.Contains(term, StringComparison.OrdinalIgnoreCase))
+                 || SearchText.Contains(i.TenNguyenLieu, term))
                 && usageFilter switch
                 {
                     LocSuDung.NgungSuDung => !i.DangSuDung,
-                    LocSuDung.TatCa => true,
-                    _ => i.DangSuDung
+                    LocSuDung.DangSuDung => i.DangSuDung,
+                    _ => true
                 }
                 // Lọc tình trạng tồn chỉ áp dụng cho nguyên liệu đang sử dụng
-                && (usageFilter == LocSuDung.NgungSuDung || TinhTrangKho.Matches(i, stockFilter)))
-                // Lọc "Cần nhập thêm": nguyên liệu Hết hàng lên đầu (nhập gấp), giữ thứ tự tên trong từng nhóm
-                .OrderBy(i => stockFilter == TinhTrangKho.CanNhapFilter && i.TinhTrang != TinhTrangKho.HetHang ? 1 : 0);
+                && (usageFilter == LocSuDung.NgungSuDung || TinhTrangKho.Matches(i, stockFilter)));
+
+            // Bấm tiêu đề cột → xếp theo cột đó; không thì lọc "Cần nhập thêm" đưa Hết hàng lên đầu (nhập gấp)
+            return sort.Active
+                ? sort.Apply(list, (SortId, i => i.MaNguyenLieu), (SortStock, i => i.SoLuongTon))
+                : list.OrderBy(i => stockFilter == TinhTrangKho.CanNhapFilter && i.TinhTrang != TinhTrangKho.HetHang ? 1 : 0);
         }
     }
 
@@ -841,14 +834,23 @@
         await Load();
     }
 
+    /// <summary>Đổi tìm kiếm / bộ lọc: về trang 1 (dòng đang chọn tự bỏ nếu không còn hiện — xem Selected).</summary>
     private void ResetPage() => page = 1;
+
+    /// <summary>Bấm tiêu đề cột (Mã NL, Tồn kho): cột mới → thấp đến cao, bấm lại → đổi chiều.</summary>
+    private void ToggleSort(string key)
+    {
+        sort.Toggle(key);
+        page = 1;
+    }
 
     /// <summary>Nút "Lọc danh sách" trên cảnh báo: lọc nhanh các nguyên liệu đang sử dụng cần nhập thêm.</summary>
     private async Task ShowNeedRestock()
     {
         search = "";
-        usageFilter = LocSuDung.DangSuDung;
+        usageFilter = LocSuDung.TatCa;
         stockFilter = TinhTrangKho.CanNhapFilter;
+        sort.Reset();
         page = 1;
 
         // Nút vừa bấm sẽ ẩn → chuyển focus sang danh sách để người dùng bàn phím không bị đưa về đầu trang
@@ -947,8 +949,9 @@
         else
         {
             search = "";
-            usageFilter = LocSuDung.DangSuDung;
+            usageFilter = LocSuDung.TatCa;
             stockFilter = "";
+            sort.Reset();
         }
 
         // Tải lại là thao tác thường xuyên: không hiện thông báo "Đã tải lại…" (yêu cầu chủ quán).
@@ -1014,7 +1017,6 @@
         error = null;
         message = null;
         editingIngredient = true;
-        editingWasActive = source.DangSuDung;
         ingredientModel = new NguyenLieuForm
         {
             MaNguyenLieu = source.MaNguyenLieu,
@@ -1025,6 +1027,30 @@
             DangSuDung = source.DangSuDung
         };
         dialog = "ingredient";
+    }
+
+    private void AskDelete()
+    {
+        if (Selected is not { DangSuDung: true }) return;
+
+        error = null;
+        message = null;
+        dialog = "delete";
+    }
+
+    /// <summary>Xóa mềm (backend): nguyên liệu chuyển sang "Ngừng sử dụng", vẫn hiện trong bảng để tra cứu lịch sử kho.</summary>
+    private Task Delete()
+    {
+        if (Selected is not { } target) return Task.CompletedTask;
+
+        return Save(() => DeleteIngredient(target));
+    }
+
+    private async Task<string> DeleteIngredient(NguyenLieu target)
+    {
+        await InventoryApi.DeleteAsync(target.MaNguyenLieu, pageCts.Token);
+        // Backend chuyển sang Ngừng sử dụng (dòng vẫn hiện, nhãn đã đủ rõ)
+        return $"Đã xóa nguyên liệu {target.TenNguyenLieu}.";
     }
 
     private void Close()
@@ -1066,8 +1092,6 @@
     {
         if (editingIngredient)
         {
-            bool wasActive = editingWasActive;
-
             var saved = await InventoryApi.UpdateAsync(ingredientModel.MaNguyenLieu, new NguyenLieuCapNhatRequest
             {
                 TenNguyenLieu = ingredientModel.TenNguyenLieu.Trim(),
@@ -1076,12 +1100,8 @@
                 DangSuDung = ingredientModel.DangSuDung
             }, pageCts.Token);
 
-            return (wasActive, saved.DangSuDung) switch
-            {
-                (true, false) => $"Đã ngừng sử dụng nguyên liệu {saved.TenNguyenLieu}.",
-                (false, true) => $"Đã sử dụng lại nguyên liệu {saved.TenNguyenLieu}.",
-                _ => $"Đã cập nhật nguyên liệu {saved.TenNguyenLieu}."
-            };
+            // Cùng một câu cho mọi trang (Món, Topping, Kho…): đổi trạng thái là một phần của "Sửa"
+            return $"Đã cập nhật nguyên liệu {saved.TenNguyenLieu}.";
         }
 
         var created = await InventoryApi.CreateAsync(new NguyenLieuRequest

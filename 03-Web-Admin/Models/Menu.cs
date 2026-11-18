@@ -152,6 +152,12 @@ public static class TrangThaiMon
     public const string HetNguyenLieu = "Hết nguyên liệu";
     public const string NgungBan = "Ngừng bán";
 
+    /// <summary>Lựa chọn của ô lọc trạng thái (sau "Tất cả trạng thái").</summary>
+    public static readonly string[] Options = [DangBan, TamHet, HetNguyenLieu, NgungBan];
+
+    /// <summary>Trạng thái chọn được trong form Sửa ("Hết nguyên liệu" do hệ thống tự tính theo kho).</summary>
+    public static readonly string[] Editable = [DangBan, TamHet, NgungBan];
+
     public static string Of(Mon m) =>
         m.NgungBan ? NgungBan
         : !m.ConHang ? TamHet

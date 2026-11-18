@@ -1,0 +1,25 @@
+@* Nút Làm mới (biểu tượng) dùng chung thanh lọc các trang danh sách: bỏ mọi bộ lọc / tìm kiếm / sắp xếp,
+   về trang 1 và tải lại. Chấm nâu khi đang lọc (bấm sẽ đưa về mặc định); xoay khi đang tải do người dùng bấm. *@
+
+<button type="button"
+        class="btn outline refresh-button @(Spinning ? "is-loading" : "")"
+        title="@Title"
+        aria-label="@Title"
+        @onclick="OnClick">
+    <Icon Name="reset" Size="18" />
+    @if (Active)
+    {
+        <span class="filter-dot" aria-hidden="true"></span>
+    }
+</button>
+
+@code {
+    /// <summary>Đang lọc / tìm / sắp xếp khác mặc định → hiện chấm.</summary>
+    [Parameter] public bool Active { get; set; }
+
+    [Parameter] public bool Spinning { get; set; }
+
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    [Parameter] public EventCallback OnClick { get; set; }
+}

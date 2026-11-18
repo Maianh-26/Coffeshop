@@ -3,6 +3,13 @@
 
 @code {
     /// <summary>
+    /// false = không nhớ trang đang mở (dùng khi đường dẫn không tồn tại, ví dụ link cũ /forgot-password, /my-account
+    /// — nếu nhớ thì đăng nhập xong lại rơi vào "Không tìm thấy trang").
+    /// </summary>
+    [Parameter]
+    public bool KeepReturnUrl { get; set; } = true;
+
+    /// <summary>
     /// Chuyển về trang Đăng nhập. Nếu phiên hết hạn hoặc mở link khi chưa đăng nhập
     /// thì nhớ trang đang mở để quay lại; nếu người dùng tự bấm Đăng xuất thì không nhớ
     /// (người đăng nhập tiếp theo có thể là người khác, vai trò khác).
@@ -11,7 +18,8 @@
     {
         string current = Navigation.ToBaseRelativePath(Navigation.Uri);
 
-        bool skipReturnUrl = AuthState.SignedOutByUser
+        bool skipReturnUrl = !KeepReturnUrl
+                             || AuthState.SignedOutByUser
                              || string.IsNullOrEmpty(current)
                              || current.StartsWith("login", StringComparison.OrdinalIgnoreCase);
 

@@ -1,0 +1,25 @@
+@* Dòng báo bảng rỗng dùng chung: đang tải / không có dữ liệu / không khớp bộ lọc (kèm nút "Bỏ lọc"). *@
+
+<tr>
+    <td class="empty-cell" colspan="@Columns">
+        <Icon Name="@IconName" Size="32" />
+        <p>@Text</p>
+        @if (ShowClear)
+        {
+            <button type="button" class="text-button" @onclick="OnClear">Bỏ lọc</button>
+        }
+    </td>
+</tr>
+
+@code {
+    [Parameter, EditorRequired] public int Columns { get; set; }
+
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+
+    [Parameter] public string IconName { get; set; } = "box";
+
+    /// <summary>Đang lọc và đã tải xong → hiện nút "Bỏ lọc".</summary>
+    [Parameter] public bool ShowClear { get; set; }
+
+    [Parameter] public EventCallback OnClear { get; set; }
+}

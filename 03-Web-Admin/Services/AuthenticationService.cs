@@ -6,8 +6,8 @@ using CoffeeShop.Admin.Services.Auth;
 namespace CoffeeShop.Admin.Services;
 
 /// <summary>
-/// Service xác thực: đăng nhập (api/v1/auth/dang-nhap), tài khoản của tôi, đổi mật khẩu.
-/// Quên mật khẩu (api/auth/forgot-password…) backend CHƯA có — hiện chỉ chế độ giả lập trả lời.
+/// Service xác thực: đăng nhập (api/v1/auth/dang-nhap), đăng xuất, thông tin tài khoản đang đăng nhập (api/v1/auth/toi).
+/// Không có quên mật khẩu: quán chỉ vài tài khoản, chủ quán đặt lại mật khẩu ở trang Tài khoản (Sửa → Mật khẩu mới).
 /// </summary>
 public class AuthenticationService
 {
@@ -111,53 +111,7 @@ public class AuthenticationService
         new() { Success = false, Message = message };
 
     // ------------------------------------------------------------------
-    // Quên mật khẩu: email → mã xác minh → mật khẩu mới
-    // ------------------------------------------------------------------
-
-    /// <summary>
-    /// Bước 1: yêu cầu backend gửi mã xác minh tới email (backend gửi qua Gmail).
-    /// </summary>
-    public Task<AuthResult<ForgotPasswordResponse>> RequestResetCodeAsync(
-        string email,
-        CancellationToken cancellationToken = default) =>
-        PostAsync<ForgotPasswordResponse>(
-            "api/auth/forgot-password",
-            new ForgotPasswordRequest { Email = email.Trim() },
-            cancellationToken);
-
-    /// <summary>
-    /// Bước 2: kiểm tra mã 6 số, nhận về token đặt lại mật khẩu.
-    /// </summary>
-    public Task<AuthResult<VerifyResetCodeResponse>> VerifyResetCodeAsync(
-        string email,
-        string code,
-        CancellationToken cancellationToken = default) =>
-        PostAsync<VerifyResetCodeResponse>(
-            "api/auth/verify-reset-code",
-            new VerifyResetCodeRequest { Email = email.Trim(), Code = code.Trim() },
-            cancellationToken);
-
-    /// <summary>
-    /// Bước 3: đặt mật khẩu mới bằng token vừa nhận.
-    /// </summary>
-    public async Task<AuthResult<bool>> ResetPasswordAsync(
-        string resetToken,
-        string newPassword,
-        CancellationToken cancellationToken = default)
-    {
-        // Không đọc body: backend có thể trả 204 hoặc 200 rỗng — chỉ cần biết thành công hay không
-        var result = await PostAsync<NoBody>(
-            "api/auth/reset-password",
-            new ResetPasswordRequest { ResetToken = resetToken, NewPassword = newPassword },
-            cancellationToken);
-
-        return result.Success
-            ? AuthResult<bool>.Ok(true)
-            : AuthResult<bool>.Fail(result.Error!, result.ErrorCode);
-    }
-
-    // ------------------------------------------------------------------
-    // Tài khoản của tôi (cần đăng nhập)
+    // Tài khoản đang đăng nhập (trang Tài khoản dùng để không cho tự xóa chính mình)
     // ------------------------------------------------------------------
 
     /// <summary>
@@ -197,90 +151,6 @@ public class AuthenticationService
     }
 
     /// <summary>
-    /// Đổi mật khẩu của chính tài khoản đang đăng nhập: POST api/v1/auth/doi-mat-khau → 204.
-    /// Sai mật khẩu cũ → 400 BAD_REQUEST (lỗi kiểm tra dữ liệu là 400 VALIDATION_ERROR).
-    /// </summary>
-    public async Task<AuthResult<bool>> ChangePasswordAsync(
-        string currentPassword,
-        string newPassword,
-        CancellationToken cancellationToken = default)
-    {
-        var result = await PostAsync<NoBody>(
-            "api/v1/auth/doi-mat-khau",
-            new DoiMatKhauRequest { MatKhauCu = currentPassword, MatKhauMoi = newPassword },
-            cancellationToken);
-
-        if (result.Success)
-        {
-            return AuthResult<bool>.Ok(true);
-        }
-
-        // Endpoint này chỉ trả BAD_REQUEST khi mật khẩu cũ sai → báo ngay dưới ô "Mật khẩu hiện tại"
-        string? errorCode = result.ErrorCode == ApiErrorCodes.BadRequest
-            ? ResetErrorCodes.WrongPassword
-            : result.ErrorCode;
-
-        return AuthResult<bool>.Fail(result.Error!, errorCode);
-    }
-
-    /// <summary>
-    /// Đánh dấu API không trả nội dung (bỏ qua việc đọc body).
-    /// </summary>
-    private sealed class NoBody;
-
-    /// <summary>
-    /// Gửi POST, trả kết quả hoặc thông báo lỗi tiếng Việt cho người dùng.
-    /// </summary>
-    private async Task<AuthResult<T>> PostAsync<T>(
-        string url,
-        object body,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var response = await _http.PostAsJsonAsync(url, body, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-            {
-                bool hasBody = typeof(T) != typeof(NoBody)
-                               && response.StatusCode != System.Net.HttpStatusCode.NoContent
-                               && response.Content.Headers.ContentLength is not 0;
-
-                T? data = hasBody
-                    ? await response.Content.ReadFromJsonAsync<T>(cancellationToken)
-                    : default;
-
-                return AuthResult<T>.Ok(data!);
-            }
-
-            var (title, errorCode) = await ReadErrorAsync(response, cancellationToken);
-
-            // 429 kèm header chuẩn Retry-After (số giây) → giao diện đếm ngược chính xác
-            int? retryAfter = response.Headers.RetryAfter?.Delta is { } delta
-                ? (int)Math.Ceiling(delta.TotalSeconds)
-                : null;
-
-            return AuthResult<T>.Fail(MessageFor(url, (int)response.StatusCode, title), errorCode, retryAfter);
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError(ex, "Không kết nối được máy chủ khi gọi {Url}.", url);
-            return AuthResult<T>.Fail("Không thể kết nối máy chủ. Kiểm tra mạng hoặc máy chủ API.");
-        }
-        catch (JsonException ex)
-        {
-            _logger.LogError(ex, "Phản hồi của {Url} không đúng định dạng.", url);
-            return AuthResult<T>.Fail("Không đọc được phản hồi từ máy chủ.");
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            // HttpClient hết thời gian chờ (không phải do người dùng rời trang)
-            _logger.LogWarning("{Url}: máy chủ phản hồi quá lâu.", url);
-            return AuthResult<T>.Fail("Máy chủ phản hồi quá lâu. Vui lòng thử lại.");
-        }
-    }
-
-    /// <summary>
     /// Câu thông báo theo mã trạng thái (dùng chung quy tắc với <see cref="ApiClient.MessageFor"/>).
     /// </summary>
     private string MessageFor(string url, int status, string? message)
@@ -295,7 +165,6 @@ public class AuthenticationService
 
     /// <summary>
     /// Đọc thông báo lỗi và mã lỗi. Backend: { error: { code, message } }.
-    /// API quên mật khẩu (giả lập) vẫn dùng ProblemDetails: { title, errorCode }.
     /// </summary>
     private static async Task<(string? Message, string? ErrorCode)> ReadErrorAsync(
         HttpResponseMessage response,
@@ -320,12 +189,9 @@ public class AuthenticationService
                     ? value.GetString()
                     : null;
 
-            if (body.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.Object)
-            {
-                return (Read(error, "message"), Read(error, "code"));
-            }
-
-            return (Read(body, "title"), Read(body, "errorCode"));
+            return body.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.Object
+                ? (Read(error, "message"), Read(error, "code"))
+                : (null, null);
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException)
         {

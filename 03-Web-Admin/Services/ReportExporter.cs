@@ -20,10 +20,12 @@ public class ReportExporter
     private static readonly CultureInfo Vi = new("vi-VN");
 
     /// <summary>
-    /// Xuất doanh thu theo ngày và món bán chạy ra file CSV (tương thích Excel).
+    /// Xuất bảng doanh thu đang xem (theo giờ / ngày / tháng) và món bán chạy ra file CSV (tương thích Excel).
     /// </summary>
     public async Task ExportExcelAsync(
         BaoCaoDoanhThu report,
+        IReadOnlyList<DongBaoCao> rows,
+        string columnTitle,
         IReadOnlyList<MonBanChay> bestSellers,
         string dateRange)
     {
@@ -31,11 +33,11 @@ public class ReportExporter
 
         sb.AppendLine(Csv("Báo cáo doanh thu", dateRange));
         sb.AppendLine();
-        sb.AppendLine(Csv("Ngày", "Đơn đã thanh toán", "Doanh thu"));
+        sb.AppendLine(Csv(columnTitle, "Đơn đã thanh toán", "Doanh thu"));
 
-        foreach (var row in report.TheoNgay)
+        foreach (var row in rows)
         {
-            sb.AppendLine(Csv(row.Ngay.ToString("dd/MM/yyyy", Vi), row.SoDon.ToString(Vi), row.DoanhThu.ToString("N0", Vi)));
+            sb.AppendLine(Csv(row.MocDayDu, row.SoDon.ToString(Vi), row.DoanhThu.ToString("N0", Vi)));
         }
 
         sb.AppendLine(Csv("Tổng", report.SoDonDaThanhToan.ToString(Vi), report.DoanhThu.ToString("N0", Vi)));

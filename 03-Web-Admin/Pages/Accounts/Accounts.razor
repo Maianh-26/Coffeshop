@@ -8,6 +8,7 @@
 
 <div class="accounts-page">
 
+    @* Thanh lọc chung (như Đơn hàng / Kho / Món / Khuyến mãi) *@
     <section class="panel filters-panel">
 
         <div class="filter-row">
@@ -19,73 +20,46 @@
                 <input @bind="search"
                        @bind:event="oninput"
                        @bind:after="Filter"
-                       placeholder="Tìm mã, tên, tên đăng nhập hoặc email"
-                       aria-label="Tìm tài khoản" />
+                       maxlength="100"
+                       placeholder="Tìm theo tên, tên đăng nhập hoặc mã…"
+                       aria-label="Tìm tài khoản theo tên, tên đăng nhập hoặc mã" />
 
             </div>
 
-            <select aria-label="Lọc vai trò"
-                    @bind="roleFilter"
-                    @bind:after="Filter">
-
-                <option value="">Tất cả vai trò</option>
-                <option value="@Roles.Admin">@Roles.Label(Roles.Admin)</option>
-                <option value="@Roles.Staff">@Roles.Label(Roles.Staff)</option>
-
-            </select>
-
-            <select aria-label="Lọc trạng thái"
-                    @bind="statusFilter"
-                    @bind:after="Filter">
-
-                <option value="">Tất cả trạng thái</option>
-                <option value="active">Đang hoạt động</option>
-                <option value="locked">Đã khóa</option>
-
-            </select>
-
-            <button class="btn outline"
-                    @onclick="Reset">
-
-                <Icon Name="reset" />
-                Đặt lại
-
+            <button type="button"
+                    class="btn outline filters-toggle"
+                    aria-expanded="@(filtersOpen ? "true" : "false")"
+                    aria-controls="account-filters"
+                    @onclick="() => filtersOpen = !filtersOpen">
+                <Icon Name="filter" />
+                Bộ lọc@(ActiveFilterCount > 0 ? $" ({ActiveFilterCount})" : "")
             </button>
+
+            <RefreshButton Active="FiltersActive" Spinning="refreshing" Title="@RefreshTitle" OnClick="RefreshAll" />
+
+            <div id="account-filters" class="filter-extra @(filtersOpen ? "open" : "")">
+
+                <span class="filter-break" aria-hidden="true"></span>
+
+                <select class="filter-half" aria-label="Lọc vai trò" @bind="roleFilter" @bind:after="Filter">
+                    <option value="">Tất cả vai trò</option>
+                    <option value="@Roles.Admin">@Roles.Label(Roles.Admin)</option>
+                    <option value="@Roles.Staff">@Roles.Label(Roles.Staff)</option>
+                </select>
+
+            </div>
 
         </div>
 
     </section>
 
-    <section class="panel action-bar">
-
-        <button class="btn primary"
-                @onclick="Add">
-
-            <Icon Name="plus" />
-            Thêm tài khoản
-
-        </button>
-
-        <button class="btn outline"
-                disabled="@(Selected is null)"
-                @onclick="Edit">
-
-            <Icon Name="edit" />
-            Sửa
-
-        </button>
-
-        <button class="btn danger-outline"
-                disabled="@(Selected is null || IsMe(Selected))"
-                title="@(IsMe(Selected) ? "Không thể tự khóa tài khoản đang đăng nhập" : null)"
-                @onclick="AskToggleLock">
-
-            <Icon Name="lock" />
-            @(Selected is { TrangThai: false } ? "Mở khóa" : "Khóa tài khoản")
-
-        </button>
-
-    </section>
+    <CrudActions AddLabel="Thêm tài khoản"
+                 ItemName="tài khoản"
+                 HasSelection="@(Selected is not null)"
+                 DeleteBlockedReason="@(IsMe(Selected) ? "Không thể xóa tài khoản đang đăng nhập" : null)"
+                 OnAdd="Add"
+                 OnEdit="Edit"
+                 OnDelete="AskDelete" />
 
     @if (message is not null)
     {
@@ -106,17 +80,16 @@
 
         <div class="table-wrap">
 
-            <table>
+            @* account-table: gộp cột phụ trên màn hình hẹp (CSS mục [13]) *@
+            <table class="account-table">
 
                 <thead>
 
                     <tr>
-                        <th>Mã TK</th>
+                        <SortHeader Sort="sort" Key="@SortId" Label="Mã TK" Name="mã tài khoản" OnSort="ToggleSort" />
                         <th>Họ và tên</th>
                         <th>Tên đăng nhập</th>
-                        <th>Email</th>
                         <th>Vai trò</th>
-                        <th>Trạng thái</th>
                     </tr>
 
                 </thead>
@@ -125,25 +98,23 @@
 
                     @foreach (var item in VisibleAccounts)
                     {
-                        <tr class="selectable @(selected == item.MaNguoiDung ? "selected" : "")"
+                        <tr @key="item.MaNguoiDung"
+                            class="selectable @(selected == item.MaNguoiDung ? "selected" : "")"
                             tabindex="0"
                             @onclick="() => selected = item.MaNguoiDung"
                             @onkeydown="e => SelectKey(e, item.MaNguoiDung)">
 
                             <td>@item.MaNguoiDung</td>
-                            <td>@item.HoTen</td>
+                            <td>
+                                @item.HoTen
+                                @* Màn hình hẹp: cột Tên đăng nhập bị ẩn → hiện gọn dưới họ tên *@
+                                <span class="stock-sub sub-login">@item.TenDangNhap</span>
+                            </td>
                             <td>@item.TenDangNhap</td>
-                            <td>@item.Email</td>
 
                             <td>
                                 <span class="badge @(item.VaiTro == Roles.Admin ? "yellow" : "green")">
                                     @Roles.Label(item.VaiTro)
-                                </span>
-                            </td>
-
-                            <td>
-                                <span class="badge @(item.TrangThai ? "green" : "red")">
-                                    @(item.TrangThai ? "Đang hoạt động" : "Đã khóa")
                                 </span>
                             </td>
 
@@ -152,19 +123,11 @@
 
                     @if (VisibleAccounts.Count == 0)
                     {
-                        <tr>
-
-                            <td class="empty-cell" colspan="6">
-
-                                <Icon Name="user" Size="32" />
-
-                                <p>
-                                    @(loading ? "Đang tải danh sách tài khoản…" : "Không có tài khoản phù hợp.")
-                                </p>
-
-                            </td>
-
-                        </tr>
+                        <EmptyRow Columns="4"
+                                  IconName="user"
+                                  Text="@EmptyText"
+                                  ShowClear="@(!loading && FiltersActive)"
+                                  OnClear="RefreshAll" />
                     }
 
                 </tbody>
@@ -240,15 +203,6 @@
                     </div>
 
                     <div class="field">
-                        <label for="a-email">Email *</label>
-                        <InputText id="a-email"
-                                   @bind-Value="model.Email"
-                                   placeholder="Nhập email"
-                                   type="email" />
-                        <ValidationMessage For="@(() => model.Email)" />
-                    </div>
-
-                    <div class="field">
                         <label for="a-role">Vai trò</label>
                         <InputSelect id="a-role"
                                      @bind-Value="model.VaiTro">
@@ -293,12 +247,9 @@
             </EditForm>
         }
 
-        @if (dialog == "lock" && Selected is { } target)
+        @if (dialog == "delete" && Selected is { } target)
         {
-            <p>
-                @(target.TrangThai ? "Khóa" : "Mở khóa") tài khoản
-                <strong>@target.HoTen (@target.TenDangNhap)</strong>?
-            </p>
+            <p>Xóa tài khoản <strong>@target.HoTen (@target.TenDangNhap)</strong>?</p>
 
             @if (error is not null)
             {
@@ -311,8 +262,8 @@
                     Hủy
                 </button>
 
-                <button class="btn @(target.TrangThai ? "danger" : "primary")" disabled="@saving" @onclick="ToggleLock">
-                    @(saving ? "Đang lưu…" : target.TrangThai ? "Khóa tài khoản" : "Mở khóa")
+                <button class="btn danger" disabled="@saving" @onclick="Delete">
+                    @(saving ? "Đang xóa…" : "Xóa")
                 </button>
 
             </div>
@@ -328,7 +279,11 @@
 
     private string search = "";
     private string roleFilter = "";
-    private string statusFilter = "";
+    private bool filtersOpen;       // màn hình hẹp: khung bộ lọc đang mở
+    private bool refreshing;        // đang tải lại do bấm nút Làm mới
+
+    private readonly ColumnSort sort = new();
+    private const string SortId = "id";
     private int? selected;
     private int page = 1;
     private const int PageSize = 10;
@@ -343,9 +298,10 @@
 
     private NguoiDungForm model = new();
 
-    private NguoiDung? Selected => accounts.FirstOrDefault(a => a.MaNguoiDung == selected);
+    // Chỉ tính dòng đang thấy: tài khoản bị lọc / ở trang khác không còn được "chọn" ngầm cho nút Sửa / Xóa
+    private NguoiDung? Selected => VisibleAccounts.FirstOrDefault(a => a.MaNguoiDung == selected);
 
-    /// <summary>Mã tài khoản đang đăng nhập (backend cũng chặn tự khóa / tự hạ quyền — 409).</summary>
+    /// <summary>Mã tài khoản đang đăng nhập (không cho tự xóa; backend cũng chặn tự hạ quyền — 409).</summary>
     private int? myId;
 
     private bool IsMe(NguoiDung? account) => account is not null && account.MaNguoiDung == myId;
@@ -353,19 +309,42 @@
     private string DialogTitle => dialog switch
     {
         "form" => editing ? "Sửa tài khoản" : "Thêm tài khoản",
-        "lock" => Selected is { TrangThai: false } ? "Mở khóa tài khoản" : "Khóa tài khoản",
+        "delete" => "Xóa tài khoản",
         _ => ""
     };
 
-    private IEnumerable<NguoiDung> FilteredAccounts =>
-        accounts.Where(a =>
-            (roleFilter == "" || a.VaiTro == roleFilter)
-            && (statusFilter == "" || a.TrangThai == (statusFilter == "active"))
-            && (search == ""
-                || a.MaNguoiDung.ToString().Contains(search, StringComparison.OrdinalIgnoreCase)
-                || a.HoTen.Contains(search, StringComparison.OrdinalIgnoreCase)
-                || a.TenDangNhap.Contains(search, StringComparison.OrdinalIgnoreCase)
-                || a.Email.Contains(search, StringComparison.OrdinalIgnoreCase)));
+    private int ActiveFilterCount => roleFilter != "" ? 1 : 0;
+
+    // Đang lọc / tìm / sắp xếp khác mặc định → nút Làm mới có chấm báo
+    private bool FiltersActive => ActiveFilterCount > 0 || search.Trim() != "" || sort.Active;
+
+    private string RefreshTitle => FiltersActive ? "Làm mới và bỏ lọc, xem toàn bộ tài khoản" : "Làm mới danh sách tài khoản";
+
+    private string EmptyText =>
+        loading ? "Đang tải dữ liệu…"
+        : FiltersActive ? "Không có tài khoản khớp bộ lọc."
+        : "Chưa có tài khoản.";
+
+    /// <summary>
+    /// Tài khoản đã xóa (TrangThai = false) không hiện. Tìm không phân biệt dấu theo họ tên, tên đăng nhập, mã.
+    /// </summary>
+    private IEnumerable<NguoiDung> FilteredAccounts
+    {
+        get
+        {
+            string term = SearchText.Fold(search);
+
+            return sort.Apply(
+                accounts.Where(a =>
+                    a.TrangThai
+                    && (roleFilter == "" || a.VaiTro == roleFilter)
+                    && (term == ""
+                        || a.MaNguoiDung.ToString(System.Globalization.CultureInfo.InvariantCulture).Contains(term, StringComparison.Ordinal)
+                        || SearchText.Contains(a.HoTen, term)
+                        || SearchText.Contains(a.TenDangNhap, term))),
+                (SortId, a => a.MaNguoiDung));
+        }
+    }
 
     private List<NguoiDung> VisibleAccounts =>
         FilteredAccounts
@@ -411,12 +390,33 @@
         page = 1;
     }
 
-    private void Reset()
+    private void ToggleSort(string key)
+    {
+        sort.Toggle(key);
+        page = 1;
+    }
+
+    /// <summary>Nút Làm mới: bỏ mọi bộ lọc / tìm kiếm / sắp xếp, về trang 1 và tải lại.</summary>
+    private async Task RefreshAll()
     {
         search = "";
         roleFilter = "";
-        statusFilter = "";
+        sort.Reset();
         page = 1;
+        message = null;
+
+        if (refreshing || loading) return;
+
+        refreshing = true;
+
+        try
+        {
+            await Load();
+        }
+        finally
+        {
+            refreshing = false;
+        }
     }
 
     private void Move(int direction)
@@ -451,20 +451,19 @@
             MaNguoiDung = source.MaNguoiDung,
             TenDangNhap = source.TenDangNhap,
             HoTen = source.HoTen,
-            Email = source.Email,
             VaiTro = source.VaiTro,
             TrangThai = source.TrangThai
         };
         dialog = "form";
     }
 
-    private void AskToggleLock()
+    private void AskDelete()
     {
         if (Selected is null || IsMe(Selected)) return;
 
         error = null;
         message = null;
-        dialog = "lock";
+        dialog = "delete";
     }
 
     private void Close()
@@ -497,7 +496,6 @@
                 saved = await AccountApi.UpdateAsync(model.MaNguoiDung, new NguoiDungCapNhatRequest
                 {
                     HoTen = model.HoTen.Trim(),
-                    Email = model.Email.Trim(),
                     VaiTro = model.VaiTro,
                     MatKhauMoi = string.IsNullOrEmpty(model.MatKhau) ? null : model.MatKhau
                 }, pageCts.Token);
@@ -511,7 +509,8 @@
                     TenDangNhap = model.TenDangNhap.Trim(),
                     MatKhau = model.MatKhau!,
                     HoTen = model.HoTen.Trim(),
-                    Email = model.Email.Trim(),
+                    // Web không nhập email (không có quên mật khẩu) — backend vẫn bắt buộc nên gửi email nội bộ
+                    Email = NguoiDungTaoRequest.EmailNoiBo(model.TenDangNhap.Trim()),
                     VaiTro = model.VaiTro
                 }, pageCts.Token);
 
@@ -521,6 +520,12 @@
             dialog = "";
             selected = saved.MaNguoiDung;
             await Load();
+        }
+        catch (ApiException ex) when (ex.Status == 409 && !editing)
+        {
+            // Email gửi lên suy ra từ tên đăng nhập nên mọi lỗi trùng (tên đăng nhập hay email) đều là trùng tên đăng nhập.
+            // Tài khoản đã xóa vẫn giữ tên đăng nhập trong CSDL (backend chưa có xóa thật) → trùng mà không thấy trong bảng
+            error = "Tên đăng nhập đã được dùng (có thể bởi một tài khoản đã xóa) — hãy chọn tên đăng nhập khác.";
         }
         catch (ApiException ex)
         {
@@ -535,7 +540,7 @@
         }
     }
 
-    private async Task ToggleLock()
+    private async Task Delete()
     {
         if (saving || Selected is not { } target || IsMe(target)) return;
 
@@ -544,11 +549,10 @@
 
         try
         {
-            bool unlock = !target.TrangThai;
-            var saved = await AccountApi.UpdateAsync(target.MaNguoiDung,
-                new NguoiDungCapNhatRequest { TrangThai = unlock }, pageCts.Token);
+            await AccountApi.DeleteAsync(target.MaNguoiDung, pageCts.Token);
 
-            message = unlock ? $"Đã mở khóa tài khoản {saved.HoTen}." : $"Đã khóa tài khoản {saved.HoTen}.";
+            message = $"Đã xóa tài khoản {target.HoTen}.";
+            selected = null;
             dialog = "";
             await Load();
         }

@@ -3,7 +3,8 @@ using CoffeeShop.Admin.Models;
 namespace CoffeeShop.Admin.Services;
 
 /// <summary>
-/// Danh mục món — api/v1/danh-muc; kích thước ly — api/v1/kich-thuoc.
+/// Danh mục món — api/v1/danh-muc; kích thước ly — api/v1/kich-thuoc (chỉ đọc: S/M/L có sẵn trong CSDL,
+/// dùng cho ô giá theo size trong form món; web không thêm / sửa / xóa size).
 /// </summary>
 public class CategoryService
 {
@@ -27,18 +28,8 @@ public class CategoryService
     public Task DeleteAsync(int id, CancellationToken ct = default) =>
         _api.DeleteAsync($"api/v1/danh-muc/{id}", ct);
 
-    // ------------------------------------------------------------------ Kích thước
+    // ------------------------------------------------------------------ Kích thước (chỉ đọc)
 
     public Task<List<KichThuoc>> GetSizesAsync(CancellationToken ct = default) =>
         _api.GetAsync<List<KichThuoc>>("api/v1/kich-thuoc", ct);
-
-    public Task<KichThuoc> CreateSizeAsync(KichThuocRequest request, CancellationToken ct = default) =>
-        _api.PostAsync<KichThuoc>("api/v1/kich-thuoc", request, ct);
-
-    public Task<KichThuoc> UpdateSizeAsync(KichThuocRequest request, CancellationToken ct = default) =>
-        _api.PutAsync<KichThuoc>($"api/v1/kich-thuoc/{Uri.EscapeDataString(request.MaKichThuoc)}", request, ct);
-
-    /// <summary>409 nếu kích thước đang có trong bảng giá món.</summary>
-    public Task DeleteSizeAsync(string maKichThuoc, CancellationToken ct = default) =>
-        _api.DeleteAsync($"api/v1/kich-thuoc/{Uri.EscapeDataString(maKichThuoc)}", ct);
 }

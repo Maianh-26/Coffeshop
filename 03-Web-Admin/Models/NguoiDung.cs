@@ -17,7 +17,7 @@ public class NguoiDung
     public string Email { get; set; } = "";
     public string VaiTro { get; set; } = "";
 
-    /// <summary>true: hoạt động, false: bị khóa.</summary>
+    /// <summary>true: hoạt động, false: đã xóa (web ẩn khỏi danh sách, không đăng nhập được).</summary>
     public bool TrangThai { get; set; } = true;
 }
 
@@ -45,6 +45,13 @@ public class DoiMatKhauRequest
 /// <summary>POST api/v1/nguoi-dung (chỉ QuanLy)</summary>
 public class NguoiDungTaoRequest
 {
+    /// <summary>
+    /// Web không còn ô nhập email (bỏ quên mật khẩu qua email). Backend vẫn bắt buộc email hợp lệ và không trùng,
+    /// nên gửi một địa chỉ nội bộ theo tên đăng nhập (tên đăng nhập đã là duy nhất).
+    /// Đề xuất backend cho email không bắt buộc: docs/de-xuat-api-bo-email-tai-khoan.md.
+    /// </summary>
+    public static string EmailNoiBo(string tenDangNhap) => $"{tenDangNhap.ToLowerInvariant()}@coffeeshop.local";
+
     public string TenDangNhap { get; set; } = "";
     public string MatKhau { get; set; } = "";
     public string HoTen { get; set; } = "";
@@ -61,7 +68,7 @@ public class NguoiDungCapNhatRequest
     public string? Email { get; set; }
     public string? VaiTro { get; set; }
 
-    /// <summary>false = khóa tài khoản.</summary>
+    /// <summary>false = xóa tài khoản (backend chưa có DELETE).</summary>
     public bool? TrangThai { get; set; }
 
     /// <summary>Quản lý đặt lại mật khẩu cho nhân viên.</summary>
@@ -71,20 +78,12 @@ public class NguoiDungCapNhatRequest
 /// <summary>
 /// Form thêm/sửa tài khoản trên trang Tài khoản (kiểm tra giống ràng buộc của backend).
 /// </summary>
-public class NguoiDungForm : IValidatableObject
+public class NguoiDungForm
 {
     public int MaNguoiDung { get; set; }
 
     /// <summary>true = form thêm mới → mật khẩu bắt buộc.</summary>
     public bool IsNew { get; set; }
-
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        if (IsNew && string.IsNullOrEmpty(MatKhau))
-        {
-            yield return new ValidationResult("Nhập mật khẩu (tối thiểu 6 ký tự).", [nameof(MatKhau)]);
-        }
-    }
 
     [Required(ErrorMessage = "Nhập tên đăng nhập.")]
     [RegularExpression("^[a-zA-Z0-9_.]{3,50}$",
@@ -95,16 +94,25 @@ public class NguoiDungForm : IValidatableObject
     [StringLength(100, ErrorMessage = "Họ tên không được vượt quá 100 ký tự.")]
     public string HoTen { get; set; } = "";
 
-    [Required(ErrorMessage = "Nhập email.")]
-    [EmailAddress(ErrorMessage = "Email không đúng định dạng.")]
-    [StringLength(100, ErrorMessage = "Email không được vượt quá 100 ký tự.")]
-    public string Email { get; set; } = "";
-
     public string VaiTro { get; set; } = "NhanVien";
 
     public bool TrangThai { get; set; } = true;
 
     /// <summary>Bắt buộc khi thêm; khi sửa để trống = giữ mật khẩu cũ.</summary>
+    [RequiredWhenNew(ErrorMessage = "Nhập mật khẩu (tối thiểu 6 ký tự).")]
     [StringLength(100, MinimumLength = 6, ErrorMessage = "Mật khẩu từ 6 đến 100 ký tự.")]
     public string? MatKhau { get; set; }
+}
+
+/// <summary>
+/// Bắt buộc khi form đang thêm mới (<see cref="NguoiDungForm.IsNew"/>). Kiểm tra ở mức ô (không phải IValidatableObject)
+/// để lỗi hiện dưới ô Mật khẩu cùng lúc với các ô khác — kiểm tra mức form chỉ chạy khi mọi ô đã hợp lệ.
+/// </summary>
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class RequiredWhenNewAttribute : ValidationAttribute
+{
+    protected override ValidationResult? IsValid(object? value, ValidationContext validationContext) =>
+        validationContext.ObjectInstance is NguoiDungForm { IsNew: true } && string.IsNullOrEmpty(value as string)
+            ? new ValidationResult(ErrorMessage, validationContext.MemberName is { } member ? [member] : null)
+            : ValidationResult.Success;
 }

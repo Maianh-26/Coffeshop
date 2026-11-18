@@ -25,6 +25,33 @@ public class KhuyenMai
 }
 
 /// <summary>
+/// Trạng thái hiển thị của khuyến mãi (một chỗ duy nhất cho chữ và màu). "Đang áp dụng" do backend tính
+/// (ngày + khung giờ vàng); các trạng thái còn lại suy ra từ ngày.
+/// </summary>
+public static class TrangThaiKhuyenMai
+{
+    public const string DangApDung = "Đang áp dụng";
+    public const string NgoaiKhungGio = "Ngoài khung giờ";
+    public const string ChuaBatDau = "Chưa bắt đầu";
+    public const string DaKetThuc = "Đã kết thúc";
+
+    public static readonly string[] Options = [DangApDung, NgoaiKhungGio, ChuaBatDau, DaKetThuc];
+
+    public static string Of(KhuyenMai p, DateTime now) =>
+        p.DangApDung ? DangApDung
+        : now > p.NgayKetThuc ? DaKetThuc
+        : now < p.NgayBatDau ? ChuaBatDau
+        : NgoaiKhungGio;
+
+    public static string Color(string status) => status switch
+    {
+        DangApDung => "green",
+        DaKetThuc => "gray",
+        _ => "yellow"
+    };
+}
+
+/// <summary>
 /// POST / PUT api/v1/khuyen-mai. MaTenMons = null → giữ nguyên danh sách món áp dụng.
 /// </summary>
 public class KhuyenMaiRequest

@@ -3,57 +3,77 @@
 
 <PageTitle>Tổng quan - Coffee Shop</PageTitle>
 
-<div class="dashboard-toolbar">
+@* Bộ lọc thời gian giống trang Đơn hàng / Kho: mốc nhanh áp dụng ngay, "Chọn khoảng ngày…" chỉ lọc khi bấm Áp dụng *@
+<section class="panel filters-panel dashboard-filters-panel">
 
-    <div class="date-filters">
+<div class="filter-row dashboard-filters">
 
-        <div class="date-range">
+    <select class="date-preset"
+            aria-label="Khoảng thời gian báo cáo"
+            @bind="datePreset"
+            @bind:after="OnDatePresetChanged">
+        @foreach (var p in DatePresets.Options)
+        {
+            <option value="@p">@DatePresets.Label(p)</option>
+        }
+    </select>
 
-            <input type="date"
-                   aria-label="Từ ngày"
-                   @bind="filter.From" />
+    <RefreshButton Active="FiltersActive" Spinning="loading" Title="@RefreshTitle" OnClick="RefreshAll" />
 
-            <span>–</span>
-
-            <input type="date"
-                   aria-label="Đến ngày"
-                   @bind="filter.To" />
-
-        </div>
-
-        <select aria-label="Khoảng thời gian"
-                @onchange="ChangePeriod">
-
-            <option value="">Tùy chọn</option>
-            <option value="7" selected>7 ngày gần nhất</option>
-            <option value="30">30 ngày gần nhất</option>
-            <option value="month">Tháng này</option>
-            <option value="all">Toàn bộ thời gian</option>
-
-        </select>
-
-        <button class="btn primary"
-                disabled="@loading"
-                @onclick="Apply">
-            @(loading ? "Đang tải…" : "Áp dụng")
-        </button>
-
-    </div>
-
-    <button class="btn primary"
+    <button type="button"
+            class="btn primary dashboard-export"
             disabled="@(report is null)"
             @onclick="() => exportOpen = true">
-
         <Icon Name="download" />
         Xuất báo cáo
-
     </button>
+
+    @if (datePreset == DatePresets.Custom)
+    {
+        <form class="custom-range" @onsubmit="ApplyCustomRange" novalidate>
+
+            <label class="range-field">
+                <span>Từ ngày</span>
+                <input type="date"
+                       @bind="customFrom"
+                       max="@DatePresets.IsoDate(customTo ?? DateTime.Today)"
+                       aria-invalid="@(dateError is not null ? "true" : null)"
+                       aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
+            </label>
+
+            <label class="range-field">
+                <span>Đến ngày</span>
+                <input type="date"
+                       @bind="customTo"
+                       min="@(customFrom is { } cf ? DatePresets.IsoDate(cf) : null)"
+                       max="@DatePresets.IsoDate(DateTime.Today)"
+                       aria-invalid="@(dateError is not null ? "true" : null)"
+                       aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
+            </label>
+
+            <button type="submit" class="btn primary btn-compact" disabled="@loading">Áp dụng</button>
+
+            @if (dateError is not null)
+            {
+                <p id="date-range-help" class="range-help is-error">@dateError</p>
+            }
+
+            <span class="sr-only" role="alert">@dateError</span>
+
+        </form>
+    }
 
 </div>
 
-<p class="filter-caption">
-    @range
-</p>
+@if (range != "")
+{
+    <p class="active-range dashboard-range">
+        <Icon Name="calendar" Size="14" />
+        @range
+    </p>
+}
+
+</section>
 
 @if (error is not null)
 {
@@ -132,88 +152,93 @@
 
 <section class="panel chart-panel">
 
-    <h2>Doanh thu theo ngày</h2>
+    @* Tên cố định cho mọi khoảng lọc; đơn vị cột (giờ / ngày / tháng) thể hiện qua nhãn trục thời gian *@
+    <h2>Biểu đồ doanh thu</h2>
 
-    <span class="axis-unit">
-        Triệu đồng
-    </span>
+    <div class="chart-container @(loading ? "is-loading" : "")">
 
-    @if (Rows.Count == 0)
-    {
-        <div class="chart-empty">
-            @(loading ? "Đang tải dữ liệu…" : "Chưa có doanh thu trong khoảng thời gian này.")
+        @* Trục tiền tự co giãn theo mốc cao nhất; không có doanh thu → chỉ còn 0 đ *@
+        <div class="chart-axis" aria-hidden="true">
+
+            @for (int i = axis.Steps; i >= 0; i--)
+            {
+                <span style="@AxisPosition(i)">
+                    @AxisLabel(axis.Step * i)
+                </span>
+            }
+
         </div>
-    }
-    else
-    {
-        <div class="chart-scroll">
 
-            <div class="chart-container"
-                 style="@($"min-width:{Math.Max(600, Rows.Count * 48)}px")">
+        <div class="plot">
 
-                <div class="chart-axis">
+            <div class="grid-lines @(axis.Steps == 0 ? "is-zero" : "")" aria-hidden="true">
 
-                    @for (int i = 6; i >= 0; i--)
-                    {
-                        <span style="@AxisPosition(i)">
-                            @((ChartMax * i / 6m / 1000000m)
-                                .ToString("0.#", Vi))
-                        </span>
-                    }
+                @for (int i = 0; i <= axis.Steps; i++)
+                {
+                    <div></div>
+                }
 
-                </div>
+            </div>
 
-                <div class="plot">
+            @if (!loading && axis.Steps == 0)
+            {
+                <p class="chart-note">Chưa có doanh thu trong khoảng thời gian này</p>
+            }
 
-                    <div class="grid-lines">
+            <div class="bars">
 
-                        @for (int i = 0; i < 7; i++)
-                        {
-                            <div></div>
-                        }
+                @for (int i = 0; i < points.Count; i++)
+                {
+                    var p = points[i];
 
-                    </div>
+                    @* Rê chuột / chạm / Tab vào cột → tô nền cả cột và hiện doanh thu + số đơn *@
+                    <div class="bar-column @TipSide(i)"
+                         style="@BarVar(p.DoanhThu)"
+                         @key="p.MocDayDu"
+                         tabindex="0"
+                         role="img"
+                         aria-label="@BarTitle(p)">
 
-                    <div class="bars">
+                        <div class="bar-value-area">
 
-                        @foreach (var row in Rows)
-                        {
-                            <div class="bar-column">
+                            @if (p.DoanhThu > 0)
+                            {
+                                <div class="bar" style="@BarHeight(p.DoanhThu)"></div>
+                            }
 
-                                <div class="bar-value-area">
-
-                                    <strong style="@LabelPosition(row.DoanhThu)">
-                                        @((row.DoanhThu / 1000000m)
-                                            .ToString("0.#", Vi))
-                                    </strong>
-
-                                    <div class="bar"
-                                         style="@BarHeight(row.DoanhThu)">
-                                    </div>
-
-                                </div>
-
-                                <span>
-                                    @row.Ngay.ToString("dd/MM", Vi)
-                                </span>
-
+                            <div class="bar-tip" aria-hidden="true">
+                                <span>@p.MocDayDu</span>
+                                <strong>@Money(p.DoanhThu)</strong>
+                                <small>@p.SoDon đơn</small>
                             </div>
-                        }
+
+                        </div>
+
+                        <span class="bar-label @(IsMajorLabel(i) ? "" : "is-minor")" aria-hidden="true">
+                            @if (ShowLabel(i))
+                            {
+                                @p.Moc
+                                @if (p.MocPhu is not null)
+                                {
+                                    <small>@p.MocPhu</small>
+                                }
+                            }
+                        </span>
 
                     </div>
-
-                </div>
+                }
 
             </div>
 
         </div>
-    }
+
+    </div>
 
 </section>
 
 <section class="panel report-panel">
 
-    <h2>Báo cáo theo ngày</h2>
+    <h2>Báo cáo theo @ScaleName</h2>
 
     <div class="table-wrap">
 
@@ -222,7 +247,7 @@
             <thead>
 
                 <tr>
-                    <th>Ngày</th>
+                    <th>@ColumnTitle</th>
                     <th>Đơn đã thanh toán</th>
                     <th>Doanh thu</th>
                 </tr>
@@ -231,16 +256,16 @@
 
             <tbody>
 
-                @foreach (var row in Rows)
+                @foreach (var row in TableRows)
                 {
-                    <tr>
-                        <td>@row.Ngay.ToString("dd/MM/yyyy", Vi)</td>
+                    <tr @key="row.MocDayDu">
+                        <td>@row.MocDayDu</td>
                         <td>@row.SoDon</td>
                         <td>@Money(row.DoanhThu)</td>
                     </tr>
                 }
 
-                @if (Rows.Count == 0)
+                @if (!TableRows.Any())
                 {
                     <tr>
                         <td colspan="3" class="empty-cell">
@@ -293,7 +318,7 @@
                     var item = bestSellers[i];
                     int rank = i + 1;
 
-                    <tr>
+                    <tr @key="item.MaTenMon">
                         <td>@rank</td>
                         <td>@item.TenMon</td>
                         <td>@item.SoLuong</td>

@@ -16,7 +16,6 @@ namespace CoffeeShop.Admin.Services.Mock;
 /// cùng định dạng lỗi { error: { code, message, details } } và mã HTTP.
 /// Các service và trang không biết mình đang chạy với dữ liệu giả.
 /// Bật/tắt bằng "Api:UseMock" trong wwwroot/appsettings.json.
-/// Riêng quên mật khẩu (api/auth/forgot-password…) backend CHƯA có — mock giữ đề xuất cũ.
 /// </summary>
 public class MockApiHandler : HttpMessageHandler
 {
@@ -78,7 +77,6 @@ public class MockApiHandler : HttpMessageHandler
         {
             HttpResponseMessage? response = route switch
             {
-                ["auth", var action] when request.Method == HttpMethod.Post => ForgotPasswordRoutes(action, body),
                 ["v1", .. var rest] => Route(request.Method, rest, query, body, CurrentUser(request)),
                 _ => null
             };
@@ -1301,161 +1299,6 @@ public class MockApiHandler : HttpMessageHandler
     }
 
     // ==================================================================
-    // QUÊN MẬT KHẨU — backend CHƯA có; mock giữ đề xuất api/auth/* (ProblemDetails)
-    // ==================================================================
-
-    private static readonly TimeSpan CodeLifetime = TimeSpan.FromMinutes(10);
-    private static readonly TimeSpan ResendCooldown = TimeSpan.FromSeconds(60);
-    private static readonly TimeSpan ResetTokenLifetime = TimeSpan.FromMinutes(15);
-    private const int MaxCodeAttempts = 5;
-    private const int MaxCodeRequestsPerHour = 5;
-
-    private HttpResponseMessage? ForgotPasswordRoutes(string action, string? body) => action switch
-    {
-        "forgot-password" => ForgotPassword(body),
-        "verify-reset-code" => VerifyResetCode(body),
-        "reset-password" => ResetPassword(body),
-        _ => null
-    };
-
-    /// <summary>
-    /// Bước 1: sinh mã 6 số cho email.
-    /// Quy tắc chống dò email: phản hồi GIỐNG HỆT nhau dù email có tài khoản hay không —
-    /// kể cả giới hạn gửi lại (60 giây) và giới hạn 5 lần/giờ đều áp cho MỌI email.
-    /// </summary>
-    private HttpResponseMessage ForgotPassword(string? body)
-    {
-        var request = JsonSerializer.Deserialize<ForgotPasswordRequest>(body ?? "{}", JsonOptions)!;
-        string email = (request.Email ?? "").Trim();
-
-        if (string.IsNullOrEmpty(email))
-        {
-            return Problem(HttpStatusCode.BadRequest, "Vui lòng nhập email.");
-        }
-
-        // Nhật ký xin mã theo email — giữ lại cả khi mã bị hủy, nên không lách được giới hạn
-        var log = _db.ResetRequestLog.TryGetValue(email, out var times) ? times : _db.ResetRequestLog[email] = [];
-        log.RemoveAll(t => t < DateTime.Now.AddHours(-1));
-
-        if (log.Count > 0)
-        {
-            var wait = log[^1] + ResendCooldown - DateTime.Now;
-
-            if (wait > TimeSpan.Zero)
-            {
-                var tooSoon = Problem((HttpStatusCode)429,
-                    $"Mã vừa được gửi. Vui lòng chờ {Math.Ceiling(wait.TotalSeconds)} giây trước khi gửi lại.",
-                    ResetErrorCodes.ResendTooSoon);
-
-                // Header chuẩn HTTP: giao diện dùng để đếm ngược đúng số giây còn lại
-                tooSoon.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(
-                    TimeSpan.FromSeconds(Math.Ceiling(wait.TotalSeconds)));
-
-                return tooSoon;
-            }
-        }
-
-        if (log.Count >= MaxCodeRequestsPerHour)
-        {
-            return Problem((HttpStatusCode)429,
-                "Bạn đã yêu cầu mã quá nhiều lần. Vui lòng thử lại sau 1 giờ.", "too_many_requests");
-        }
-
-        log.Add(DateTime.Now);
-
-        var response = new ForgotPasswordResponse
-        {
-            Message = "Nếu email thuộc một tài khoản, mã xác minh đã được gửi. Vui lòng kiểm tra hộp thư (cả mục Spam).",
-            ResendAfterSeconds = (int)ResendCooldown.TotalSeconds
-        };
-
-        var account = _db.NguoiDungs.FirstOrDefault(a => a.Email.Equals(email, StringComparison.OrdinalIgnoreCase));
-
-        if (account is not null)
-        {
-            string code = Random.Shared.Next(0, 1_000_000).ToString("D6");
-
-            _db.ResetCodes[email] = new ResetCode
-            {
-                Username = account.TenDangNhap,
-                Code = code,
-                SentAt = DateTime.Now,
-                ExpiresAt = DateTime.Now + CodeLifetime
-            };
-
-            response.DevCode = code; // CHỈ có ở giả lập — backend thật gửi mã qua Gmail
-        }
-
-        return Ok(response);
-    }
-
-    /// <summary>
-    /// Bước 2: kiểm tra mã — đúng thì cấp token đặt lại mật khẩu (dùng một lần).
-    /// </summary>
-    private HttpResponseMessage VerifyResetCode(string? body)
-    {
-        var request = JsonSerializer.Deserialize<VerifyResetCodeRequest>(body ?? "{}", JsonOptions)!;
-        string email = (request.Email ?? "").Trim();
-        string code = (request.Code ?? "").Trim();
-
-        if (!_db.ResetCodes.TryGetValue(email, out var entry) || entry.ExpiresAt < DateTime.Now)
-        {
-            _db.ResetCodes.Remove(email);
-            return Problem(HttpStatusCode.BadRequest,
-                "Mã không hợp lệ hoặc đã hết hạn. Kiểm tra lại email đã nhập, rồi gửi lại mã.", ResetErrorCodes.CodeExpired);
-        }
-
-        if (entry.Code != code)
-        {
-            entry.FailedAttempts++;
-            int left = MaxCodeAttempts - entry.FailedAttempts;
-
-            if (left <= 0)
-            {
-                _db.ResetCodes.Remove(email);
-                return Problem(HttpStatusCode.BadRequest,
-                    "Nhập sai quá số lần cho phép. Vui lòng gửi lại mã mới.", ResetErrorCodes.TooManyAttempts);
-            }
-
-            return Problem(HttpStatusCode.BadRequest,
-                $"Mã xác minh không đúng. Còn {left} lần thử.", ResetErrorCodes.InvalidCode);
-        }
-
-        _db.ResetCodes.Remove(email);
-
-        string token = Guid.NewGuid().ToString("N");
-        _db.ResetTokens[token] = (entry.Username, DateTime.Now + ResetTokenLifetime);
-
-        return Ok(new VerifyResetCodeResponse { ResetToken = token });
-    }
-
-    /// <summary>
-    /// Bước 3: đặt mật khẩu mới bằng token. Kiểm tra dữ liệu TRƯỚC, chỉ hủy token khi đổi thành công.
-    /// </summary>
-    private HttpResponseMessage ResetPassword(string? body)
-    {
-        var request = JsonSerializer.Deserialize<ResetPasswordRequest>(body ?? "{}", JsonOptions)!;
-        string token = request.ResetToken ?? "";
-        string password = request.NewPassword ?? "";
-
-        if (!_db.ResetTokens.TryGetValue(token, out var entry) || entry.ExpiresAt < DateTime.Now)
-        {
-            _db.ResetTokens.Remove(token);
-            return Problem(HttpStatusCode.BadRequest,
-                "Phiên đặt lại mật khẩu đã hết hạn. Vui lòng làm lại từ đầu.", ResetErrorCodes.TokenExpired);
-        }
-
-        if (password.Length is < 6 or > 100)
-        {
-            return Problem(HttpStatusCode.BadRequest, "Mật khẩu từ 6 đến 100 ký tự.");
-        }
-
-        _db.ResetTokens.Remove(token);
-        _db.MatKhaus[entry.Username] = password;
-        return NoContent();
-    }
-
-    // ==================================================================
     // TIỆN ÍCH
     // ==================================================================
 
@@ -1525,8 +1368,4 @@ public class MockApiHandler : HttpMessageHandler
     /// <summary>Lỗi chung của backend: { error: { code, message, details } }.</summary>
     private static HttpResponseMessage Error(int status, string code, string message, object? details = null) =>
         Json((HttpStatusCode)status, new { error = new { code, message, details } });
-
-    /// <summary>ProblemDetails — chỉ dùng cho API quên mật khẩu (đề xuất, backend chưa có).</summary>
-    private static HttpResponseMessage Problem(HttpStatusCode status, string title, string? errorCode = null) =>
-        Json(status, new { title, status = (int)status, errorCode });
 }
