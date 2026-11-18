@@ -34,6 +34,29 @@ public class MonBanChay
     public int MaTenMon { get; set; }
     public string TenMon { get; set; } = "";
     public int SoLuong { get; set; }
+
+    /// <summary>Tiền món (không gồm topping).</summary>
+    public decimal DoanhThu { get; set; }
+
+    /// <summary>Tiền topping gọi kèm món này.</summary>
+    public decimal DoanhThuTopping { get; set; }
+
+    /// <summary>DoanhThu + DoanhThuTopping (backend cũ không trả → 0).</summary>
+    public decimal TongDoanhThu { get; set; }
+
+    /// <summary>Doanh thu hiển thị: gồm topping; backend cũ chưa trả TongDoanhThu thì dùng tiền món.</summary>
+    public decimal DoanhThuGomTopping => Math.Max(TongDoanhThu, DoanhThu);
+}
+
+/// <summary>GET api/v1/bao-cao/topping-ban-chay — chỉ tính đơn đã thanh toán.</summary>
+public class ToppingBanChay
+{
+    public int MaTopping { get; set; }
+    public string TenTopping { get; set; } = "";
+
+    /// <summary>Tổng số ly có gọi topping này.</summary>
+    public int SoLuong { get; set; }
+
     public decimal DoanhThu { get; set; }
 }
 

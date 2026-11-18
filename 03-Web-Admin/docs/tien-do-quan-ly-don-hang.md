@@ -152,6 +152,7 @@ Người dùng đã được hỏi có ghi phần này vào tài liệu đề xu
 - **Vẫn giữ bên trong:** phân biệt đơn tablet (`MaNguoiDung` rỗng) để báo đơn mới và ghi chú chuyển khoản. Backend vẫn lưu tài khoản tạo đơn (`maNguoiDung`, `tenNhanVien` trong DTO), chỉ không hiển thị. Đã bỏ thuộc tính hiển thị `DonHang.Nguon`.
 - **Nếu giảng viên hỏi** "nhân viên nghỉ thì ai làm": hệ thống phân quyền theo vai trò (Nhân viên / Quản lý), không theo người; nhân viên nào cũng làm được mọi việc trên trang Đơn hàng, chủ quán làm được tất cả. "Làm sao biết ai tạo đơn": dữ liệu vẫn được lưu, chỉ ẩn khỏi giao diện; mỗi người nên đăng nhập tài khoản riêng.
 - CSS: các luật ẩn cột theo `nth-child` của `.orders-table` đã chỉnh cho bảng 6 cột (Thời gian tạo là cột 6). `app.css?v=58`.
+- **Mở rộng 18/11/2026 (chủ quán):** web **không hiển thị tên người ở bất kỳ đâu**: người tạo đơn, **người thu tiền** (chi tiết đơn, hóa đơn K80) và **người thực hiện** ở lịch sử kho. Backend đã có `maNguoiThu`/`tenNguoiThu` (đơn) và `tenNguoiDung` (`lich-su-kho`): giữ nguyên phía backend, web không đưa vào model, không hiển thị. Từ backend mới chỉ dùng `thoiGianThanhToan` ("Thu lúc …", không kèm tên). Đã đính chính trong `hop-dong-api-bo-sung.md` (A6, C3, mục 12).
 
 
 ## 10. Cập nhật 16/11/2026: bỏ chữ giải thích trên toàn web admin

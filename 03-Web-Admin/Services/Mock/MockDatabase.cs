@@ -247,6 +247,12 @@ public class MockDatabase
         DonHangs.Add(preparing);
 
         DonHangs.Add(NewOrder(id, null, now.AddMinutes(-5), PhuongThucThanhToans.Cash, (5, 1, [1, 2]), (1, 1, [])));
+
+        // Đơn mẫu đã thu tiền (kể cả đã hoàn tiền): giờ thu = vài phút sau giờ tạo
+        foreach (var d in DonHangs.Where(d => d.ThoiGianThanhToan is null && (d.TrangThaiThanhToan == TrangThaiDon.Paid || d.DaHoanTien)))
+        {
+            d.ThoiGianThanhToan = d.ThoiGianTao.AddMinutes(3);
+        }
     }
 
     /// <summary>

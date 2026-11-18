@@ -20,13 +20,15 @@ public class ReportExporter
     private static readonly CultureInfo Vi = new("vi-VN");
 
     /// <summary>
-    /// Xuất bảng doanh thu đang xem (theo giờ / ngày / tháng) và món bán chạy ra file CSV (tương thích Excel).
+    /// Xuất bảng doanh thu đang xem (theo giờ / ngày / tháng), món bán chạy (doanh thu gồm topping) và topping bán chạy
+    /// ra file CSV (tương thích Excel).
     /// </summary>
     public async Task ExportExcelAsync(
         BaoCaoDoanhThu report,
         IReadOnlyList<DongBaoCao> rows,
         string columnTitle,
         IReadOnlyList<MonBanChay> bestSellers,
+        IReadOnlyList<ToppingBanChay> bestToppings,
         string dateRange)
     {
         var sb = new StringBuilder();
@@ -53,7 +55,18 @@ public class ReportExporter
 
             foreach (var item in bestSellers)
             {
-                sb.AppendLine(Csv(item.TenMon, item.SoLuong.ToString(Vi), item.DoanhThu.ToString("N0", Vi)));
+                sb.AppendLine(Csv(item.TenMon, item.SoLuong.ToString(Vi), item.DoanhThuGomTopping.ToString("N0", Vi)));
+            }
+        }
+
+        if (bestToppings.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine(Csv("Topping bán chạy", "Số ly", "Doanh thu"));
+
+            foreach (var item in bestToppings)
+            {
+                sb.AppendLine(Csv(item.TenTopping, item.SoLuong.ToString(Vi), item.DoanhThu.ToString("N0", Vi)));
             }
         }
 

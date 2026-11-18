@@ -111,14 +111,14 @@
 
                     <Icon Name="search" />
 
-                    @* Chỉ tìm theo cột đang hiển thị: mã đơn hoặc số nhận món (chỉ nhận chữ số) *@
+                    @* Máy chủ tìm trên toàn bộ danh sách: mã đơn hoặc số nhận món (chỉ nhận chữ số) *@
                     <input value="@searchText"
                            @oninput="OnSearchInput"
                            @onblur="() => searchHint = false"
                            inputmode="numeric"
                            maxlength="10"
-                           placeholder="Tìm trong trang này: mã đơn, số nhận món…"
-                           aria-label="Tìm trong trang hiện tại theo mã đơn hoặc số nhận món (chỉ nhập số)"
+                           placeholder="Tìm mã đơn, số nhận món…"
+                           aria-label="Tìm đơn theo mã đơn hoặc số nhận món (chỉ nhập số)"
                            aria-describedby="@(searchHint ? "search-hint" : null)" />
 
                     @* Gợi ý nổi (không đẩy bố cục) khi người dùng gõ ký tự không phải số.
@@ -438,8 +438,10 @@
                                     <p>
                                         @(loading && orders.Count == 0
                                             ? "Đang tải đơn hàng…"
-                                            : search.Length > 0 && orders.Count > 0
-                                                ? $"Không có đơn khớp \"{search}\" trên trang này."
+                                            : search.Length > 0 && (searchPending || loading)
+                                                ? "Đang tìm…"
+                                            : search.Length > 0
+                                                ? $"Không có đơn khớp \"{search}\"."
                                                 : "Không tìm thấy đơn hàng nào phù hợp với bộ lọc.")
                                     </p>
 
@@ -457,14 +459,7 @@
             <div class="list-footer">
 
                 <span>
-                    @if (search.Length > 0)
-                    {
-                        @($"Đang hiện {VisibleOrders.Count}/{orders.Count} đơn trên trang này (tổng {FooterTotal} đơn)")
-                    }
-                    else
-                    {
-                        @($"{FooterTotal} đơn hàng")
-                    }
+                    @($"{FooterTotal} đơn hàng")
                     <span class="page-of">Trang @(page)/@totalPages</span>
                 </span>
 
@@ -536,6 +531,13 @@
                     <dt>Thanh toán</dt>
                     <dd>@PhuongThucThanhToans.Summary(detail)</dd>
                 </div>
+                @if (detail.ThoiGianThanhToan is { } paidAt)
+                {
+                    <div>
+                        <dt>Thu tiền lúc</dt>
+                        <dd>@paidAt.ToString("HH:mm, dd/MM/yyyy")</dd>
+                    </div>
+                }
                 @if (detail.LyDoHuy is not null)
                 {
                     <div>
@@ -1054,8 +1056,9 @@
                 <td class="r-right">@(receipt.SoNhanMon is { } receiptNo ? $"Số nhận món: {receiptNo}" : "")</td>
             </tr>
             <tr>
-                <td>Ngày: @receipt.ThoiGianTao.ToString("dd/MM/yyyy")</td>
-                <td class="r-right">Giờ: @receipt.ThoiGianTao.ToString("HH:mm:ss")</td>
+                @* Hóa đơn thanh toán: ghi giờ thu tiền; đơn chưa thu (in trước) thì ghi giờ tạo đơn *@
+                <td>Ngày: @((receipt.ThoiGianThanhToan ?? receipt.ThoiGianTao).ToString("dd/MM/yyyy"))</td>
+                <td class="r-right">Giờ: @((receipt.ThoiGianThanhToan ?? receipt.ThoiGianTao).ToString("HH:mm:ss"))</td>
             </tr>
         </table>
 
@@ -1296,9 +1299,9 @@
     private DonHang? SelectedOrder => selectedOrder;
 
     /// <summary>
-    /// Tìm nhanh trong trang đang hiển thị (máy chủ chưa hỗ trợ tìm theo từ khóa).
-    /// Chỉ so với dữ liệu nhìn thấy trên bảng: mã đơn bắt đầu bằng số đã nhập, hoặc số nhận món trùng khớp.
-    /// (Trước đây tìm cả tên món / nhân viên vốn không hiện trên bảng → kết quả trông như "lọc sai".)
+    /// Máy chủ tìm trên TOÀN BỘ danh sách (tham số <c>timKiem</c>, xem <see cref="ReloadForSearch"/>).
+    /// Lọc thêm tại chỗ cùng quy tắc (mã đơn bắt đầu bằng số đã nhập, hoặc số nhận món trùng khớp) để bảng
+    /// phản hồi ngay khi đang gõ, trước khi kết quả của máy chủ về.
     /// </summary>
     private List<DonHang> VisibleOrders =>
         search.Length == 0
@@ -1320,6 +1323,7 @@
 
         int version = ++searchVersion;
 
+        string previous = search;
         search = digits;
         searchHint = digits != raw;
 
@@ -1336,6 +1340,36 @@
         }
 
         searchText = digits;
+
+        if (digits != previous) await ReloadForSearch();
+    }
+
+    private const int SearchDebounceMs = 350;
+    private int searchReloadVersion;   // tăng mỗi lượt chờ tìm kiếm mới / nút Làm mới → lượt chờ cũ tự bỏ
+    private bool searchPending;        // đang chờ debounce → tạm dừng tự làm mới (tránh tải từ khóa mới ở trang cũ)
+
+    /// <summary>
+    /// Gõ xong (ngừng gõ <see cref="SearchDebounceMs"/> ms) mới hỏi máy chủ, về trang 1.
+    /// </summary>
+    private async Task ReloadForSearch()
+    {
+        int version = ++searchReloadVersion;
+        searchPending = true;
+
+        try
+        {
+            await Task.Delay(SearchDebounceMs, pageCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;   // rời trang
+        }
+
+        if (version != searchReloadVersion) return;
+
+        searchPending = false;
+        page = 1;
+        await LoadOrders();
     }
 
     private Mon? BuilderProduct => menu.FirstOrDefault(m => m.MaTenMon == builderProductId);
@@ -1416,7 +1450,7 @@
             // (trang 1 theo thứ tự mặc định "mới nhất trước" mới chứa sẵn các đơn mới nhất)
             string? requestedSort = SortParam;
             bool unfilteredFirstPage = page == 1 && statusFilter == "" && paymentFilter == ""
-                                       && !fromDate.HasValue && requestedSort is null;
+                                       && !fromDate.HasValue && requestedSort is null && search.Length == 0;
             Task<PagedResult<DonHang>>? scanTask = unfilteredFirstPage
                 ? null
                 : OrderApi.GetPageAsync(1, NewOrderScan, ct: cts.Token);
@@ -1428,7 +1462,8 @@
                 cancelledOnly ? TrangThaiDon.Cancelled : (paymentFilter == "" ? null : paymentFilter),
                 cancelledOnly || statusFilter == "" ? null : statusFilter,
                 fromDate,
-                toDate);
+                toDate,
+                search.Length == 0 ? null : search);
 
             if (requestedSort is not null && !serverSortSupported)
             {
@@ -1444,6 +1479,7 @@
                     tuNgay: filter.TuNgay,
                     denNgay: filter.DenNgay,
                     sapXep: requestedSort,
+                    timKiem: filter.TimKiem,
                     ct: cts.Token);
 
                 // Phản hồi của lượt tải cũ về sau khi đã có lượt mới (WASM không hủy kịp request đã xong):
@@ -1549,7 +1585,7 @@
     private async Task AutoRefresh()
     {
         // Không làm mới khi đang thao tác (tránh danh sách nhảy dưới tay người dùng)
-        if (!autoRefreshEnabled || loading || paying || creating || cancelling || servingBusy
+        if (!autoRefreshEnabled || loading || paying || creating || cancelling || servingBusy || searchPending
             || isOrderModalOpen || isCancelModalOpen || pageCts.IsCancellationRequested)
         {
             return;
@@ -1682,7 +1718,7 @@
     }
 
     /// <summary>Bộ lọc đang áp dụng, dùng chung cho request 1 trang và request tải hết để sắp xếp.</summary>
-    private sealed record OrderFilter(string? TrangThai, string? TrangThaiPhucVu, DateTime? TuNgay, DateTime? DenNgay);
+    private sealed record OrderFilter(string? TrangThai, string? TrangThaiPhucVu, DateTime? TuNgay, DateTime? DenNgay, string? TimKiem);
 
     // Máy chủ chưa hỗ trợ "sapXep": web tự tải hết danh sách (đã lọc) theo lô 100 đơn — mức tối đa backend cho phép —
     // rồi sắp xếp và chia trang tại chỗ. Giới hạn để không tải quá nhiều khi danh sách rất dài.
@@ -1718,7 +1754,7 @@
     {
         // Mốc nhanh: khóa theo TÊN mốc (giờ cụ thể đổi mỗi lần tải); khoảng tự chọn: khóa theo 2 ngày đã chọn
         string range = appliedPreset == DatePresets.Custom ? $"{filter.TuNgay:yyyyMMdd}-{filter.DenNgay:yyyyMMdd}" : appliedPreset;
-        string key = $"{filter.TrangThai}|{filter.TrangThaiPhucVu}|{range}|{SortParam}";
+        string key = $"{filter.TrangThai}|{filter.TrangThaiPhucVu}|{range}|{filter.TimKiem}|{SortParam}";
 
         // Còn danh sách vừa tải cho đúng bộ lọc + cách sắp xếp → chỉ cắt lại trang, không gọi máy chủ
         if (clientSorted is not null && clientSortedKey == key
@@ -1744,6 +1780,7 @@
                     trangThaiPhucVu: filter.TrangThaiPhucVu,
                     tuNgay: filter.TuNgay,
                     denNgay: filter.DenNgay,
+                    timKiem: filter.TimKiem,
                     ct: batchCts.Token);
             }
             catch
@@ -1831,6 +1868,8 @@
         searchText = "";
         searchHint = false;
         searchVersion++;
+        searchReloadVersion++;
+        searchPending = false;
         datePreset = DatePresets.All;
         appliedPreset = DatePresets.All;
         fromDate = null;
@@ -2238,13 +2277,14 @@
     }
 
     /// <summary>
-    /// Các API số nhận món / trạng thái phục vụ / sửa đơn mới chỉ là đề xuất: backend chưa có thì báo rõ thay vì "không tìm thấy".
+    /// API số nhận món / trạng thái phục vụ / sửa đơn: backend cũ (chưa cập nhật theo hợp đồng bổ sung) chưa có
+    /// thì báo rõ thay vì "không tìm thấy".
     /// </summary>
-    /// Backend thật trả 404 NOT_FOUND "Không có endpoint ..." (MapFallback) cho route chưa có; đơn hàng thì không bị xóa,
-    /// nên 404/405/501 trên các route đề xuất được coi là "chưa hỗ trợ".
+    /// Backend trả 404 NOT_FOUND "Không có endpoint ..." (MapFallback) cho route chưa có; đơn hàng thì không bị xóa,
+    /// nên 404/405/501 trên các route này được coi là "chưa hỗ trợ".
     private static string ProposedApiError(ApiException ex) =>
         ex.Status is 404 or 405 or 501
-            ? "Máy chủ chưa hỗ trợ chức năng này (đã đề xuất với nhóm backend)."
+            ? "Máy chủ chưa hỗ trợ chức năng này (cần cập nhật backend)."
             : ex.Message;
 
     // =========================================================================

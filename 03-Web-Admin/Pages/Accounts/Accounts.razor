@@ -326,7 +326,7 @@
         : "Chưa có tài khoản.";
 
     /// <summary>
-    /// Tài khoản đã xóa (TrangThai = false) không hiện. Tìm không phân biệt dấu theo họ tên, tên đăng nhập, mã.
+    /// Tài khoản đã xóa backend không trả về; tài khoản bị khóa (TrangThai = false, web không dùng) cũng ẩn. Tìm không phân biệt dấu theo họ tên, tên đăng nhập, mã.
     /// </summary>
     private IEnumerable<NguoiDung> FilteredAccounts
     {
@@ -509,8 +509,8 @@
                     TenDangNhap = model.TenDangNhap.Trim(),
                     MatKhau = model.MatKhau!,
                     HoTen = model.HoTen.Trim(),
-                    // Web không nhập email (không có quên mật khẩu) — backend vẫn bắt buộc nên gửi email nội bộ
-                    Email = NguoiDungTaoRequest.EmailNoiBo(model.TenDangNhap.Trim()),
+                    // Web không nhập email (không có quên mật khẩu); backend cho phép không có email
+                    Email = null,
                     VaiTro = model.VaiTro
                 }, pageCts.Token);
 
@@ -523,9 +523,10 @@
         }
         catch (ApiException ex) when (ex.Status == 409 && !editing)
         {
-            // Email gửi lên suy ra từ tên đăng nhập nên mọi lỗi trùng (tên đăng nhập hay email) đều là trùng tên đăng nhập.
-            // Tài khoản đã xóa vẫn giữ tên đăng nhập trong CSDL (backend chưa có xóa thật) → trùng mà không thấy trong bảng
-            error = "Tên đăng nhập đã được dùng (có thể bởi một tài khoản đã xóa) — hãy chọn tên đăng nhập khác.";
+            // Không gửi email nên lỗi trùng khi thêm chỉ có thể là trùng tên đăng nhập. Tài khoản xóa bằng DELETE đã được
+            // giải phóng tên; còn tài khoản "xóa" kiểu cũ (PATCH trangThai=false, bảng ẩn) nếu chưa được script backend
+            // DongBoWebAdmin_20261118.sql chuyển sang đã xóa thì vẫn giữ tên → gợi ý để người dùng hiểu vì sao trùng.
+            error = "Tên đăng nhập đã được dùng (có thể bởi một tài khoản đã xóa trước đây) — hãy chọn tên đăng nhập khác.";
         }
         catch (ApiException ex)
         {

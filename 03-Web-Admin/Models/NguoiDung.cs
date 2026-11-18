@@ -14,10 +14,14 @@ public class NguoiDung
     public int MaNguoiDung { get; set; }
     public string TenDangNhap { get; set; } = "";
     public string HoTen { get; set; } = "";
-    public string Email { get; set; } = "";
+    /// <summary>Không bắt buộc (web không nhập email); null = không có.</summary>
+    public string? Email { get; set; }
     public string VaiTro { get; set; } = "";
 
-    /// <summary>true: hoạt động, false: đã xóa (web ẩn khỏi danh sách, không đăng nhập được).</summary>
+    /// <summary>
+    /// true: hoạt động, false: bị khóa (backend còn chức năng khóa; web không dùng, ẩn khỏi danh sách).
+    /// Tài khoản đã xóa (DELETE) backend không trả về nữa.
+    /// </summary>
     public bool TrangThai { get; set; } = true;
 }
 
@@ -45,17 +49,13 @@ public class DoiMatKhauRequest
 /// <summary>POST api/v1/nguoi-dung (chỉ QuanLy)</summary>
 public class NguoiDungTaoRequest
 {
-    /// <summary>
-    /// Web không còn ô nhập email (bỏ quên mật khẩu qua email). Backend vẫn bắt buộc email hợp lệ và không trùng,
-    /// nên gửi một địa chỉ nội bộ theo tên đăng nhập (tên đăng nhập đã là duy nhất).
-    /// Đề xuất backend cho email không bắt buộc: docs/de-xuat-api-bo-email-tai-khoan.md.
-    /// </summary>
-    public static string EmailNoiBo(string tenDangNhap) => $"{tenDangNhap.ToLowerInvariant()}@coffeeshop.local";
-
     public string TenDangNhap { get; set; } = "";
     public string MatKhau { get; set; } = "";
     public string HoTen { get; set; } = "";
-    public string Email { get; set; } = "";
+
+    /// <summary>Không bắt buộc: web không có ô email nên luôn gửi null (backend coi null / "" là không có email).</summary>
+    public string? Email { get; set; }
+
     public string VaiTro { get; set; } = "NhanVien";
 }
 
@@ -68,7 +68,7 @@ public class NguoiDungCapNhatRequest
     public string? Email { get; set; }
     public string? VaiTro { get; set; }
 
-    /// <summary>false = xóa tài khoản (backend chưa có DELETE).</summary>
+    /// <summary>false = khóa tài khoản (web không dùng; xóa tài khoản dùng DELETE).</summary>
     public bool? TrangThai { get; set; }
 
     /// <summary>Quản lý đặt lại mật khẩu cho nhân viên.</summary>

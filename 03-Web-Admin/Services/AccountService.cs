@@ -3,8 +3,8 @@ using CoffeeShop.Admin.Models;
 namespace CoffeeShop.Admin.Services;
 
 /// <summary>
-/// Quản lý tài khoản (chỉ Quản lý) — api/v1/nguoi-dung. Web không còn "khóa / mở khóa": chỉ có Xóa
-/// (xem <see cref="DeleteAsync"/>). Tài khoản đã xóa (TrangThai = false) không hiện trong danh sách.
+/// Quản lý tài khoản (chỉ Quản lý) — api/v1/nguoi-dung. Web không dùng "khóa / mở khóa": chỉ có Xóa
+/// (xem <see cref="DeleteAsync"/>). Tài khoản đã xóa backend không trả về; tài khoản bị khóa (TrangThai = false) web ẩn.
 /// </summary>
 public class AccountService
 {
@@ -26,10 +26,10 @@ public class AccountService
         _api.PatchAsync<NguoiDung>($"api/v1/nguoi-dung/{id}", request, ct);
 
     /// <summary>
-    /// Xóa tài khoản. Backend CHƯA có DELETE api/v1/nguoi-dung/{id} (đã đề xuất, xem docs/de-xuat-api-xoa-tai-khoan.md),
-    /// nên tạm vô hiệu hóa bằng PATCH trangThai = false: không đăng nhập được nữa, đơn hàng / lịch sử kho của
-    /// tài khoản vẫn giữ. Khi backend có route xóa, chỉ cần đổi lời gọi ở đây.
+    /// Xóa tài khoản (204). Backend xóa mềm: giải phóng tên đăng nhập (tạo lại được tài khoản cùng tên),
+    /// token đang dùng của tài khoản đó bị 401 ngay, đơn hàng / lịch sử kho cũ vẫn giữ.
+    /// 409 khi xóa chính mình hoặc quản lý cuối cùng; 404 khi tài khoản không còn.
     /// </summary>
     public Task DeleteAsync(int id, CancellationToken ct = default) =>
-        _api.PatchAsync<NguoiDung>($"api/v1/nguoi-dung/{id}", new NguoiDungCapNhatRequest { TrangThai = false }, ct);
+        _api.DeleteAsync($"api/v1/nguoi-dung/{id}", ct);
 }

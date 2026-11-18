@@ -27,6 +27,9 @@ public class DashboardService
     public Task<List<MonBanChay>> GetBestSellersAsync(DashboardFilter filter, int top = 5, CancellationToken ct = default) =>
         _api.GetAsync<List<MonBanChay>>(Range("api/v1/bao-cao/mon-ban-chay", filter, top), ct);
 
+    public Task<List<ToppingBanChay>> GetBestToppingsAsync(DashboardFilter filter, int top = 5, CancellationToken ct = default) =>
+        _api.GetAsync<List<ToppingBanChay>>(Range("api/v1/bao-cao/topping-ban-chay", filter, top), ct);
+
     public Task<List<GioCaoDiem>> GetPeakHoursAsync(DashboardFilter filter, CancellationToken ct = default) =>
         _api.GetAsync<List<GioCaoDiem>>(Range("api/v1/bao-cao/gio-cao-diem", filter), ct);
 }

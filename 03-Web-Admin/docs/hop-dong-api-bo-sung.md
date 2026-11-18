@@ -43,7 +43,7 @@
 | B2 | `email` không bắt buộc khi tạo tài khoản | Sửa API + DB | Trung bình | Gửi tạm `<tenDangNhap>@coffeeshop.local` |
 | C1 | Báo cáo doanh thu tính theo **giờ thu tiền** | Sửa API | **Cao** | Phụ thuộc A6 |
 | C2 | `mon-ban-chay` trả thêm doanh thu topping; thêm `bao-cao/topping-ban-chay` | Sửa API + API mới | Trung bình | Chưa có |
-| C3 | `lich-su-kho` trả thêm `tenNguoiDung` | DTO | Thấp | Chưa hiện người thực hiện |
+| C3 | `lich-su-kho` trả thêm `tenNguoiDung` | DTO | Thấp | **Web không hiển thị** (xem ghi chú bên dưới) |
 | D1 | Giá nhập khi nhập kho + báo cáo chi phí | DB + API | Tùy chọn | Chưa có |
 | D2 | Tải ảnh món lên | API mới | Tùy chọn | Chỉ nhập được URL |
 | D3 | Đơn chuyển khoản trên tablet tự sang `PAID` | Tích hợp | Tùy chọn | Mở từ v2.1 |
@@ -187,6 +187,8 @@ if (!string.IsNullOrEmpty(q.TimKiem))
 - **Dữ liệu cũ:** đơn `PAID` đã có → `ThoiGianThanhToan = ThoiGianTao` (chạy một lần trong script).
 - Hủy đơn đã `PAID` (hoàn tiền) **không** xóa hai trường này.
 
+> **Đính chính (18/11/2026, quyết định của chủ quán):** web **không hiển thị tên người** ở bất kỳ đâu: không người tạo đơn, không người thu tiền (chi tiết đơn, hóa đơn K80), không người thực hiện kho. Lý do giống quyết định ngày 14/11 (`tien-do-quan-ly-don-hang.md` mục 9): quán gia đình, mọi người đứng chung quầy, đối soát tiền theo két tiền mặt / sao kê chuyển khoản. Web chỉ dùng **`thoiGianThanhToan`**. Backend đã làm `maNguoiThu`, `tenNguoiThu` (C3: `tenNguoiDung`): **giữ nguyên, không cần gỡ** (trường thêm, cho phép null, giống `tenNhanVien` hiện có), dữ liệu lưu bên trong để tra khi cần.
+
 ### Ví dụ `DonHangDto` sau khi bổ sung
 
 ```json
@@ -286,6 +288,8 @@ if (!string.IsNullOrEmpty(q.TimKiem))
 ### C3. `lich-su-kho` trả tên người thực hiện
 
 `LichSuKhoDto` thêm `tenNguoiDung: string?` (họ tên của `MaNguoiDung`; `null` với dòng `TieuHaoTheoDon` do hệ thống ghi). Nên trả kèm luôn **người thu tiền của đơn** cho dòng tiêu hao, nếu dễ lấy: không bắt buộc.
+
+> **Đính chính (18/11/2026):** trang Kho **không hiển thị** người thực hiện (quyết định của chủ quán). Backend giữ trường này, web không dùng. Phần tùy chọn "người thu tiền cho dòng tiêu hao" **không làm**.
 
 ---
 
@@ -527,12 +531,12 @@ paths:
 | Hạng mục backend | Việc của Web Admin |
 |---|---|
 | A1–A5 | Không phải sửa code (đã gọi đúng hợp đồng). Gửi thêm `timKiem` khi tìm đơn; bỏ chế độ tự sắp xếp khi phát hiện máy chủ hỗ trợ `sapXep` |
-| A6 | Thêm 3 trường vào `Models/DonHang`; chi tiết đơn và hóa đơn K80 hiện "Thu lúc … bởi …" |
+| A6 | Chỉ thêm `ThoiGianThanhToan` vào `Models/DonHang`; chi tiết đơn và hóa đơn K80 hiện "Thu lúc …" (**không** có tên người thu, không thêm `maNguoiThu`/`tenNguoiThu` vào model) |
 | C1 | Không đổi code; cập nhật ghi chú trang Tổng quan "doanh thu tính theo giờ thu tiền" |
 | B1 | `AccountService.DeleteAsync` đổi sang `DELETE`; bỏ chú thích "đã xóa vẫn giữ tên đăng nhập" ở trang Tài khoản |
 | B2 | Bỏ `NguoiDungTaoRequest.EmailNoiBo`, không gửi `email` khi tạo |
 | C2 | Trang Tổng quan: cột "Doanh thu" món bán chạy dùng `tongDoanhThu`; thêm bảng "Topping bán chạy" |
-| C3 | Trang Kho: thêm cột "Người thực hiện" ở lịch sử kho |
+| C3 | **Không làm**: trang Kho không hiển thị người thực hiện (quyết định của chủ quán 18/11/2026) |
 | D1 / D2 | Thêm ô "Đơn giá nhập" khi nhập kho + thẻ chi phí ở Tổng quan / nút "Tải ảnh lên" ở form món |
 
 Mọi thay đổi phía web đi kèm cập nhật `Services/Mock/MockApiHandler.cs` để chế độ giả lập vẫn khớp hợp đồng.
