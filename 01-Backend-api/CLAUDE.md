@@ -8,12 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repo layout & git workflow
 
-This folder is the backend part of the team monorepo `https://github.com/Maianh-26/Coffeshop.git` (`01-Backend-API/`, `02-Flutter-Tablet/`, `03-Web-Admin/`). The local clone uses **sparse-checkout (cone)** so only `01-Backend-API/` (plus root files) exists on disk — other folders are hidden, not deleted, and commits never touch them.
+This folder is the backend part of the team monorepo `https://github.com/Maianh-26/Coffeshop.git` (`01-Backend-api/`, `02-Flutter-Tablet/`, `03-Web-Admin/`). The local clone uses **sparse-checkout (cone)** so only `01-Backend-api/` (plus root files) exists on disk — other folders are hidden, not deleted, and commits never touch them.
 
-- Never move backend files out of `01-Backend-API/` or recreate them at the repo root; commits must use paths `01-Backend-API/...`. A local `pre-commit` hook blocks commits on `main` and commits when the backend sits at the root; a `pre-push` hook blocks pushing to `main`.
+- Never move backend files out of `01-Backend-api/` or recreate them at the repo root; commits must use paths `01-Backend-api/...`. A local `pre-commit` hook blocks commits on `main` and commits when the backend sits at the root; a `pre-push` hook blocks pushing to `main`.
 - Work on branch `API-HIHI`; integrate via Pull Request `API-HIHI` → `main`.
-- Daily: `git pull origin main` → code/test → `git add 01-Backend-API` → commit → `git push` → PR.
-- To see other parts temporarily: `git sparse-checkout disable`; to go back: `git sparse-checkout set 01-Backend-API`.
+- Daily: `git pull origin main` → code/test → `git add 01-Backend-api` → commit → `git push` → PR.
+- To see other parts temporarily: `git sparse-checkout disable`; to go back: `git sparse-checkout set 01-Backend-api`.
 - Machine-specific settings (connection string) go in **user-secrets**, not `appsettings.json`, to avoid conflicts between teammates' SQL Server instances (`.` vs `.\SQLEXPRESS`):
   `dotnet user-secrets set "ConnectionStrings:QuanCaPheDB" "Server=.;Database=QuanCaPheDB;Trusted_Connection=True;TrustServerCertificate=True"`
 
@@ -23,7 +23,7 @@ ASP.NET Core 8 Web API for a coffee shop ordering system (customer tablet orderi
 
 ## Commands
 
-Run from `01-Backend-API/`:
+Run from `01-Backend-api/`:
 
 ```powershell
 dotnet build
