@@ -71,12 +71,44 @@ public class BaoCaoController(AppDbContext db) : ControllerBase
     public async Task<List<MonBanChayDto>> MonBanChay([FromQuery] KhoangThoiGian r, [FromQuery, Range(1, 50)] int soLuong = 10)
     {
         var don = DaThuTrongKhoang(r).Select(d => d.MaDonHang);
-        var rows = await (from ct in db.ChiTietDonHangs
-                          join cm in db.ChiTietMons on ct.MaChiTietMon equals cm.MaChiTietMon
-                          join m in db.Mons on cm.MaTenMon equals m.MaTenMon
+        var mon = await (from ct in db.ChiTietDonHangs
+                         join cm in db.ChiTietMons on ct.MaChiTietMon equals cm.MaChiTietMon
+                         join m in db.Mons on cm.MaTenMon equals m.MaTenMon
+                         where don.Contains(ct.MaDonHang)
+                         group ct by new { m.MaTenMon, m.TenMon } into g
+                         select new { g.Key.MaTenMon, g.Key.TenMon, SoLuong = g.Sum(x => x.SoLuong), DoanhThu = g.Sum(x => x.DonGiaBan * x.SoLuong) })
+                        .ToListAsync();
+        // Tiền topping gom theo món: truy vấn riêng (SQL Server không cho SUM trên biểu thức chứa subquery)
+        var topping = await (from t in db.ChiTietDonHangToppings
+                             join ct in db.ChiTietDonHangs on t.MaChiTietDon equals ct.MaChiTietDon
+                             join cm in db.ChiTietMons on ct.MaChiTietMon equals cm.MaChiTietMon
+                             where don.Contains(ct.MaDonHang)
+                             group new { t.DonGiaTopping, ct.SoLuong } by cm.MaTenMon into g
+                             select new { MaTenMon = g.Key, TienTopping = g.Sum(x => x.DonGiaTopping * x.SoLuong) })
+                            .ToDictionaryAsync(x => x.MaTenMon, x => x.TienTopping);
+        return mon
+            .Select(x =>
+            {
+                var tienTopping = topping.GetValueOrDefault(x.MaTenMon);
+                return new MonBanChayDto(x.MaTenMon, x.TenMon, x.SoLuong, x.DoanhThu, tienTopping, x.DoanhThu + tienTopping);
+            })
+            .OrderByDescending(x => x.SoLuong).ThenByDescending(x => x.DoanhThu).Take(soLuong).ToList();
+    }
+
+    /// <summary>
+    /// GET /bao-cao/topping-ban-chay — đơn PAID theo giờ thu tiền. SoLuong = tổng số ly có gọi topping,
+    /// DoanhThu = Σ DonGiaTopping × số ly. Gom theo mã topping, tên lấy tên hiện tại (đổi tên không tách dòng).
+    /// </summary>
+    [HttpGet("topping-ban-chay")]
+    public async Task<List<ToppingBanChayDto>> ToppingBanChay([FromQuery] KhoangThoiGian r, [FromQuery, Range(1, 50)] int soLuong = 10)
+    {
+        var don = DaThuTrongKhoang(r).Select(d => d.MaDonHang);
+        var rows = await (from t in db.ChiTietDonHangToppings
+                          join ct in db.ChiTietDonHangs on t.MaChiTietDon equals ct.MaChiTietDon
+                          join tp in db.Toppings on t.MaTopping equals tp.MaTopping
                           where don.Contains(ct.MaDonHang)
-                          group ct by new { m.MaTenMon, m.TenMon } into g
-                          select new MonBanChayDto(g.Key.MaTenMon, g.Key.TenMon, g.Sum(x => x.SoLuong), g.Sum(x => x.DonGiaBan * x.SoLuong)))
+                          group new { t.DonGiaTopping, ct.SoLuong } by new { tp.MaTopping, tp.TenTopping } into g
+                          select new ToppingBanChayDto(g.Key.MaTopping, g.Key.TenTopping, g.Sum(x => x.SoLuong), g.Sum(x => x.DonGiaTopping * x.SoLuong)))
                          .ToListAsync();
         return rows.OrderByDescending(x => x.SoLuong).ThenByDescending(x => x.DoanhThu).Take(soLuong).ToList();
     }

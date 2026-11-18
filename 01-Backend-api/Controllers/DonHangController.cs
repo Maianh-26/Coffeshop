@@ -22,24 +22,43 @@ public class DonHangController(DonHangService service) : ControllerBase
     public async Task<IActionResult> DatMon(DatMonRequest req) =>
         StatusCode(201, (await service.DatMon(req, User.MaNguoiDung())).ToDto());
 
-    /// <summary>GET /don-hang — danh sách đơn (lọc trạng thái, thời gian)</summary>
+    /// <summary>GET /don-hang — danh sách đơn (lọc trạng thái, thời gian, tìm mã đơn / số nhận món, sắp xếp)</summary>
     [HttpGet, Authorize(Roles = VaiTros.TatCa)]
     public async Task<Paged<DonHangDto>> DanhSach([FromQuery] DonHangQuery q)
     {
-        var query = service.Query();
+        var query = service.Query().AsNoTracking();
         if (q.TrangThai is not null) query = query.Where(d => d.TrangThaiThanhToan == q.TrangThai);
         if (q.TrangThaiPhucVu is not null)
             query = query.Where(d => d.TrangThaiPhucVu == q.TrangThaiPhucVu && d.TrangThaiThanhToan != TrangThais.Cancelled);
         if (q.TuNgay is { } tu) query = query.Where(d => d.ThoiGianTao >= tu);
         if (q.DenNgay is { } den) query = query.Where(d => d.ThoiGianTao <= den);
+        if (!string.IsNullOrEmpty(q.TimKiem))
+        {
+            // Mã đơn BẮT ĐẦU BẰNG chuỗi số, HOẶC số nhận món BẰNG ĐÚNG số đó (chuỗi vượt int → chỉ so mã đơn)
+            var tk = q.TimKiem;
+            int? so = int.TryParse(tk, out var n) ? n : null;
+            query = query.Where(d => d.MaDonHang.ToString().StartsWith(tk) || (so != null && d.SoNhanMon == so));
+        }
         var total = await query.CountAsync();
-        var rows = await query.OrderByDescending(d => d.ThoiGianTao).ThenByDescending(d => d.MaDonHang)
-            .Skip(q.Skip).Take(q.Limit).ToListAsync();
+        // Sắp xếp TRƯỚC Skip/Take; cùng tổng tiền thì đơn mới hơn (mã lớn hơn) trước để thứ tự giữa các trang ổn định
+        var sorted = q.SapXep switch
+        {
+            "maDonHang" => query.OrderBy(d => d.MaDonHang),
+            "-maDonHang" => query.OrderByDescending(d => d.MaDonHang),
+            "tongTien" => query.OrderBy(d => d.TongTien).ThenByDescending(d => d.MaDonHang),
+            "-tongTien" => query.OrderByDescending(d => d.TongTien).ThenByDescending(d => d.MaDonHang),
+            _ => query.OrderByDescending(d => d.ThoiGianTao).ThenByDescending(d => d.MaDonHang),
+        };
+        var rows = await sorted.Skip(q.Skip).Take(q.Limit).ToListAsync();
         return new Paged<DonHangDto>(rows.Select(d => d.ToDto()).ToList(), PhanTrang.Of(q.Page, q.Limit, total));
     }
 
     [HttpGet("{id:int}"), Authorize(Roles = VaiTros.TatCa)]
     public async Task<DonHangDto> ChiTiet(int id) => (await service.Tim(id)).ToDto();
+
+    /// <summary>PUT /don-hang/{id} — sửa món của đơn chưa thanh toán, chưa phục vụ (body giống POST /don-hang)</summary>
+    [HttpPut("{id:int}"), Authorize(Roles = VaiTros.TatCa)]
+    public async Task<DonHangDto> SuaMon(int id, DatMonRequest req) => (await service.SuaMon(id, req)).ToDto();
 
     /// <summary>POST /don-hang/{id}/thanh-toan — gọi sp_ThanhToanVaTruKho (PAID + giờ/người thu tiền + trừ kho + ghi LichSuKho)</summary>
     [HttpPost("{id:int}/thanh-toan"), Authorize(Roles = VaiTros.TatCa)]

@@ -228,6 +228,7 @@ public class GiaoDichKhoRequest
 
 public record LichSuKhoDto(
     int MaLichSu, int MaNguyenLieu, string TenNguyenLieu, int? MaDonHang, int? MaNguoiDung,
+    string? TenNguoiDung, // Họ tên người thực hiện; null với dòng TieuHaoTheoDon do hệ thống ghi
     string LoaiGiaoDich, decimal SoLuongThayDoi, DateTime ThoiGian, string? GhiChu);
 
 public class LichSuKhoQuery : PageQuery
@@ -273,6 +274,10 @@ public class DonHangQuery : PageQuery
     [AllowedValues("PENDING", "PAID", "CANCELLED", null)] public string? TrangThai { get; set; }
     /// <summary>Lọc theo trạng thái phục vụ (luôn loại đơn CANCELLED)</summary>
     [AllowedValues("WAITING", "PREPARING", "SERVED", null)] public string? TrangThaiPhucVu { get; set; }
+    /// <summary>"-" = giảm dần; bỏ trống = mới nhất trước</summary>
+    [AllowedValues("maDonHang", "-maDonHang", "tongTien", "-tongTien", null)] public string? SapXep { get; set; }
+    /// <summary>Mã đơn bắt đầu bằng chuỗi này HOẶC số nhận món bằng đúng số này</summary>
+    [RegularExpression("^[0-9]{1,10}$")] public string? TimKiem { get; set; }
     public DateTime? TuNgay { get; set; }
     public DateTime? DenNgay { get; set; }
 }
@@ -311,5 +316,8 @@ public record BaoCaoDoanhThuDto(
     int SoDonHoanTien, decimal DoanhThu, decimal GiaTriDonTrungBinh,
     Dictionary<string, decimal> TheoPhuongThuc, IReadOnlyList<DoanhThuNgayDto> TheoNgay);
 
-public record MonBanChayDto(int MaTenMon, string TenMon, int SoLuong, decimal DoanhThu);
+/// <summary>DoanhThu = tiền món (không gồm topping); TongDoanhThu = DoanhThu + DoanhThuTopping.</summary>
+public record MonBanChayDto(int MaTenMon, string TenMon, int SoLuong, decimal DoanhThu, decimal DoanhThuTopping, decimal TongDoanhThu);
+/// <summary>SoLuong = tổng số ly có gọi topping; DoanhThu = Σ DonGiaTopping × số ly.</summary>
+public record ToppingBanChayDto(int MaTopping, string TenTopping, int SoLuong, decimal DoanhThu);
 public record GioCaoDiemDto(int Gio, int SoDon, decimal DoanhThu);
