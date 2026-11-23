@@ -512,7 +512,7 @@ paths:
 ## 11. Tương thích ngược và thứ tự triển khai
 
 - Mọi thay đổi **chỉ thêm** trường response / tham số query / API mới. Tablet Flutter không phải sửa gì; `POST don-hang` của tablet giữ nguyên.
-- Web Admin **đã chịu được** backend cũ: thiếu `trangThaiPhucVu` → ẩn phần phục vụ; API mới trả 404 → báo "máy chủ chưa hỗ trợ"; `sapXep` bị bỏ qua → web tự sắp xếp. Vì vậy backend có thể **triển khai từng nhóm**, không cần làm hết một lần.
+- Web Admin **đã chịu được** backend cũ: thiếu `trangThaiPhucVu` → ẩn phần phục vụ; API mới trả 404 → báo "máy chủ chưa hỗ trợ"; `sapXep` bị bỏ qua → web tự sắp xếp *(chế độ này đã bỏ 23/11/2026 vì backend đã có `sapXep`)*. Vì vậy backend có thể **triển khai từng nhóm**, không cần làm hết một lần.
 
 **Thứ tự đề xuất:**
 
@@ -530,7 +530,7 @@ paths:
 
 | Hạng mục backend | Việc của Web Admin |
 |---|---|
-| A1–A5 | Không phải sửa code (đã gọi đúng hợp đồng). Gửi thêm `timKiem` khi tìm đơn; bỏ chế độ tự sắp xếp khi phát hiện máy chủ hỗ trợ `sapXep` |
+| A1–A5 | Không phải sửa code (đã gọi đúng hợp đồng). Gửi thêm `timKiem` khi tìm đơn; bỏ chế độ tự sắp xếp khi phát hiện máy chủ hỗ trợ `sapXep` — **đã làm 23/11/2026** |
 | A6 | Chỉ thêm `ThoiGianThanhToan` vào `Models/DonHang`; chi tiết đơn và hóa đơn K80 hiện "Thu lúc …" (**không** có tên người thu, không thêm `maNguoiThu`/`tenNguoiThu` vào model) |
 | C1 | Không đổi code; cập nhật ghi chú trang Tổng quan "doanh thu tính theo giờ thu tiền" |
 | B1 | `AccountService.DeleteAsync` đổi sang `DELETE`; bỏ chú thích "đã xóa vẫn giữ tên đăng nhập" ở trang Tài khoản |
