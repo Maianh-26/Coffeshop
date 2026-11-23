@@ -14,6 +14,9 @@ public class DonHangService(AppDbContext db)
         .Include(d => d.ChiTiets).ThenInclude(c => c.Toppings)
         .AsSplitQuery();
 
+    /// <summary>Bảng DonHang trơn, không Include — để lọc / đếm / sắp xếp trước khi nạp chi tiết.</summary>
+    public IQueryable<DonHang> DonHangs() => db.DonHangs.AsNoTracking();
+
     public async Task<DonHang> Tim(int id) =>
         await Query().FirstOrDefaultAsync(d => d.MaDonHang == id) ?? throw ApiException.NotFound("Đơn hàng");
 

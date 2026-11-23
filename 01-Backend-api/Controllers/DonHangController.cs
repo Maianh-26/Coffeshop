@@ -26,19 +26,15 @@ public class DonHangController(DonHangService service) : ControllerBase
     [HttpGet, Authorize(Roles = VaiTros.TatCa)]
     public async Task<Paged<DonHangDto>> DanhSach([FromQuery] DonHangQuery q)
     {
-        var query = service.Query().AsNoTracking();
+        // Lọc trên bảng DonHang trơn (chưa Include) — các điều kiện đều so cột trực tiếp để SQL dùng được index
+        var query = service.DonHangs();
         if (q.TrangThai is not null) query = query.Where(d => d.TrangThaiThanhToan == q.TrangThai);
         if (q.TrangThaiPhucVu is not null)
             query = query.Where(d => d.TrangThaiPhucVu == q.TrangThaiPhucVu && d.TrangThaiThanhToan != TrangThais.Cancelled);
         if (q.TuNgay is { } tu) query = query.Where(d => d.ThoiGianTao >= tu);
         if (q.DenNgay is { } den) query = query.Where(d => d.ThoiGianTao <= den);
-        if (!string.IsNullOrEmpty(q.TimKiem))
-        {
-            // Mã đơn BẮT ĐẦU BẰNG chuỗi số, HOẶC số nhận món BẰNG ĐÚNG số đó (chuỗi vượt int → chỉ so mã đơn)
-            var tk = q.TimKiem;
-            int? so = int.TryParse(tk, out var n) ? n : null;
-            query = query.Where(d => d.MaDonHang.ToString().StartsWith(tk) || (so != null && d.SoNhanMon == so));
-        }
+        if (!string.IsNullOrEmpty(q.TimKiem)) query = query.Where(TimKiemDonHang.DieuKien(q.TimKiem));
+
         var total = await query.CountAsync();
         // Sắp xếp TRƯỚC Skip/Take; cùng tổng tiền thì đơn mới hơn (mã lớn hơn) trước để thứ tự giữa các trang ổn định
         var sorted = q.SapXep switch
@@ -49,8 +45,16 @@ public class DonHangController(DonHangService service) : ControllerBase
             "-tongTien" => query.OrderByDescending(d => d.TongTien).ThenByDescending(d => d.MaDonHang),
             _ => query.OrderByDescending(d => d.ThoiGianTao).ThenByDescending(d => d.MaDonHang),
         };
-        var rows = await sorted.Skip(q.Skip).Take(q.Limit).ToListAsync();
-        return new Paged<DonHangDto>(rows.Select(d => d.ToDto()).ToList(), PhanTrang.Of(q.Page, q.Limit, total));
+        // Bước 1: chỉ lấy MÃ đơn của trang → lọc + sắp xếp + phân trang chạy đúng MỘT lần, đọc trên index.
+        // (Include + AsSplitQuery trên cả truy vấn sẽ lặp lại lọc/sắp xếp/OFFSET cho mỗi bảng con.)
+        var ids = await sorted.Select(d => d.MaDonHang).Skip(q.Skip).Take(q.Limit).ToListAsync();
+        // Bước 2: nạp đủ món / topping cho đúng các mã đó (tìm theo khóa chính), giữ nguyên thứ tự bước 1
+        var rows = ids.Count == 0
+            ? []
+            : await service.Query().AsNoTracking().Where(d => ids.Contains(d.MaDonHang)).ToListAsync();
+        var byId = rows.ToDictionary(d => d.MaDonHang);
+        var data = ids.Where(byId.ContainsKey).Select(id => byId[id].ToDto()).ToList();
+        return new Paged<DonHangDto>(data, PhanTrang.Of(q.Page, q.Limit, total));
     }
 
     [HttpGet("{id:int}"), Authorize(Roles = VaiTros.TatCa)]
