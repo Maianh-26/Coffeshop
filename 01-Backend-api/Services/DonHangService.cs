@@ -198,6 +198,20 @@ public class DonHangService(AppDbContext db)
         return new ThanhToanResponse(daThanhToan.ToDto(), tienThua, canhBao);
     }
 
+    /// <summary>Khách đổi QR ↔ tiền mặt trên tablet (không tạo đơn trùng). Chỉ áp dụng cho đơn còn PENDING.</summary>
+    public async Task<DonHang> DoiPhuongThuc(int id, string phuongThuc)
+    {
+        var don = await db.DonHangs.FindAsync(id) ?? throw ApiException.NotFound("Đơn hàng");
+        if (don.TrangThaiThanhToan != TrangThais.Pending)
+            throw ApiException.Conflict($"Đơn đang ở trạng thái {don.TrangThaiThanhToan}, không đổi được phương thức thanh toán");
+        if (don.PhuongThucThanhToan != phuongThuc)
+        {
+            don.PhuongThucThanhToan = phuongThuc;
+            await db.SaveChangesAsync();
+        }
+        return don;
+    }
+
     // ------------------------------------------------------------------ PHỤC VỤ TẠI QUẦY
     /// <summary>Đơn đang giữ số = có số + chưa phục vụ xong + chưa hủy (trùng điều kiện index UX_DonHang_SoNhanMon_DangGiu).</summary>
     private IQueryable<DonHang> DonDangGiuSo(int soNhanMon) => db.DonHangs.AsNoTracking().Where(d =>
