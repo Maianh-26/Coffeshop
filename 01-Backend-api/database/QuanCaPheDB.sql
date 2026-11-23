@@ -131,7 +131,16 @@ CREATE TABLE DonHang (
 CREATE UNIQUE NONCLUSTERED INDEX UX_DonHang_SoNhanMon_DangGiu ON DonHang (SoNhanMon)
     WHERE SoNhanMon IS NOT NULL AND TrangThaiPhucVu IN ('WAITING', 'PREPARING') AND TrangThaiThanhToan <> 'CANCELLED';
 CREATE NONCLUSTERED INDEX IX_DonHang_TrangThaiPhucVu ON DonHang (TrangThaiPhucVu, ThoiGianTao DESC);
-CREATE NONCLUSTERED INDEX IX_DonHang_ThoiGianThanhToan ON DonHang (ThoiGianThanhToan) WHERE ThoiGianThanhToan IS NOT NULL;
+-- Báo cáo theo giờ thu tiền (INCLUDE để đọc thẳng từ index)
+CREATE NONCLUSTERED INDEX IX_DonHang_ThoiGianThanhToan ON DonHang (ThoiGianThanhToan)
+    INCLUDE (TrangThaiThanhToan, PhuongThucThanhToan, TongTien) WHERE ThoiGianThanhToan IS NOT NULL;
+-- Hiệu năng danh sách đơn (xem database/ToiUuHieuNang_20261123.sql)
+CREATE NONCLUSTERED INDEX IX_DonHang_ThoiGianTao ON DonHang (ThoiGianTao DESC, MaDonHang DESC);
+CREATE NONCLUSTERED INDEX IX_DonHang_TongTien ON DonHang (TongTien, MaDonHang);                 -- sapXep=-tongTien (đọc ngược)
+CREATE NONCLUSTERED INDEX IX_DonHang_TongTien_MaGiam ON DonHang (TongTien, MaDonHang DESC);     -- sapXep=tongTien
+CREATE NONCLUSTERED INDEX IX_DonHang_TrangThai_ThoiGianTao ON DonHang (TrangThaiThanhToan, ThoiGianTao DESC, MaDonHang DESC);
+CREATE NONCLUSTERED INDEX IX_DonHang_SoNhanMon ON DonHang (SoNhanMon) WHERE SoNhanMon IS NOT NULL;
+CREATE NONCLUSTERED INDEX IX_DonHang_GioHoanTien ON DonHang (GioHoanTien) WHERE DaHoanTien = 1 AND GioHoanTien IS NOT NULL;
 
 CREATE TABLE ChiTietDonHang (
     MaChiTietDon INT IDENTITY(1,1) PRIMARY KEY,
@@ -144,6 +153,8 @@ CREATE TABLE ChiTietDonHang (
     CONSTRAINT FK_ChiTietDon_DonHang FOREIGN KEY (MaDonHang) REFERENCES DonHang(MaDonHang),
     CONSTRAINT FK_ChiTietDon_ChiTietMon FOREIGN KEY (MaChiTietMon) REFERENCES ChiTietMon(MaChiTietMon)
 );
+-- SQL Server không tự tạo index cho khóa ngoại: thiếu index này thì nạp món của 1 đơn phải quét cả bảng
+CREATE NONCLUSTERED INDEX IX_ChiTietDonHang_MaDonHang ON ChiTietDonHang (MaDonHang);
 
 CREATE TABLE ChiTietDonHang_Topping (
     MaChiTietTopping INT IDENTITY(1,1) PRIMARY KEY,
