@@ -459,7 +459,7 @@
             <div class="list-footer">
 
                 <span>
-                    @($"{FooterTotal} đơn hàng")
+                    @($"{totalOrders} đơn hàng")
                     <span class="page-of">Trang @(page)/@totalPages</span>
                 </span>
 
@@ -1458,51 +1458,40 @@
             // Request chính lỗi / bị hủy thì scanTask không được await → "quan sát" lỗi của nó để không thành lỗi bị bỏ rơi
             _ = scanTask?.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
 
-            var filter = new OrderFilter(
-                cancelledOnly ? TrangThaiDon.Cancelled : (paymentFilter == "" ? null : paymentFilter),
-                cancelledOnly || statusFilter == "" ? null : statusFilter,
-                fromDate,
-                toDate,
-                search.Length == 0 ? null : search);
+            string? trangThai = cancelledOnly ? TrangThaiDon.Cancelled : (paymentFilter == "" ? null : paymentFilter);
+            string? trangThaiPhucVu = cancelledOnly || statusFilter == "" ? null : statusFilter;
+            string? timKiem = search.Length == 0 ? null : search;
 
-            if (requestedSort is not null && !serverSortSupported)
-            {
-                // Đã biết máy chủ chưa hỗ trợ "sapXep" → web tự sắp xếp TOÀN BỘ danh sách (không chỉ trang đang xem)
-                if (!await LoadAllAndSort(filter, cts.Token)) return false;
-            }
-            else
-            {
-                var result = await OrderApi.GetPageAsync(
-                    page, PageSize,
-                    trangThai: filter.TrangThai,
-                    trangThaiPhucVu: filter.TrangThaiPhucVu,
-                    tuNgay: filter.TuNgay,
-                    denNgay: filter.DenNgay,
-                    sapXep: requestedSort,
-                    timKiem: filter.TimKiem,
-                    ct: cts.Token);
+            // Lọc, tìm kiếm, sắp xếp và phân trang đều do máy chủ làm trên TOÀN BỘ dữ liệu:
+            // web chỉ nhận đúng 1 trang (20 đơn), dù trong DB có bao nhiêu đơn.
+            Task<PagedResult<DonHang>> FetchPage(int p) => OrderApi.GetPageAsync(
+                p, PageSize,
+                trangThai: trangThai,
+                trangThaiPhucVu: trangThaiPhucVu,
+                tuNgay: fromDate,
+                denNgay: toDate,
+                sapXep: requestedSort,
+                timKiem: timKiem,
+                ct: cts.Token);
 
-                // Phản hồi của lượt tải cũ về sau khi đã có lượt mới (WASM không hủy kịp request đã xong):
-                // bỏ qua, không ghi đè danh sách và không kết luận sai về khả năng sắp xếp của máy chủ
+            var result = await FetchPage(page);
+
+            // Phản hồi của lượt tải cũ về sau khi đã có lượt mới (WASM không hủy kịp request đã xong):
+            // bỏ qua, không ghi đè danh sách
+            if (cts.IsCancellationRequested) return false;
+
+            // Danh sách ngắn lại trong lúc đang xem trang cuối (đơn được phục vụ / hủy ở máy khác…)
+            // → trang hiện tại không còn đơn nào: lùi về trang cuối còn dữ liệu và tải lại 1 lần
+            if (result.Data.Count == 0 && result.Meta.Total > 0 && page > result.Meta.TotalPages)
+            {
+                page = Math.Max(1, result.Meta.TotalPages);
+                result = await FetchPage(page);
                 if (cts.IsCancellationRequested) return false;
-
-                // Máy chủ bỏ qua "sapXep" (trả về thứ tự mặc định) → chuyển sang tự sắp xếp toàn bộ ở web.
-                // So với đúng thứ tự ĐÃ GỬI đi (requestedSort), không phải giá trị có thể vừa đổi trong lúc chờ.
-                if (requestedSort is not null && requestedSort == SortParam && !IsSorted(result.Data))
-                {
-                    serverSortSupported = false;
-                    if (!await LoadAllAndSort(filter, cts.Token)) return false;
-                }
-                else
-                {
-                    orders = result.Data;
-                    totalOrders = result.Meta.Total;
-                    totalPages = Math.Max(1, result.Meta.TotalPages);
-                    sortTruncated = false;
-                    listFromCache = false;
-                    ClearClientSortCache();
-                }
             }
+
+            orders = result.Data;
+            totalOrders = result.Meta.Total;
+            totalPages = Math.Max(1, result.Meta.TotalPages);
 
             // Backend cũ không trả trangThaiPhucVu → ẩn phần phục vụ thay vì hiện "Chờ phục vụ" cho mọi đơn
             if (orders.Count > 0) servingSupported = orders.Any(o => o.TrangThaiPhucVu is not null);
@@ -1550,12 +1539,10 @@
     {
         if (selectedId is not { } id) return;
 
-        var inPage = orders.FirstOrDefault(o => o.MaDonHang == id)
-                     ?? clientSorted?.FirstOrDefault(o => o.MaDonHang == id);
+        var inPage = orders.FirstOrDefault(o => o.MaDonHang == id);
 
-        // Danh sách lấy từ bộ nhớ đệm (tới 60 giây) có thể đã cũ → đơn đang xem luôn hỏi lại máy chủ
-        // (khách chuyển khoản trên tablet, đơn bị hủy ở máy khác… phải hiện đúng sau ≤ 10 giây)
-        if (inPage is not null && !listFromCache)
+        // Trang vừa tải từ máy chủ đã có đơn này → dùng luôn; không có thì hỏi riêng máy chủ
+        if (inPage is not null)
         {
             selectedOrder = inPage;
             SyncPickupInput(inPage);
@@ -1573,8 +1560,6 @@
             // Cập nhật luôn bản trong danh sách (không xếp lại; lần tải đầy đủ sau sẽ xếp đúng chỗ)
             int i = orders.FindIndex(o => o.MaDonHang == id);
             if (i >= 0) orders[i] = fresh;
-            int j = clientSorted?.FindIndex(o => o.MaDonHang == id) ?? -1;
-            if (j >= 0) clientSorted![j] = fresh;
         }
         catch (ApiException)
         {
@@ -1663,15 +1648,9 @@
 
     private string sortKey = SortKeys.None;
     private bool sortDesc;
-    private bool serverSortSupported = true;    // false khi máy chủ bỏ qua tham số sapXep (backend chưa cập nhật)
 
     /// <summary>Giá trị gửi lên máy chủ: "maDonHang" / "-maDonHang" / "tongTien" / "-tongTien".</summary>
     private string? SortParam => sortKey == SortKeys.None ? null : (sortDesc ? "-" : "") + sortKey;
-
-    // Danh sách quá dài để web tự tải hết và sắp xếp → chỉ sắp xếp phần đơn mới nhất, báo rõ để người dùng lọc thêm
-    // Tổng số đơn khớp bộ lọc (khi danh sách quá dài chỉ sắp xếp phần đầu, vẫn ghi tổng thật)
-    private int FooterTotal => sortTruncated && sortKey != SortKeys.None ? totalOrdersAll : totalOrders;
-
 
     /// <summary>
     /// Bấm tiêu đề cột: cột mới → thấp đến cao; bấm lại cùng cột → đổi chiều (cao đến thấp ↔ thấp đến cao).
@@ -1691,150 +1670,6 @@
 
         page = 1;
         await LoadOrders();
-    }
-
-    private decimal SortValue(DonHang o) => sortKey == SortKeys.Total ? o.TongTien : o.MaDonHang;
-
-    /// <summary>Danh sách trả về đã đúng thứ tự yêu cầu chưa (để biết máy chủ có hỗ trợ sapXep không).</summary>
-    private bool IsSorted(List<DonHang> list)
-    {
-        for (int i = 1; i < list.Count; i++)
-        {
-            int cmp = SortValue(list[i - 1]).CompareTo(SortValue(list[i]));
-            if (sortDesc ? cmp < 0 : cmp > 0) return false;
-        }
-
-        return true;
-    }
-
-    /// <summary>Sắp xếp tại web (khi máy chủ chưa hỗ trợ "sapXep"); bằng nhau thì đơn mới hơn trước, giống đề xuất 5.3b.</summary>
-    private List<DonHang> SortLocally(List<DonHang> list)
-    {
-        var sorted = sortDesc
-            ? list.OrderByDescending(SortValue)
-            : list.OrderBy(SortValue);
-
-        return sorted.ThenByDescending(o => o.MaDonHang).ToList();
-    }
-
-    /// <summary>Bộ lọc đang áp dụng, dùng chung cho request 1 trang và request tải hết để sắp xếp.</summary>
-    private sealed record OrderFilter(string? TrangThai, string? TrangThaiPhucVu, DateTime? TuNgay, DateTime? DenNgay, string? TimKiem);
-
-    // Máy chủ chưa hỗ trợ "sapXep": web tự tải hết danh sách (đã lọc) theo lô 100 đơn — mức tối đa backend cho phép —
-    // rồi sắp xếp và chia trang tại chỗ. Giới hạn để không tải quá nhiều khi danh sách rất dài.
-    private const int FetchBatchSize = 100;
-    private const int MaxClientSortOrders = 2000;
-    private bool sortTruncated;      // danh sách dài hơn giới hạn → chỉ sắp xếp phần mới nhất
-    private int totalOrdersAll;      // tổng số đơn khớp bộ lọc (kể cả phần không tải)
-
-    // Danh sách đã tải hết + sắp xếp, giữ lại để chuyển trang / tự làm mới không phải tải lại toàn bộ.
-    // Gắn với bộ lọc + cách sắp xếp; hết hạn sau ClientSortCacheSeconds (đơn mới vẫn được báo qua thông báo đơn mới).
-    private const int ClientSortCacheSeconds = 60;
-    private List<DonHang>? clientSorted;
-    private string? clientSortedKey;
-    private DateTime clientSortedAt;
-
-    // Tăng mỗi lần xóa bộ nhớ đệm: lượt tải toàn bộ đang chạy dở (bắt đầu TRƯỚC khi thu tiền / sửa đơn…)
-    // thấy số này đổi thì bỏ kết quả, không ghi đè dữ liệu mới bằng dữ liệu cũ.
-    private int clientSortGeneration;
-    // Lượt tải vừa rồi lấy danh sách từ bộ nhớ đệm (không hỏi máy chủ) → đơn đang xem phải hỏi lại riêng.
-    private bool listFromCache;
-
-    private void ClearClientSortCache()
-    {
-        clientSorted = null;
-        clientSortGeneration++;
-    }
-
-    /// <summary>
-    /// Tải mọi trang của danh sách đang lọc (song song sau trang đầu), sắp xếp toàn bộ theo cột đang chọn
-    /// rồi cắt đúng trang đang xem. Trả false nếu lượt tải đã bị thay bởi lượt mới hơn.
-    /// </summary>
-    private async Task<bool> LoadAllAndSort(OrderFilter filter, CancellationToken ct)
-    {
-        // Mốc nhanh: khóa theo TÊN mốc (giờ cụ thể đổi mỗi lần tải); khoảng tự chọn: khóa theo 2 ngày đã chọn
-        string range = appliedPreset == DatePresets.Custom ? $"{filter.TuNgay:yyyyMMdd}-{filter.DenNgay:yyyyMMdd}" : appliedPreset;
-        string key = $"{filter.TrangThai}|{filter.TrangThaiPhucVu}|{range}|{filter.TimKiem}|{SortParam}";
-
-        // Còn danh sách vừa tải cho đúng bộ lọc + cách sắp xếp → chỉ cắt lại trang, không gọi máy chủ
-        if (clientSorted is not null && clientSortedKey == key
-            && DateTime.UtcNow - clientSortedAt < TimeSpan.FromSeconds(ClientSortCacheSeconds))
-        {
-            ShowClientSortedPage();
-            listFromCache = true;
-            return true;
-        }
-
-        int generation = clientSortGeneration;
-
-        // Một lô lỗi → hủy ngay các lô còn lại thay vì để chúng chạy hết
-        using var batchCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-
-        async Task<PagedResult<DonHang>> Fetch(int p)
-        {
-            try
-            {
-                return await OrderApi.GetPageAsync(
-                    p, FetchBatchSize,
-                    trangThai: filter.TrangThai,
-                    trangThaiPhucVu: filter.TrangThaiPhucVu,
-                    tuNgay: filter.TuNgay,
-                    denNgay: filter.DenNgay,
-                    timKiem: filter.TimKiem,
-                    ct: batchCts.Token);
-            }
-            catch
-            {
-                batchCts.Cancel();
-                throw;
-            }
-        }
-
-        PagedResult<DonHang> first;
-        PagedResult<DonHang>[] rest;
-        int batches;
-
-        // Trong lúc tải có thao tác đổi dữ liệu (thu tiền, sửa, tạo đơn…) → tải lại (tối đa 2 lần nữa) thay vì bỏ
-        // lượt này: bỏ thì bảng giữ dữ liệu cũ dù biểu tượng sắp xếp / số trang đã đổi, và lượt tải lại sau 409 bị mất.
-        for (int attempt = 0; ; attempt++)
-        {
-            first = await Fetch(1);
-            if (ct.IsCancellationRequested) return false;
-
-            batches = Math.Min(first.Meta.TotalPages, MaxClientSortOrders / FetchBatchSize);
-            rest = await Task.WhenAll(Enumerable.Range(2, Math.Max(0, batches - 1)).Select(Fetch));
-
-            // Bị thay bởi lượt mới hơn
-            if (ct.IsCancellationRequested) return false;
-
-            if (generation == clientSortGeneration || attempt >= 2) break;
-            generation = clientSortGeneration;
-        }
-
-        var all = first.Data.Concat(rest.SelectMany(r => r.Data))
-            .DistinctBy(o => o.MaDonHang)   // đơn mới chen vào giữa các lô có thể làm 1 đơn xuất hiện 2 lần
-            .ToList();
-
-        totalOrdersAll = first.Meta.Total;
-        // Theo số TRANG còn lại chưa tải (không theo số đơn): đơn rời bộ lọc giữa các lô không làm báo nhầm
-        sortTruncated = first.Meta.TotalPages > batches;
-
-        clientSorted = SortLocally(all);
-        clientSortedKey = key;
-        clientSortedAt = DateTime.UtcNow;
-        ShowClientSortedPage();
-        listFromCache = false;
-        return true;
-    }
-
-    /// <summary>Cắt trang đang xem từ danh sách đã sắp xếp ở web.</summary>
-    private void ShowClientSortedPage()
-    {
-        var sorted = clientSorted ?? [];
-        totalOrders = sorted.Count;
-        totalPages = Math.Max(1, (int)Math.Ceiling(sorted.Count / (double)PageSize));
-        page = Math.Clamp(page, 1, totalPages);
-        orders = sorted.Skip((page - 1) * PageSize).Take(PageSize).ToList();
     }
 
     private string? AriaSort(string key) =>
@@ -1879,8 +1714,6 @@
         dateError = null;
         sortKey = SortKeys.None;
         sortDesc = false;
-        serverSortSupported = true;   // dò lại ở lần sắp xếp sau (backend có thể vừa được cập nhật)
-        ClearClientSortCache();       // Làm mới = luôn tải lại dữ liệu mới nhất
         statusFilter = "";
         paymentFilter = "";
         page = 1;
@@ -2168,7 +2001,6 @@
             // Đơn đã đổi trạng thái ở nơi khác (409) → tải lại cho đúng
             if (ex.Status == 409)
             {
-                ClearClientSortCache();
                 await LoadOrders(quiet: true);
             }
         }
@@ -2185,9 +2017,6 @@
     {
         int index = orders.FindIndex(o => o.MaDonHang == updated.MaDonHang);
         if (index >= 0) orders[index] = updated;
-
-        // Đơn vừa đổi (thu tiền, sửa món…) có thể đổi chỗ khi sắp xếp → lần tải sau lấy lại toàn bộ
-        ClearClientSortCache();
 
         if (selectedId == updated.MaDonHang)
         {
@@ -2402,7 +2231,6 @@
             servingError = ProposedApiError(ex);
             if (ex.Status == 409)
             {
-                ClearClientSortCache();
                 await LoadOrders(quiet: true);
             }
         }
@@ -2626,7 +2454,6 @@
             ShowAlert($"Đã tạo đơn #{created.MaDonHang} — tổng {Money(created.TongTien)}.", "success");
 
             page = 1;
-            ClearClientSortCache();   // đơn mới phải có trong danh sách đã sắp xếp ở web
             await LoadOrders();
 
             // Khi đang sắp xếp, đơn mới có thể nằm ở trang khác → vẫn mở chi tiết bằng bản máy chủ vừa trả về

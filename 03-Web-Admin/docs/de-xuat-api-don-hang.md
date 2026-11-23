@@ -362,7 +362,7 @@ query = q.SapXep switch
 };
 ```
 
-- **Tương thích:** backend hiện tại bỏ qua tham số lạ trên query string, nên web gửi `sapXep` không gây lỗi. Khi máy chủ chưa hỗ trợ (danh sách trả về không đúng thứ tự), web tự sắp xếp trong trang và hiện ghi chú "Máy chủ chưa hỗ trợ sắp xếp toàn bộ danh sách".
+- **Tương thích:** backend hiện tại bỏ qua tham số lạ trên query string, nên web gửi `sapXep` không gây lỗi. Khi máy chủ chưa hỗ trợ (danh sách trả về không đúng thứ tự), web tự sắp xếp trong trang và hiện ghi chú "Máy chủ chưa hỗ trợ sắp xếp toàn bộ danh sách". *(Cập nhật 23/11/2026: backend đã hỗ trợ `sapXep`; web đã bỏ chế độ tự sắp xếp, luôn dùng sắp xếp của máy chủ.)*
 - **Lưu ý `tuNgay`:** web giờ gửi mốc chính xác đến giờ phút (vd. `tuNgay=2026-11-11T13:27:43.000` cho "24 giờ qua"), không còn cắt về 00:00. Backend đang so sánh `ThoiGianTao >= tuNgay` nên không cần sửa.
 
 ### 5.4. `PUT api/v1/don-hang/{id}`: sửa món của đơn
