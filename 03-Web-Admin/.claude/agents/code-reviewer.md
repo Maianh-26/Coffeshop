@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Soát lại code C#/Razor của CoffeeShop.Admin (Blazor WebAssembly) theo quy tắc riêng của dự án — khớp hợp đồng API (Models ↔ MockApiHandler ↔ tài liệu), mẫu Blazor đúng, xử lý lỗi, chuỗi trạng thái tiếng Việt, quy ước CSS. Dùng sau khi hoàn thành một thay đổi lớn (nối trang vào service, thêm tính năng, sửa nhiều file), hoặc khi người dùng yêu cầu "review code". Chỉ đọc và báo cáo, không sửa code.
+description: Soát lại code C#/Razor của CoffeeShop.Admin (Blazor WebAssembly) theo quy tắc riêng của dự án — khớp hợp đồng API (Models ↔ backend ↔ tài liệu), mẫu Blazor đúng, xử lý lỗi, chuỗi trạng thái tiếng Việt, quy ước CSS. Dùng sau khi hoàn thành một thay đổi lớn (nối trang vào service, thêm tính năng, sửa nhiều file), hoặc khi người dùng yêu cầu "review code". Chỉ đọc và báo cáo, không sửa code.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -17,14 +17,14 @@ Bạn **chỉ đọc và báo cáo**. Không sửa, không tạo, không xóa fi
 ## Checklist
 
 ### A. Hợp đồng API (quan trọng nhất — dự án chia nhóm, backend do nhóm khác làm)
-- Thuộc tính trong `Models/*.cs` khớp với dữ liệu `Services/Mock/MockDatabase.cs` và cách `Services/Mock/MockApiHandler.cs` xử lý.
-- Mọi route `api/v1/...` gọi trong `Services/*Service.cs` khớp backend (`C:\dev\CoffeeShop.Api` — `openapi/openapi.yaml`, `Dtos/Dtos.cs`, `Controllers/`) và có nhánh xử lý trong `MockApiHandler.Route`, đúng HTTP method. Request DTO không được có trường lạ (backend trả 400).
-- Body gửi lên (ví dụ `accept`, `pay`) đúng tên trường mà `MockApiHandler` đọc.
+- Thuộc tính trong `Models/*.cs` khớp DTO của backend (`Dtos/Dtos.cs`, `openapi/openapi.yaml`).
+- Mọi route `api/v1/...` gọi trong `Services/*Service.cs` khớp backend (`C:\dev\CoffeeShop.Api` — `openapi/openapi.yaml`, `Dtos/Dtos.cs`, `Controllers/`) và đúng HTTP method. Request DTO không được có trường lạ (backend trả 400).
+- Body gửi lên (ví dụ `accept`, `pay`) đúng tên trường mà backend đọc.
 - Thực thể định danh bằng `Code` (chuỗi), không dùng id số.
 - Nếu thay đổi làm lệch hợp đồng → ghi rõ là cần cập nhật tài liệu hợp đồng API và báo nhóm backend (link trong `CLAUDE.md`).
 
 ### B. Chuỗi trạng thái tiếng Việt
-Phải khớp **từng ký tự** (dấu tiếng Việt) giữa trang, model và mock:
+Phải khớp **từng ký tự** (dấu tiếng Việt) giữa trang, model và backend:
 - Đơn (chuỗi của backend, khai báo một chỗ trong `TrangThaiDon`): `PENDING`, `PAID`, `CANCELLED` — trang chỉ hiển thị qua `TrangThaiDon.Label`
 - Phương thức thanh toán (`PhuongThucThanhToans`): `CASH`, `QR_TRANSFER`
 - Món: `Đang bán`, `Ngừng bán`; topping: `Đang phục vụ`, `Tạm hết`, `Ngừng bán`; loại: `Size`, `Topping`

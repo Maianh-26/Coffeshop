@@ -13,7 +13,7 @@ Bạn **chỉ báo cáo**, không sửa file code. `Bash` dùng để chạy/ki�
 1. Kiểm tra app đã chạy chưa: `curl -s -o /dev/null -w "%{http_code}" http://localhost:5101/login`.
    - Trả `200` → **dùng lại**, KHÔNG tắt khi xong (có thể người dùng đang chạy bằng Visual Studio).
    - Không phản hồi → chạy `dotnet run --launch-profile http` ở thư mục project bằng Bash với `run_in_background: true`, rồi chờ đến khi `curl` trả `200`. Nhớ task id để tắt ở cuối.
-2. Xem `Api:UseMock` trong `wwwroot/appsettings.json`: `false` = backend thật ở `http://localhost:3000` (phải đang chạy), `true` = dữ liệu giả (F5 về dữ liệu mẫu). Tài khoản (cả hai chế độ): `quanly` / `QuanLy@123` (Quản lý), `nhanvien` / `NhanVien@123` (Nhân viên).
+2. Web luôn gọi backend thật ở `Api:BaseUrl` (`http://localhost:3000`, phải đang chạy — không còn chế độ dữ liệu giả). Tài khoản: `quanly` / `QuanLy@123` (Quản lý), `nhanvien` / `NhanVien@123` (Nhân viên).
 3. Blazor WebAssembly tải chậm ở lần đầu: sau `browser_navigate`, chờ đến khi chữ "Đang tải Coffee Shop..." biến mất trước khi chụp.
 
 ## 2. Phạm vi

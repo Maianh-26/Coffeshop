@@ -3,7 +3,7 @@
 
 <PageTitle>Tổng quan - Coffee Shop</PageTitle>
 
-@* Bộ lọc thời gian giống trang Đơn hàng / Kho: mốc nhanh áp dụng ngay, "Chọn khoảng ngày…" chỉ lọc khi bấm Áp dụng *@
+@* Bộ lọc thời gian (mặc định Hôm nay): mốc nhanh áp dụng ngay, "Chọn khoảng ngày…" chỉ lọc khi bấm Áp dụng — giống trang Đơn hàng / Kho *@
 <section class="panel filters-panel dashboard-filters-panel">
 
 <div class="filter-row dashboard-filters">
@@ -12,7 +12,7 @@
             aria-label="Khoảng thời gian báo cáo"
             @bind="datePreset"
             @bind:after="OnDatePresetChanged">
-        @foreach (var p in DatePresets.Options)
+        @foreach (var p in DatePresets.ReportOptions)
         {
             <option value="@p">@DatePresets.Label(p)</option>
         }
@@ -20,13 +20,17 @@
 
     <RefreshButton Active="FiltersActive" Spinning="loading" Title="@RefreshTitle" OnClick="RefreshAll" />
 
+    @* Tải ngay file Excel (.xlsx) đúng khoảng đang xem: tổng quan, doanh thu theo mốc, top 50 món, top 50 topping *@
     <button type="button"
             class="btn primary dashboard-export"
-            disabled="@(report is null)"
-            @onclick="() => exportOpen = true">
+            disabled="@(report is null || loading || exporting)"
+            aria-busy="@(exporting ? "true" : "false")"
+            @onclick="ExportExcel">
         <Icon Name="download" />
-        Xuất báo cáo
+        @(exporting ? "Đang xuất…" : "Xuất Excel")
     </button>
+
+    <span class="sr-only" role="status">@(exporting ? "Đang xuất file Excel…" : "")</span>
 
     @if (datePreset == DatePresets.Custom)
     {
@@ -65,20 +69,19 @@
 
 </div>
 
-@if (range != "")
-{
-    <p class="active-range dashboard-range">
-        <Icon Name="calendar" Size="14" />
-        @range
-    </p>
-}
-
 </section>
 
 @if (error is not null)
 {
     <p class="alert error" role="alert">
         @error
+    </p>
+}
+
+@if (exportError is not null)
+{
+    <p class="alert error" role="alert">
+        @exportError
     </p>
 }
 
@@ -92,11 +95,16 @@
 
         <div>
 
-            <p>Doanh thu đã thanh toán</p>
+            <p>Doanh thu thuần</p>
 
             <strong>
                 @(report is null ? "—" : Money(report.DoanhThu))
             </strong>
+
+            @if (report is not null)
+            {
+                <small>@PhuongThucThanhToans.Label(PhuongThucThanhToans.Cash): @Money(report.TheoPhuongThuc.GetValueOrDefault(PhuongThucThanhToans.Cash)) · @PhuongThucThanhToans.Label(PhuongThucThanhToans.QrTransfer): @Money(report.TheoPhuongThuc.GetValueOrDefault(PhuongThucThanhToans.QrTransfer))</small>
+            }
 
         </div>
 
@@ -139,11 +147,6 @@
                 @(report is null ? "—" : Money(report.GiaTriDonTrungBinh))
             </strong>
 
-            @if (report is not null)
-            {
-                <small>Tiền mặt: @Money(report.TheoPhuongThuc.GetValueOrDefault(PhuongThucThanhToans.Cash)) · QR: @Money(report.TheoPhuongThuc.GetValueOrDefault(PhuongThucThanhToans.QrTransfer))</small>
-            }
-
         </div>
 
     </section>
@@ -152,8 +155,15 @@
 
 <section class="panel chart-panel">
 
-    @* Tên cố định cho mọi khoảng lọc; đơn vị cột (giờ / ngày / tháng) thể hiện qua nhãn trục thời gian *@
-    <h2>Biểu đồ doanh thu</h2>
+    @* Tên cố định cho mọi khoảng lọc; đơn vị cột (giờ / ngày / tháng) thể hiện qua nhãn trục thời gian.
+       Khoảng ngày đang xem ghi gọn ngay cạnh tiêu đề (thay cho dòng "Đang xem…" dưới bộ lọc). *@
+    <div class="chart-head">
+        <h2>Biểu đồ doanh thu</h2>
+        @if (range != "")
+        {
+            <span class="chart-range">@range</span>
+        }
+    </div>
 
     <div class="chart-container @(loading ? "is-loading" : "")">
 
@@ -185,19 +195,24 @@
                 <p class="chart-note">Chưa có doanh thu trong khoảng thời gian này</p>
             }
 
-            <div class="bars">
+            @* Bàn phím: cả biểu đồ chỉ là MỘT điểm dừng Tab, phím ← / → chuyển giữa các cột (roving tabindex) *@
+            <div class="bars" role="group" aria-label="Các cột doanh thu, dùng phím mũi tên trái phải để chuyển">
 
                 @for (int i = 0; i < points.Count; i++)
                 {
                     var p = points[i];
+                    int idx = i;
 
-                    @* Rê chuột / chạm / Tab vào cột → tô nền cả cột và hiện doanh thu + số đơn *@
+                    @* Rê chuột / chạm / chọn bằng bàn phím → tô nền cả cột và hiện doanh thu + số đơn *@
                     <div class="bar-column @TipSide(i)"
                          style="@BarVar(p.DoanhThu)"
                          @key="p.MocDayDu"
-                         tabindex="0"
+                         @ref="barRefs[idx]"
+                         tabindex="@(idx == ActiveBar ? 0 : -1)"
                          role="img"
-                         aria-label="@BarTitle(p)">
+                         aria-label="@BarTitle(p)"
+                         @onfocus="() => activeBar = idx"
+                         @onkeydown="e => OnBarKey(e, idx)">
 
                         <div class="bar-value-area">
 
@@ -238,62 +253,6 @@
 
 <section class="panel report-panel">
 
-    <h2>Báo cáo theo @ScaleName</h2>
-
-    <div class="table-wrap">
-
-        <table class="report-table">
-
-            <thead>
-
-                <tr>
-                    <th>@ColumnTitle</th>
-                    <th>Đơn đã thanh toán</th>
-                    <th>Doanh thu</th>
-                </tr>
-
-            </thead>
-
-            <tbody>
-
-                @foreach (var row in TableRows)
-                {
-                    <tr @key="row.MocDayDu">
-                        <td>@row.MocDayDu</td>
-                        <td>@row.SoDon</td>
-                        <td>@Money(row.DoanhThu)</td>
-                    </tr>
-                }
-
-                @if (!TableRows.Any())
-                {
-                    <tr>
-                        <td colspan="3" class="empty-cell">
-                            Chưa có dữ liệu báo cáo.
-                        </td>
-                    </tr>
-                }
-
-            </tbody>
-
-            <tfoot>
-
-                <tr>
-                    <td>Tổng</td>
-                    <td>@(report?.SoDonDaThanhToan ?? 0)</td>
-                    <td>@Money(report?.DoanhThu ?? 0)</td>
-                </tr>
-
-            </tfoot>
-
-        </table>
-
-    </div>
-
-</section>
-
-<section class="panel report-panel">
-
     <h2>Món bán chạy</h2>
 
     <div class="table-wrap">
@@ -303,10 +262,10 @@
             <thead>
 
                 <tr>
-                    <th>#</th>
+                    <th class="rank-col">#</th>
                     <th>Món</th>
-                    <th>Số lượng</th>
-                    <th>Doanh thu</th>
+                    <th class="num">Số lượng</th>
+                    <th class="num">Doanh thu</th>
                 </tr>
 
             </thead>
@@ -319,10 +278,10 @@
                     int rank = i + 1;
 
                     <tr @key="item.MaTenMon">
-                        <td>@rank</td>
+                        <td class="rank-col">@rank</td>
                         <td>@item.TenMon</td>
-                        <td>@item.SoLuong</td>
-                        <td>@Money(item.DoanhThuGomTopping)</td>
+                        <td class="num">@item.SoLuong</td>
+                        <td class="num">@Money(item.DoanhThuGomTopping)</td>
                     </tr>
                 }
 
@@ -343,89 +302,3 @@
 
 </section>
 
-<section class="panel report-panel">
-
-    <h2>Topping bán chạy</h2>
-
-    <div class="table-wrap">
-
-        <table class="report-table">
-
-            <thead>
-
-                <tr>
-                    <th>#</th>
-                    <th>Topping</th>
-                    <th>Số ly</th>
-                    <th>Doanh thu</th>
-                </tr>
-
-            </thead>
-
-            <tbody>
-
-                @for (int i = 0; i < bestToppings.Count; i++)
-                {
-                    var item = bestToppings[i];
-                    int rank = i + 1;
-
-                    <tr @key="item.MaTopping">
-                        <td>@rank</td>
-                        <td>@item.TenTopping</td>
-                        <td>@item.SoLuong</td>
-                        <td>@Money(item.DoanhThu)</td>
-                    </tr>
-                }
-
-                @if (bestToppings.Count == 0)
-                {
-                    <tr>
-                        <td colspan="4" class="empty-cell">
-                            @(toppingReportSupported
-                                ? "Chưa có topping nào được bán trong khoảng thời gian này."
-                                : "Máy chủ chưa hỗ trợ báo cáo topping.")
-                        </td>
-                    </tr>
-                }
-
-            </tbody>
-
-        </table>
-
-    </div>
-
-</section>
-
-@if (exportOpen)
-{
-    <Modal Title="Xuất báo cáo"
-           OnClose="() => exportOpen = false">
-
-        <p>@range</p>
-
-        <div class="actions">
-
-            <button class="btn primary"
-                    disabled="@exporting"
-                    @onclick="ExportExcel">
-                Excel (.csv)
-            </button>
-
-            <button class="btn outline"
-                    @onclick="PrintPdf">
-                PDF / In
-            </button>
-
-        </div>
-
-        <div class="modal-footer">
-
-            <button class="btn outline"
-                    @onclick="() => exportOpen = false">
-                Đóng
-            </button>
-
-        </div>
-
-    </Modal>
-}

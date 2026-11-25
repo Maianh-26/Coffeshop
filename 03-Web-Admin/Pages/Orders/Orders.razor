@@ -6,7 +6,6 @@
 @inject ToppingService ToppingApi
 @inject IJSRuntime JS
 @inject IConfiguration Configuration
-@inject IServiceProvider Services
 @inject ILogger<Orders> Logger
 
 <PageTitle>Đơn hàng - Coffee Shop</PageTitle>
@@ -296,18 +295,6 @@
 
                 </button>
 
-                @* Công cụ thử nghiệm — chỉ hiện khi chạy với dữ liệu giả *@
-                @if (IsMock)
-                {
-                    <button type="button"
-                            class="text-button"
-                            disabled="@loading"
-                            @onclick="SimulateTabletOrder"
-                            title="Chỉ có ở chế độ dữ liệu giả">
-                        Mô phỏng đơn từ Tablet
-                    </button>
-                }
-
             </div>
 
             </div>
@@ -415,7 +402,8 @@
 
                                 <td>
                                     <span class="status status-@PhuongThucThanhToans.Tone(order)">@PhuongThucThanhToans.ShortLabel(order)</span>
-                                    @if (PhuongThucThanhToans.Tone(order) != "void")
+                                    @* Chưa thu: không hiện hình thức (chỉ là lựa chọn lúc đặt / mặc định CASH của backend) *@
+                                    @if (PhuongThucThanhToans.DaChot(order))
                                     {
                                         <span class="muted pay-method">@PhuongThucThanhToans.Label(order.PhuongThucThanhToan)</span>
                                     }
@@ -1281,8 +1269,6 @@
 
     private bool IsAdmin => isAdmin;
 
-    private bool IsMock => Configuration.GetValue("Api:UseMock", true);
-
     private static string Money(decimal value) => value.ToString("N0", Vi) + " đ";
 
     private static string Number(decimal value) => value.ToString("#,##0.##", Vi);
@@ -1744,17 +1730,6 @@
         ShowAlert(autoRefreshEnabled
             ? $"Đã bật tự động cập nhật đơn mới (mỗi {RefreshSeconds} giây)."
             : "Đã tắt tự động cập nhật.", "success");
-    }
-
-    /// <summary>Chế độ giả lập: yêu cầu API giả sinh một đơn tablet rồi tải lại danh sách.</summary>
-    private async Task SimulateTabletOrder()
-    {
-        if (Services.GetService<CoffeeShop.Admin.Services.Mock.MockDatabase>() is { } mock)
-        {
-            mock.TabletOrderRequested = true;
-            page = 1;
-            await LoadOrders();
-        }
     }
 
     // =========================================================================

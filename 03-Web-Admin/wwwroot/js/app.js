@@ -2,29 +2,23 @@
 
 window.appHelpers = {
     /**
-     * Tải file CSV về máy người dùng (hỗ trợ hiển thị đúng tiếng Việt trên Excel nhờ BOM UTF-8)
-     * @param {string} fileName Tên file cần tải về
-     * @param {string} content Nội dung CSV
+     * Tải một file (ví dụ báo cáo Excel .xlsx) về máy người dùng.
+     * @param {string} fileName Tên file
+     * @param {Uint8Array} bytes Nội dung (Blazor gửi byte[] dưới dạng Uint8Array)
+     * @param {string} mimeType Kiểu file
      */
-    downloadCsv: function (fileName, content) {
-        var bom = "\uFEFF";
-        var blob = new Blob([bom + content], { type: "text/csv;charset=utf-8;" });
+    downloadFile: function (fileName, bytes, mimeType) {
+        var blob = new Blob([bytes], { type: mimeType });
         var url = URL.createObjectURL(blob);
         var link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", fileName);
-        link.style.visibility = "hidden";
+        link.href = url;
+        link.download = fileName;
+        link.style.display = "none";
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    },
-
-    /**
-     * Mở hộp thoại in trang hoặc lưu file PDF
-     */
-    printPage: function () {
-        window.print();
+        // Thu hồi sau một nhịp để trình duyệt kịp bắt đầu tải
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     },
 
     /**

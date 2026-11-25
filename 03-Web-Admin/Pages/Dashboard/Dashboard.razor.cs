@@ -3,14 +3,16 @@ using CoffeeShop.Admin.Models;
 using CoffeeShop.Admin.Services;
 using CoffeeShop.Admin.Utilities;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 
 namespace CoffeeShop.Admin.Pages.Dashboard;
 
 /// <summary>
-/// Tổng quan cho chủ quán: doanh thu (api/v1/bao-cao/doanh-thu), món bán chạy (mon-ban-chay),
-/// doanh thu theo giờ (gio-cao-diem — chỉ khi xem 24 giờ qua hoặc một ngày).
-/// Bộ lọc thời gian dùng chung lựa chọn với trang Đơn hàng / Kho (Utilities/DatePresets).
+/// Tổng quan cho chủ quán: doanh thu thuần (api/v1/bao-cao/doanh-thu), món bán chạy (mon-ban-chay),
+/// doanh thu theo giờ (gio-cao-diem — khi xem hôm nay, 24 giờ qua hoặc một ngày).
+/// Topping bán chạy (topping-ban-chay) không hiện trên trang, chỉ có trong file Excel.
+/// Bộ lọc thời gian: Utilities/DatePresets.ReportOptions, mặc định "Hôm nay".
 /// </summary>
 public partial class Dashboard : IDisposable
 {
@@ -26,8 +28,11 @@ public partial class Dashboard : IDisposable
     private readonly CancellationTokenSource pageCts = new();
     private CancellationTokenSource? loadCts;   // lượt tải đang chạy; đổi bộ lọc giữa chừng thì hủy lượt cũ
 
-    /// <summary>Mở trang / bấm Làm mới khi đang lọc → về 7 ngày qua.</summary>
-    private const string DefaultPreset = DatePresets.Last7;
+    /// <summary>Mở trang / bấm Làm mới khi đang lọc → về hôm nay.</summary>
+    private const string DefaultPreset = DatePresets.Today;
+
+    /// <summary>Số món / topping lấy cho file Excel (tối đa backend cho phép); trang chỉ hiện top 5 món.</summary>
+    private const int ExportTop = 50;
 
     /// <summary>Khoảng dài hơn số ngày này thì biểu đồ gom theo tháng.</summary>
     private const int MaxDailyPoints = 62;
@@ -38,42 +43,32 @@ public partial class Dashboard : IDisposable
     private DateTime? customFrom;                   // bản nháp 2 ô Từ ngày / Đến ngày
     private DateTime? customTo;
     private string? dateError;
-    private DashboardFilter applied = new();        // khoảng của lần tải gần nhất
+    private DashboardFilter applied = new();        // khoảng đang chọn
+    private DashboardFilter? loaded;                // khoảng của lần tải thành công gần nhất (file Excel xuất đúng khoảng này)
+    private string loadedPreset = DefaultPreset;    // lựa chọn ứng với khoảng đó
 
     // ---- Dữ liệu
     private BaoCaoDoanhThu? report;
     private List<MonBanChay> bestSellers = [];
-    private List<ToppingBanChay> bestToppings = [];
-    private bool toppingReportSupported = true;     // false khi backend cũ chưa có bao-cao/topping-ban-chay (404)
     private List<DongBaoCao> points = [];           // mọi mốc của biểu đồ, kể cả mốc không có doanh thu
-    private ChartScale scale = ChartScale.Day;
     private AxisScale axis = AxisScale.For(0);
+    private ElementReference[] barRefs = [];        // ô cột biểu đồ (để chuyển focus bằng phím mũi tên)
+    private int activeBar;                          // cột giữ điểm dừng Tab của biểu đồ
 
     private bool loading;
-    private bool exportOpen;
     private bool exporting;
     private string? error;
+    private string? exportError;                    // lỗi của lần xuất Excel (tách riêng để không xóa lỗi tải trang)
     private string range = "";
 
     private static readonly CultureInfo Vi = new("vi-VN");
 
-    private enum ChartScale { Hour, Day, Month }
 
     private bool FiltersActive => appliedPreset != DefaultPreset;
 
     private string RefreshTitle => FiltersActive
-        ? "Làm mới và về 7 ngày qua"
+        ? "Làm mới và về hôm nay"
         : "Làm mới báo cáo";
-
-    private string ScaleName => scale switch
-    {
-        ChartScale.Hour => "giờ",
-        ChartScale.Month => "tháng",
-        _ => "ngày"
-    };
-
-    /// <summary>Bảng chỉ liệt kê mốc có đơn; biểu đồ vẫn vẽ đủ mốc (cột 0) để trục thời gian liền mạch.</summary>
-    private IEnumerable<DongBaoCao> TableRows => points.Where(p => p.SoDon > 0 || p.DoanhThu > 0);
 
     private static string Money(decimal value) => value.ToString("N0", Vi) + " đ";
 
@@ -87,10 +82,13 @@ public partial class Dashboard : IDisposable
     /// Khoảng của một mốc nhanh, canh theo đơn vị của biểu đồ để mỗi cột là một giờ / một ngày trọn vẹn:
     /// 24 giờ qua = đúng 24 khung giờ (từ đầu giờ của 23 giờ trước tới hết giờ hiện tại — có mốc cuối để
     /// đơn tạo sau khi đồng hồ máy chủ qua giờ mới không bị gom chung với khung giờ đầu, vì API gom theo giờ trong ngày);
-    /// 7 / 30 ngày qua = 7 / 30 ngày lịch, tính cả hôm nay.
+    /// Hôm nay = từ 00:00 tới hết hôm nay; 7 / 30 ngày qua = 7 / 30 ngày lịch, tính cả hôm nay.
     /// </summary>
     private static DashboardFilter RangeOf(string preset, DateTime now)
     {
+        if (preset == DatePresets.Today)
+            return new() { From = now.Date, To = Query.EndOfDay(now.Date) };
+
         if (preset == DatePresets.Last24h)
         {
             DateTime start = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0).AddHours(-23);
@@ -107,25 +105,29 @@ public partial class Dashboard : IDisposable
         _ => new()
     };
 
-    private bool IsHourly(DashboardFilter f) =>
-        appliedPreset == DatePresets.Last24h
-        || (appliedPreset == DatePresets.Custom && f.From is { } from && f.To is { } to && from.Date == to.Date);
+    private static bool IsHourly(string preset, DashboardFilter f) =>
+        preset is DatePresets.Today or DatePresets.Last24h
+        || (preset == DatePresets.Custom && f.From is { } from && f.To is { } to && from.Date == to.Date);
 
-    private string Describe(DashboardFilter f)
+    /// <summary>
+    /// Khoảng ngày ngắn gọn ghi cạnh tiêu đề biểu đồ (file Excel tự ghi kỳ báo cáo chính xác từ TuLuc / DenLuc).
+    /// Mọi lựa chọn của trang này đều có mốc đầu (không có "Tất cả thời gian").
+    /// </summary>
+    private static string Describe(string preset, DashboardFilter f)
     {
-        if (f.From is not { } from) return "Đang xem doanh thu tất cả thời gian";
+        DateTime from = f.From ?? DateTime.Today;
 
-        // Mốc nhanh của trang này canh theo giờ / ngày lịch (khác khoảng trượt của trang Đơn hàng) → ghi rõ mốc đầu
-        if (appliedPreset == DatePresets.Last24h)
-            return $"Đang xem doanh thu từ {from:HH:mm dd/MM/yyyy} đến nay (24 khung giờ gần nhất)";
+        if (preset == DatePresets.Today) return $"Hôm nay, {from:dd/MM/yyyy}";
 
-        if (f.To is { } to)
-            return from.Date == to.Date
-                ? $"Đang xem doanh thu ngày {from:dd/MM/yyyy}"
-                : $"Đang xem doanh thu từ {from:dd/MM/yyyy} đến hết {to:dd/MM/yyyy}";
+        if (preset == DatePresets.Last24h) return $"Từ {from:HH:mm dd/MM/yyyy} đến nay";
 
-        int days = (DateTime.Today - from.Date).Days + 1;
-        return $"Đang xem doanh thu từ 00:00 {from:dd/MM/yyyy} đến nay ({days} ngày gần nhất, gồm hôm nay)";
+        DateTime to = (f.To ?? DateTime.Today).Date;
+
+        if (from.Date == to) return $"Ngày {from:dd/MM/yyyy}";
+
+        return from.Year == to.Year
+            ? $"{from:dd/MM} – {to:dd/MM/yyyy}"
+            : $"{from:dd/MM/yyyy} – {to:dd/MM/yyyy}";
     }
 
     private async Task OnDatePresetChanged()
@@ -203,33 +205,36 @@ public partial class Dashboard : IDisposable
             applied = RangeOf(appliedPreset, DateTime.Now);
 
         var current = new DashboardFilter { From = applied.From, To = applied.To };
-        bool hourly = IsHourly(current);
+        string preset = appliedPreset;
+        bool hourly = IsHourly(preset, current);
 
         loading = true;
         error = null;
+        exportError = null;     // lỗi xuất của khoảng trước không còn liên quan
 
         try
         {
             var revenueTask = Reports.GetRevenueAsync(current, token);
             var bestTask = Reports.GetBestSellersAsync(current, 5, token);
-            var toppingTask = BestToppingsOrEmpty(current, token);
             var hoursTask = hourly ? Reports.GetPeakHoursAsync(current, token) : Task.FromResult(new List<GioCaoDiem>());
 
-            await Task.WhenAll(revenueTask, bestTask, toppingTask, hoursTask);
+            await Task.WhenAll(revenueTask, bestTask, hoursTask);
 
             // Lượt này đã bị lượt mới thay thế → không ghi đè dữ liệu của lượt mới
             token.ThrowIfCancellationRequested();
 
             report = await revenueTask;
             bestSellers = await bestTask;
-            bestToppings = await toppingTask;
 
-            (scale, points) = hourly
-                ? (ChartScale.Hour, HourPoints(current.From!.Value, await hoursTask))
+            (_, points) = hourly
+                ? (DonViMoc.Gio, HourPoints(current.From!.Value, HourCount(preset, current), await hoursTask))
                 : DayOrMonthPoints(current, report.TheoNgay);
 
             axis = AxisScale.For(points.Count == 0 ? 0 : points.Max(p => p.DoanhThu));
-            range = Describe(current);
+            barRefs = new ElementReference[points.Count];
+            range = Describe(preset, current);
+            loaded = current;
+            loadedPreset = preset;
         }
         catch (ApiException ex) when (!token.IsCancellationRequested)
         {
@@ -247,29 +252,33 @@ public partial class Dashboard : IDisposable
     }
 
     /// <summary>
-    /// Topping bán chạy. Backend cũ chưa có route này (404) → bảng trống, không làm hỏng cả trang báo cáo.
+    /// Topping bán chạy cho file Excel. Backend cũ chưa có route này (404) → null, file ghi "máy chủ chưa hỗ trợ"
+    /// thay vì làm hỏng cả lần xuất.
     /// </summary>
-    private async Task<List<ToppingBanChay>> BestToppingsOrEmpty(DashboardFilter filter, CancellationToken token)
+    private async Task<List<ToppingBanChay>?> BestToppingsOrNull(DashboardFilter filter, CancellationToken token)
     {
         try
         {
-            var list = await Reports.GetBestToppingsAsync(filter, 5, token);
-            toppingReportSupported = true;
-            return list;
+            return await Reports.GetBestToppingsAsync(filter, ExportTop, token);
         }
         catch (ApiException ex) when (ex.Status is 404 or 405)
         {
-            toppingReportSupported = false;
-            return [];
+            return null;
         }
     }
 
-    /// <summary>24 khung giờ liên tiếp bắt đầu từ <paramref name="start"/> (đầu giờ).</summary>
-    private static List<DongBaoCao> HourPoints(DateTime start, List<GioCaoDiem> hours)
+    /// <summary>Hôm nay (hoặc chọn đúng ngày hôm nay): chỉ tới giờ hiện tại — không vẽ các giờ chưa tới. Còn lại 24 giờ.</summary>
+    private static int HourCount(string preset, DashboardFilter f) =>
+        preset != DatePresets.Last24h && f.From is { } from && from.Date == DateTime.Today
+            ? DateTime.Now.Hour + 1
+            : 24;
+
+    /// <summary><paramref name="count"/> khung giờ liên tiếp bắt đầu từ <paramref name="start"/> (đầu giờ).</summary>
+    private static List<DongBaoCao> HourPoints(DateTime start, int count, List<GioCaoDiem> hours)
     {
         var byHour = hours.ToDictionary(h => h.Gio);
 
-        return Enumerable.Range(0, 24)
+        return Enumerable.Range(0, count)
             .Select(i =>
             {
                 DateTime slot = start.AddHours(i);
@@ -283,21 +292,19 @@ public partial class Dashboard : IDisposable
                     $"{slot:HH:mm}–{slot.AddHours(1):HH:mm} {slot:dd/MM/yyyy}",
                     h?.SoDon ?? 0,
                     h?.DoanhThu ?? 0,
+                    slot,
                     newDay);
             })
             .ToList();
     }
 
     /// <summary>Theo ngày (điền đủ ngày không bán, cột 0) nếu khoảng ≤ 62 ngày, dài hơn thì gom theo tháng.</summary>
-    private static (ChartScale, List<DongBaoCao>) DayOrMonthPoints(DashboardFilter f, List<DoanhThuNgay> days)
+    private static (DonViMoc, List<DongBaoCao>) DayOrMonthPoints(DashboardFilter f, List<DoanhThuNgay> days)
     {
         var byDay = days.ToDictionary(d => d.Ngay);
 
-        // "Toàn bộ thời gian": bắt đầu từ ngày đầu tiên có doanh thu
-        DateOnly? first = f.From is { } from ? DateOnly.FromDateTime(from)
-            : days.Count > 0 ? days.Min(d => d.Ngay) : null;
-
-        if (first is not { } start) return (ChartScale.Day, []);
+        // Mọi lựa chọn của trang đều có mốc đầu (không có "Tất cả thời gian")
+        DateOnly start = DateOnly.FromDateTime(f.From ?? DateTime.Today);
 
         DateOnly end = DateOnly.FromDateTime(f.To ?? DateTime.Today);
         if (days.Count > 0 && days.Max(d => d.Ngay) > end) end = days.Max(d => d.Ngay);
@@ -306,12 +313,12 @@ public partial class Dashboard : IDisposable
 
         if (dayCount <= MaxDailyPoints)
         {
-            return (ChartScale.Day, Enumerable.Range(0, dayCount)
+            return (DonViMoc.Ngay, Enumerable.Range(0, dayCount)
                 .Select(i =>
                 {
                     DateOnly day = start.AddDays(i);
                     byDay.TryGetValue(day, out var d);
-                    return new DongBaoCao(day.ToString("dd/MM", Vi), day.ToString("dd/MM/yyyy", Vi), d?.SoDon ?? 0, d?.DoanhThu ?? 0);
+                    return new DongBaoCao(day.ToString("dd/MM", Vi), day.ToString("dd/MM/yyyy", Vi), d?.SoDon ?? 0, d?.DoanhThu ?? 0, day.ToDateTime(TimeOnly.MinValue));
                 })
                 .ToList());
         }
@@ -322,60 +329,86 @@ public partial class Dashboard : IDisposable
         {
             var inMonth = days.Where(d => d.Ngay.Year == month.Year && d.Ngay.Month == month.Month).ToList();
             string label = month.ToString("MM/yyyy", Vi);
-            months.Add(new DongBaoCao(label, "Tháng " + label, inMonth.Sum(d => d.SoDon), inMonth.Sum(d => d.DoanhThu)));
+            months.Add(new DongBaoCao(label, "Tháng " + label, inMonth.Sum(d => d.SoDon), inMonth.Sum(d => d.DoanhThu), month.ToDateTime(TimeOnly.MinValue)));
         }
 
-        return (ChartScale.Month, months);
+        return (DonViMoc.Thang, months);
     }
 
     // =========================================================================
     // XUẤT BÁO CÁO
     // =========================================================================
 
+    /// <summary>
+    /// Xuất file Excel (.xlsx) đúng khoảng đang xem. Lúc bấm, tải lại TOÀN BỘ số liệu của khoảng đó (tổng quan,
+    /// theo giờ nếu cần, top 50 món, top 50 topping) để mọi trang tính trong file tính tới cùng một thời điểm.
+    /// Khoảng và lựa chọn được chốt trước lần chờ mạng đầu tiên → đổi bộ lọc giữa chừng không làm lệch file.
+    /// </summary>
     private async Task ExportExcel()
     {
-        if (report is null || exporting) return;
+        if (loaded is null || loading || exporting) return;
+
+        DashboardFilter filter = new() { From = loaded.From, To = loaded.To };
+        string preset = loadedPreset;
+        bool hourly = IsHourly(preset, filter);
+        CancellationToken token = pageCts.Token;
 
         exporting = true;
+        exportError = null;
 
         try
         {
-            await Exporter.ExportExcelAsync(report, TableRows.ToList(), ColumnTitle, bestSellers, bestToppings, range);
-            exportOpen = false;
+            var revenueTask = Reports.GetRevenueAsync(filter, token);
+            var hoursTask = hourly ? Reports.GetPeakHoursAsync(filter, token) : Task.FromResult(new List<GioCaoDiem>());
+            var dishesTask = Reports.GetBestSellersAsync(filter, ExportTop, token);
+            var toppingsTask = BestToppingsOrNull(filter, token);
+
+            await Task.WhenAll(revenueTask, hoursTask, dishesTask, toppingsTask);
+
+            var revenue = await revenueTask;
+            var (rowScale, rows) = hourly
+                ? (DonViMoc.Gio, HourPoints(filter.From!.Value, HourCount(preset, filter), await hoursTask))
+                : DayOrMonthPoints(filter, revenue.TheoNgay);
+
+            // Kỳ báo cáo chính xác: từ mốc đầu tới mốc cuối, nhưng không vượt quá lúc xuất ("Hôm nay" → tới giờ hiện tại)
+            DateTime now = DateTime.Now;
+            DateTime to = filter.To is { } end && end < now ? end : now;
+            DateTime from = filter.From ?? now.Date;   // mọi lựa chọn đều có mốc đầu; dự phòng = 00:00 hôm nay
+
+            await Exporter.ExportExcelAsync(new BaoCaoXuat(
+                from,
+                to,
+                now,
+                revenue,
+                rowScale,
+                rows,
+                await dishesTask,
+                await toppingsTask));
+        }
+        catch (ApiException ex) when (!token.IsCancellationRequested)
+        {
+            // ApiException.Message luôn là câu tiếng Việt dành cho người dùng
+            exportError = ex.Message;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // Rời trang khi đang xuất
         }
         catch (JSException ex)
         {
-            Logger.LogError(ex, "Xuất CSV thất bại.");
-            error = "Không xuất được file. Hãy tải lại trang (Ctrl + F5) rồi thử lại.";
-            exportOpen = false;
+            Logger.LogError(ex, "Tải file Excel thất bại.");
+            exportError = "Không tải được file. Hãy tải lại trang (Ctrl + F5) rồi thử lại.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Dựng file Excel thất bại.");
+            exportError = "Không xuất được file Excel. Vui lòng thử lại.";
         }
         finally
         {
             exporting = false;
         }
     }
-
-    private async Task PrintPdf()
-    {
-        exportOpen = false;
-
-        try
-        {
-            await Exporter.PrintPdfAsync();
-        }
-        catch (JSException ex)
-        {
-            Logger.LogError(ex, "Mở hộp thoại in thất bại.");
-            error = "Không mở được hộp thoại in. Hãy tải lại trang rồi thử lại.";
-        }
-    }
-
-    private string ColumnTitle => scale switch
-    {
-        ChartScale.Hour => "Giờ",
-        ChartScale.Month => "Tháng",
-        _ => "Ngày"
-    };
 
     // =========================================================================
     // BIỂU ĐỒ
@@ -465,6 +498,33 @@ public partial class Dashboard : IDisposable
         index * 3 < points.Count ? "tip-start"
         : index * 3 >= points.Count * 2 ? "tip-end"
         : "";
+
+    /// <summary>Cột đang giữ điểm dừng Tab (giới hạn trong số cột hiện có sau mỗi lần tải).</summary>
+    private int ActiveBar => Math.Clamp(activeBar, 0, Math.Max(0, points.Count - 1));
+
+    /// <summary>Phím ← / → chuyển focus sang cột bên cạnh (thẻ số liệu hiện theo :focus-visible).</summary>
+    private async Task OnBarKey(KeyboardEventArgs e, int index)
+    {
+        int next = e.Key switch
+        {
+            "ArrowRight" => index + 1,
+            "ArrowLeft" => index - 1,
+            _ => index
+        };
+
+        if (next == index || next < 0 || next >= barRefs.Length) return;
+
+        activeBar = next;
+
+        try
+        {
+            await barRefs[next].FocusAsync();
+        }
+        catch (JSException ex)
+        {
+            Logger.LogWarning(ex, "Không chuyển được focus sang cột biểu đồ.");
+        }
+    }
 
     /// <summary>Chiều cao cột (%) làm biến CSS để thẻ số liệu nằm ngay trên đỉnh cột, không che cột.</summary>
     private string BarVar(decimal value) => $"--h:{Percent(value)}%";
