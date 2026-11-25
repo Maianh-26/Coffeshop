@@ -9,10 +9,10 @@ Bộ tài liệu này giúp trả lời nhanh câu hỏi kiểu **"Nút này em 
 | # | Tài liệu | Màn hình | Trạng thái |
 |---|----------|----------|------------|
 | 1 | [01-dang-nhap.md](01-dang-nhap.md) | Đăng nhập, Đăng xuất, phân quyền | ✅ |
-| 2 | [02-tong-quan.md](02-tong-quan.md) | Tổng quan (bộ lọc ngày, thống kê, biểu đồ, xuất báo cáo) | ✅ |
+| 2 | [02-tong-quan.md](02-tong-quan.md) | Tổng quan (bộ lọc ngày, doanh thu thuần, biểu đồ, xuất Excel) | ✅ |
 | 3 | [03-don-hang.md](03-don-hang.md) | Đơn hàng (lọc, chi tiết, tiếp nhận, thanh toán, tạo/sửa/hủy, Tablet) | ✅ |
 | 4 | [04-mon.md](04-mon.md) | Món (Món / Danh mục / Topping & Size, ảnh, công thức) | ✅ |
-| 5–11 | *(sẽ viết tiếp)* | Kho nguyên liệu, Khuyến mãi, Tài khoản, Khung trang (sidebar/header), Mock API, CSS & giao diện | ⏳ |
+| 5–11 | *(sẽ viết tiếp)* | Kho nguyên liệu, Khuyến mãi, Tài khoản, Khung trang (sidebar/header), CSS & giao diện | ⏳ |
 
 ---
 
@@ -25,14 +25,13 @@ Trình duyệt (Blazor WASM)
  ├─ Models/*.cs                            ← dữ liệu + quy tắc kiểm tra ([Required], [Range]…)
  ├─ Services/*Service.cs                   ← gọi API "api/..." qua HttpClient
  │   └─ Services/Auth/AuthHeaderHandler.cs ← gắn token vào MỌI request
- │       └─ Services/Mock/MockApiHandler.cs← (đang bật UseMock) API giả trả lời thay backend
  ├─ Components/*.razor                     ← mảnh giao diện dùng chung (Icon, Modal, Brand…)
  ├─ Layout/MainLayout.razor, AuthLayout    ← khung trang: sidebar + header / trang đăng nhập
  └─ wwwroot/css/app.css, js/app.js         ← toàn bộ CSS, vài hàm JavaScript nhỏ
 ```
 
-- **`Program.cs`** đăng ký mọi service (dòng 56–66) và chọn API giả hay thật (dòng 19–46, đọc `wwwroot/appsettings.json` → `Api:UseMock`).
-- **Bấm nút** trong `.razor` → gọi **hàm C#** (cùng tên trong `@code` hoặc `.razor.cs`) → (nếu có) gọi **Service** → **HttpClient** → `AuthHeaderHandler` → **MockApiHandler** (hoặc backend thật).
+- **`Program.cs`** đăng ký mọi service (dòng 56–66) và tạo `HttpClient` gọi backend tại `Api:BaseUrl` (`wwwroot/appsettings.json`).
+- **Bấm nút** trong `.razor` → gọi **hàm C#** (cùng tên trong `@code` hoặc `.razor.cs`) → (nếu có) gọi **Service** → **HttpClient** → `AuthHeaderHandler` → **backend thật**.
 
 > ⚠️ Hiện tại **chỉ luồng Đăng nhập** thật sự gọi Service → API.
 > Các trang Tổng quan, Đơn hàng, Món… **đang dùng dữ liệu mẫu viết sẵn trong trang** (chưa nối Service). Mỗi tài liệu đều ghi rõ điểm này để trả lời đúng.

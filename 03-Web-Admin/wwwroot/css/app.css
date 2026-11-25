@@ -468,8 +468,23 @@ textarea {
 
 /* Dashboard: biểu đồ doanh thu (cột mảnh giữa mỗi ô, rê chuột / chạm / Tab → tô nền cả ô + thẻ số liệu) */
 
-.chart-panel h2 {
+/* Tiêu đề biểu đồ + khoảng ngày đang xem (chữ nhỏ, cùng hàng; màn hình hẹp tự xuống dòng) */
+.chart-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
     margin-bottom: 18px;
+}
+
+    .chart-head h2 {
+        margin: 0;
+    }
+
+.chart-range {
+    color: var(--muted);
+    font-size: var(--fs-sm);
+    font-weight: 600;
 }
 
 .chart-container {
@@ -587,7 +602,7 @@ textarea {
 /* Thẻ nằm ngay trên đỉnh cột (--h = chiều cao cột); cột gần chạm trần thì thẻ dừng ở sát trần vùng vẽ */
 .bar-tip {
     position: absolute;
-    bottom: min(calc(var(--h, 0%) + 8px), calc(100% - 40px));
+    bottom: min(calc(var(--h, 0%) + 8px), calc(100% - 84px));
     left: 50%;
     z-index: 3;
     display: none;
@@ -1225,6 +1240,11 @@ tfoot td {
 @media (max-width: 900px) {
     .stat-grid {
         grid-template-columns: 1fr;
+    }
+
+    /* Thẻ xếp dọc: cao bằng nhau kể cả thẻ không có dòng phụ (Giá trị đơn trung bình) */
+    .stat-grid .stat-card {
+        min-height: 126px;
     }
 
     .search-field {
@@ -3460,7 +3480,7 @@ fieldset.field {
     display: none;
 }
 
-/* Phương thức thanh toán đi nguyên cụm dưới nhãn "Chưa thu" */
+/* Hình thức thanh toán dưới nhãn — chỉ khi đã thu / đã hoàn tiền (PhuongThucThanhToans.DaChot) */
 .orders-table .pay-method {
     display: block;
     margin: 2px 0 0;
@@ -3796,6 +3816,16 @@ fieldset.field {
     font-weight: 600;
 }
 
+/* Tổng quan: bảng Món bán chạy — cột số canh phải, cột thứ hạng hẹp */
+.report-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.report-table .rank-col {
+    width: 48px;
+}
+
 /* Tổng quan: bảng báo cáo 3–4 cột vừa màn hình hẹp */
 
 @media (max-width: 1000px) {
@@ -3815,7 +3845,7 @@ fieldset.field {
         }
 
         /* Số tiền giữ trên một dòng */
-        .report-table td:last-child {
+        .report-table td:last-child:not(.empty-cell) {
             white-space: nowrap;
         }
 }

@@ -4,10 +4,11 @@
 
 ← [Mục lục](README.md)
 
-Đây là luồng **duy nhất đã nối hoàn chỉnh**: giao diện → service → HttpClient → API (đang là API giả `MockApiHandler`). Khi backend thật sẵn sàng, chỉ cần đổi `wwwroot/appsettings.json` → `"UseMock": false`; code trang không phải sửa.
+> **Cập nhật 24/11/2026:** đã **xóa chế độ API giả** (`Services/Mock/`, `Api:UseMock`). Web luôn gọi backend thật `CoffeeShop.Api` tại `Api:BaseUrl` (`wwwroot/appsettings.json`, mặc định `http://localhost:3000/`), mọi route nằm dưới `api/v1/`. Một số số dòng, tên route cũ trong file này viết cho bản trước, khi cần thì tra lại bằng Ctrl+Shift+F.
 
-Tài khoản thử (mật khẩu đều là `123456`, khai báo ở `Services/Mock/MockDatabase.cs:23–31`):
-`admin` (Quản lý) · `nhanvien`, `minh.nv`, `lan.nv` (Nhân viên).
+Luồng: giao diện → service → HttpClient → `AuthHeaderHandler` → backend thật (`POST api/v1/auth/dang-nhap`).
+
+Tài khoản mẫu do backend tạo sẵn trong CSDL `QuanCaPheDB`: `quanly` / `QuanLy@123` (Quản lý) · `nhanvien` / `NhanVien@123` (Nhân viên).
 
 ---
 
@@ -24,7 +25,7 @@ Tài khoản thử (mật khẩu đều là `123456`, khai báo ở `Services/Mo
 | Lưu phiên đăng nhập | `Services/Auth/TokenAuthenticationStateProvider.cs` | Lưu vào `sessionStorage` |
 | Gắn token vào request | `Services/Auth/AuthHeaderHandler.cs` | Header `Authorization: Bearer …` |
 | Trạng thái dùng chung | `Services/AppState.cs` | Token, họ tên, vai trò |
-| API giả | `Services/Mock/MockApiHandler.cs` | `Login` |
+| API (backend) | `CoffeeShop.Api` → `POST api/v1/auth/dang-nhap` | Nhóm backend làm, không nằm trong repo web |
 | Chặn trang khi chưa đăng nhập | `App.razor`, `Pages/_Imports.razor`, `Components/RedirectToLogin.razor` | |
 | Vai trò | `Utilities/Roles.cs` | `"Admin"`, `"Nhân viên"` |
 | CSS | `wwwroot/css/app.css` | `.auth-shell` 992, `.auth-card` 1033, `.password-field` 1058, `.auth-submit` 1077 |
@@ -45,14 +46,13 @@ Tài khoản thử (mật khẩu đều là `123456`, khai báo ở `Services/Mo
       │  loading = true → nút đổi thành "Đang đăng nhập…" và bị khóa
       ▼
 [AuthenticationService.cs:30] LoginAsync(model)
-      │  POST "api/auth/login"  { username, password }
+      │  POST "api/v1/auth/dang-nhap"  { tenDangNhap, matKhau }
       ▼
 [AuthHeaderHandler.cs:22] gắn token (lúc này chưa có) → chuyển tiếp
       ▼
-[MockApiHandler.cs:122] route "auth/login" → [MockApiHandler.cs:149] Login()
-      │  so khớp tài khoản + mật khẩu trong MockDatabase
-      │  đúng → { success: true, token: "mock-token-admin", fullName, role }
-      │  sai  → { success: false, message: "Sai tên đăng nhập hoặc mật khẩu." }
+[Backend CoffeeShop.Api] kiểm tra tài khoản + mật khẩu trong CSDL
+      │  đúng → 200 { token, hetHan, nguoiDung { hoTen, vaiTro, … } }
+      │  sai  → 401 { error: { code, message: "Sai tên đăng nhập hoặc mật khẩu…" } }
       ▼
 [AuthenticationService.cs:64] thành công → _authState.SignInAsync(token, tên, vai trò)
       ▼
@@ -98,7 +98,7 @@ Dashboard.razor:2, Products.razor:2    [Authorize(Roles="Admin")] → chỉ ch�
   - Nhân viên mở `/` → chuyển sang `/orders` (dòng 19–23).
   - Nhân viên mở trang Admin khác → hiện "Không có quyền truy cập" (dòng 26–32).
 - Menu khác nhau theo vai trò: `Layout/MainLayout.razor`, khối `@if (auth.User.IsInRole("Admin"))`.
-- **Máy chủ cũng chặn** (không chỉ giao diện): `MockApiHandler.cs:69` trả 403 nếu nhân viên gọi API không được phép (`StaffMayCall`, dòng 440).
+- **Máy chủ cũng chặn** (không chỉ giao diện): backend trả 403 nếu nhân viên gọi API chỉ dành cho Quản lý (hủy đơn, tài khoản, kho, báo cáo, sửa thực đơn).
 
 > Thầy hỏi *"Ẩn menu thì nhân viên gõ URL vẫn vào được à?"*: "Không ạ. Trang có `[Authorize(Roles = "Admin")]` nên `AuthorizeRouteView` chặn. API phía máy chủ cũng kiểm tra vai trò và trả 403."
 
@@ -153,4 +153,4 @@ Dashboard.razor:2, Products.razor:2    [Authorize(Roles="Admin")] → chỉ ch�
 | Chữ trên nút | `Đăng nhập`, `Đăng xuất` |
 | Hàm xử lý | `HandleLogin`, `Logout` |
 | API | `api/v1/auth/dang-nhap` |
-| Câu báo lỗi | `Sai tên đăng nhập hoặc mật khẩu` (ra cả mock lẫn service) |
+| Câu báo lỗi | `Sai tên đăng nhập hoặc mật khẩu` (do backend trả về, service hiện nguyên câu) |

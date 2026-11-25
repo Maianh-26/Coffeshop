@@ -2,6 +2,8 @@
 
 ← [Mục lục](README.md)
 
+> **Cập nhật 24/11/2026:** đã **xóa chế độ API giả** (`Services/Mock/`, `Api:UseMock`). Web luôn gọi backend thật `CoffeeShop.Api` tại `Api:BaseUrl` (`wwwroot/appsettings.json`, mặc định `http://localhost:3000/`), mọi route nằm dưới `api/v1/`. Một số số dòng, tên route cũ trong file này viết cho bản trước, khi cần thì tra lại bằng Ctrl+Shift+F.
+
 - **URL:** `/products` · **Quyền:** chỉ Admin (`Products.razor:2` → `[Authorize(Roles = "Admin")]`).
 - **Giao diện:** `Pages/Products/Products.razor` (1183 dòng)
 - **Logic:** `Pages/Products/Products.razor.cs` (813 dòng), `partial class Products`.
@@ -9,7 +11,7 @@
 
 > ⚠️ **Trạng thái hiện tại — cần nói đúng khi bị hỏi:**
 > Trang **chưa nối service**. Danh mục, nguyên liệu, topping/size và món được tạo sẵn trong `OnInitializedAsync` (`Products.razor.cs:120–292`). Thêm / sửa / xóa chỉ thay đổi danh sách trong bộ nhớ, **F5 là mất**.
-> Phần nối đã viết sẵn: `ProductService`, `CategoryService`, `ToppingService` (`api/products`, `api/categories`, `api/toppings`, `PUT …/{code}/recipe`), và API giả xử lý CRUD chung ở `MockApiHandler.cs:129–135`.
+> Phần nối đã viết sẵn: `ProductService`, `CategoryService`, `ToppingService` (`api/products`, `api/categories`, `api/toppings`, `PUT …/{code}/recipe`), backend xử lý các route `api/v1/mon`, `danh-muc`, `topping`, `chi-tiet-mon/{id}/cong-thuc`.
 
 ---
 
@@ -137,7 +139,7 @@ Nút **Xóa** (razor 145) → `AskDelete()` (`.cs:481`) → `dialog = "delete"` 
 - Nút đỏ "Xóa món" / "Xóa danh mục" / "Xóa Topping / Size" (razor 996–1006, đổi chữ thành "Đang xóa…" khi đang chạy) → `Delete()` (`.cs:722`) → `RemoveAll(x => x.Code == target)` trên đúng danh sách của tab.
 - Chưa chọn gì → "Chọn đối tượng cần xóa.".
 
-> Khi nối API, xóa danh mục **đang có món** thì backend nên trả **409**, và trang nên hiện câu tiếng Việt cho trường hợp này. API giả hiện **chưa** kiểm tra trường hợp này: nó chỉ trả 409 khi thêm trùng mã (`MockApiHandler.cs:509`).
+> Khi nối API, xóa danh mục **đang có món** thì backend nên trả **409**, và trang nên hiện câu tiếng Việt cho trường hợp này.
 
 ---
 

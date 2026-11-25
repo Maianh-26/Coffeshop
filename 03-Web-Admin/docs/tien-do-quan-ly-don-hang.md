@@ -15,14 +15,14 @@
 
 - Nhánh `web-admin`. Commit `eb1d588` (phần đầu: số nhận món, trạng thái phục vụ, sửa đơn, API đề xuất, mock) và `aa66bbf` (làm lại giao diện, bước phục vụ tuần tự, đề xuất API v2.1, quy tắc CLAUDE.md, file này) **đã vào `main`** qua PR #3 và #4 của repo nhóm.
 - Phần ở mục 7 (lọc thời gian, sắp xếp, ô chọn hình thức thanh toán, hóa đơn K80, `SortIcon.razor`, `DocSoTien.cs`) **chưa commit** tính đến 13/11/2026.
-- `wwwroot/appsettings.json` giữ `UseMock: false` (có thêm mục `Receipt`). Muốn demo bằng dữ liệu giả thì đổi tạm sang `true`, không commit.
+- `wwwroot/appsettings.json` chỉ còn `Api:BaseUrl` và mục `Receipt`. Chế độ dữ liệu giả (`Services/Mock`) đã xóa ngày 24/11/2026.
 - Chưa commit (cố ý): `.playwright-mcp/` (ảnh test, ở cả gốc repo lẫn `03-Web-Admin/`). 2 ảnh trong `docs/` (`Screenshot …png`, `1793106…jpg`) chưa rõ có nên commit không, cần hỏi người dùng.
 
 ## 3. Chức năng đã làm trên trang `/orders`
 
 **Danh sách**
 - Ô tìm kiếm chỉ nhận chữ số, khớp **mã đơn (tiền tố)** hoặc **số nhận món (chính xác)**. Trước đây tìm cả tên món/nhân viên không hiện trên bảng nên trông như "lọc sai".
-- Cột: Mã đơn, Số nhận món, Trạng thái, Tổng tiền (căn phải), Thanh toán (nhãn + hình thức bên dưới), Thời gian tạo (đã bỏ cột Nguồn 14/11, xem mục 9). Màn hình hẹp hoặc đang mở chi tiết: ẩn Thời gian. Điện thoại: ẩn thêm Tổng tiền, số tiền hiện dưới nhãn thanh toán.
+- Cột: Mã đơn, Số nhận món, Trạng thái, Tổng tiền (căn phải), Thanh toán (nhãn; hình thức bên dưới **chỉ khi đã thu / đã hoàn tiền**, xem mục 11), Thời gian tạo (đã bỏ cột Nguồn 14/11, xem mục 9). Màn hình hẹp hoặc đang mở chi tiết: ẩn Thời gian. Điện thoại: ẩn thêm Tổng tiền, số tiền hiện dưới nhãn thanh toán.
 - Bộ lọc trạng thái phục vụ + bộ lọc thanh toán. Màn hình ≤1000px gom vào nút "Bộ lọc (n)". Nút **Làm mới** (biểu tượng) thay chữ "Xóa lọc" (xem mục 7).
 - **Đơn mới từ Tablet**: dò mỗi 10 giây trên **toàn bộ dữ liệu** (không phụ thuộc trang hay bộ lọc). Thông báo ở **đầu trang, màu cam** (12/11: chủ quán yêu cầu đổi từ tím sang màu thông dụng hơn; nút Xem không còn icon con mắt), có nút **Xem** (mở chi tiết, kể cả đơn không có trong trang đang xem). Dòng mới có vạch cam + chip "Mới" cho đến khi mở. Đơn tạo tại quầy **không** tính là đơn mới (cố ý).
 - Thông báo kết quả thao tác nổi ở góc dưới trái (điện thoại: dưới cùng), thành công tự ẩn sau 6 giây. Thông báo có cảnh báo kho thì giữ lại.
@@ -43,7 +43,7 @@ Chuỗi và tông màu nằm một chỗ: `TrangThaiDon.Label`, `TrangThaiPhucVu
 **Chi tiết đơn (khung bên phải)**
 - Thứ tự: thông tin → **phiếu order** (số lượng ×, món, giá thẳng cột; topping có giá; ghi chú in nghiêng) → tổng → số nhận món + thanh tiến trình → thu tiền → In hóa đơn.
 - **Số nhận món** (bảng gỗ 1–50): ô tròn như thiết kế cũ (chủ quán không thích kiểu "miếng gỗ"). Số đang được đơn chưa phục vụ xong giữ thì bị khóa (báo "Số 18 đang được dùng cho đơn #12"). Đã phục vụ hoặc đã hủy thì giải phóng nhưng vẫn lưu trên đơn.
-- **Trạng thái phục vụ đi lần lượt, không nhảy cóc**: Chờ phục vụ → (nút xanh dương **Bắt đầu chuẩn bị**) → Đang chuẩn bị → (nút xanh lá **Xác nhận đã phục vụ**) → Đã phục vụ. Mock cũng chặn bỏ bước (409).
+- **Trạng thái phục vụ đi lần lượt, không nhảy cóc**: Chờ phục vụ → (nút xanh dương **Bắt đầu chuẩn bị**) → Đang chuẩn bị → (nút xanh lá **Xác nhận đã phục vụ**) → Đã phục vụ.
 - Bắt đầu chuẩn bị khi chưa có số → hộp hỏi lại "Nhập số nhận món" / "Vẫn bắt đầu (khách mang đi)". Đã gõ số mà chưa bấm Lưu thì lưu luôn rồi bắt đầu.
 - Phục vụ khi chưa thu tiền → hộp hỏi lại "Thu tiền trước" / "Vẫn xác nhận đã phục vụ".
 - **Thu tiền**: nút cam chữ tối (chữ trắng trên cam không đủ tương phản), **không có ô tiền khách đưa** (chủ quán chọn đơn giản), có link đổi tiền mặt ↔ chuyển khoản.
@@ -54,7 +54,7 @@ Chuỗi và tông màu nằm một chỗ: `TrangThaiDon.Label`, `TrangThaiPhucVu
 ## 4. Backend: chưa hỗ trợ, đã gửi đề xuất
 
 API **chưa có** ở `CoffeeShop.Api` (mã nguồn tại `C:\dev\CoffeeShop.Api`, chỉ đọc, không sửa):
-`PUT don-hang/{id}`, `PUT don-hang/{id}/so-nhan-mon`, `PUT don-hang/{id}/trang-thai-phuc-vu`, lọc `trangThaiPhucVu`, trường `soNhanMon` / `trangThaiPhucVu`. Web chạy đủ ở mock. Với backend thật, nếu response không có `trangThaiPhucVu` thì trang tự ẩn phần phục vụ và báo "Máy chủ chưa hỗ trợ". Chi tiết xem `docs/de-xuat-api-don-hang.md`.
+`PUT don-hang/{id}`, `PUT don-hang/{id}/so-nhan-mon`, `PUT don-hang/{id}/trang-thai-phuc-vu`, lọc `trangThaiPhucVu`, trường `soNhanMon` / `trangThaiPhucVu`. Với backend thật, nếu response không có `trangThaiPhucVu` thì trang tự ẩn phần phục vụ và báo "Máy chủ chưa hỗ trợ". Chi tiết xem `docs/de-xuat-api-don-hang.md`.
 
 **Lỗi tranh chấp phía backend đã phân tích (chưa sửa, chưa ghi vào đề xuất):**
 1. `sp_ThanhToanVaTruKho` kiểm tra PENDING và UPDATE tách rời. Hai người thu tiền cùng lúc → **trừ kho 2 lần**. Sửa: `UPDATE … WHERE TrangThaiThanhToan='PENDING'` + `@@ROWCOUNT`.
@@ -69,15 +69,14 @@ Người dùng đã được hỏi có ghi phần này vào tài liệu đề xu
 - [ ] Thu tiền mặt một cú bấm, không hỏi lại, không hoàn tác: agent đề nghị thêm xác nhận hoặc hoàn tác vài giây. Chờ chủ quán quyết định.
 - [ ] Có cho hủy đơn "Đã phục vụ" không? Có bắt buộc thu tiền trước khi phục vụ không? Chờ chủ quán.
 - [ ] Trên điện thoại, thông báo nổi che nút In hóa đơn khoảng 6 giây (nhỏ).
-- [ ] Chưa test dòng ghi chú món trên phiếu order (mock không có đơn có ghi chú).
+- [ ] Chưa test dòng ghi chú món trên phiếu order (cần tạo một đơn có ghi chú món trên backend thật).
 - [ ] Đề xuất "Hoàn tác / Recall" sau khi bấm Đã phục vụ: cần backend cho đi lùi trạng thái.
 - [ ] Nâng cấp sau: kết nối thời gian thực (SignalR) thay cho tự làm mới 10 giây. Ghi lại ai thu tiền / ai chuẩn bị.
 
 ## 6. Cách test
 
-- Dữ liệu giả: `wwwroot/appsettings.json` → `Api:UseMock: true`, **xong phải trả `false`**. Mock tự sinh đơn tablet mỗi 60 giây, nút "Mô phỏng đơn từ Tablet" sinh ngay (đơn chuyển khoản tự sang "Đã thu").
-- Dữ liệu mẫu: đơn #20 "Đang chuẩn bị" giữ số 18, #19 đã phục vụ số 18, #21 chờ phục vụ chưa có số.
-- Chạy app: `dotnet run --launch-profile http` → http://localhost:5101 (tự đăng nhập `quanly` ở mock). **Kiểm tra cổng 5101 trước**: nếu đang có app (người dùng chạy từ Visual Studio) thì không tắt và hỏi trước khi chạy `ui-ux-reviewer`.
+- Test với backend thật (`CoffeeShop.Api` ở `http://localhost:3000` + DB `QuanCaPheDB`); đơn tablet tạo bằng `POST api/v1/don-hang` (Swagger hoặc app tablet).
+- Chạy app: `dotnet run --launch-profile http` → http://localhost:5101 (đăng nhập `quanly` / `QuanLy@123`). **Kiểm tra cổng 5101 trước**: nếu đang có app (người dùng chạy từ Visual Studio) thì không tắt và hỏi trước khi chạy `ui-ux-reviewer`.
 - Mở Claude **từ thư mục `03-Web-Admin`** để các agent `code-reviewer` / `ui-ux-reviewer` được nạp. Mở từ gốc repo thì dùng agent `general-purpose` và bảo nó đọc `.claude/agents/<tên>.md`.
 - Mỗi lần sửa `app.css` / `app.js`: tăng `?v=` trong `wwwroot/index.html` (hiện `app.css?v=66`, `app.js?v=7`).
 
@@ -99,7 +98,7 @@ Người dùng đã được hỏi có ghi phần này vào tài liệu đề xu
 ### 7.3. Sắp xếp theo cột Mã đơn và Tổng tiền
 
 - Theo mẫu W3C APG "Sortable Table" / Carbon / eBay: tiêu đề là `<button class="sort-button">` + `Components/SortIcon.razor` (2 mũi tên mờ khi chưa sắp xếp, mũi tên đang dùng đậm lên); `aria-sort` chỉ đặt trên cột đang sắp xếp. Bấm cột mới → thấp đến cao; bấm lại → cao đến thấp ↔ thấp đến cao. Làm mới → về mặc định (mới nhất trước).
-- Sắp xếp **ở máy chủ trên toàn bộ danh sách** (trang 2 nối tiếp trang 1): tham số `sapXep` = `maDonHang` | `-maDonHang` | `tongTien` | `-tongTien` (backend đã làm, `main` 18/11/2026). Mock đã làm.
+- Sắp xếp **ở máy chủ trên toàn bộ danh sách** (trang 2 nối tiếp trang 1): tham số `sapXep` = `maDonHang` | `-maDonHang` | `tongTien` | `-tongTien` (backend đã làm, `main` 18/11/2026).
 - **23/11/2026:** đã **bỏ** nhánh web tự tải hết danh sách để sắp xếp (`LoadAllAndSort`, `serverSortSupported`, bộ nhớ đệm 60 giây, giới hạn 2.000 đơn). Web chỉ gửi bộ lọc + `sapXep` + `page` và nhận đúng 1 trang. Lý do: đo trên bản sao 1 triệu đơn, việc lọc / sắp xếp / tìm kiếm phải nằm ở máy chủ (có index) — xem `01-Backend-api/database/ToiUuHieuNang_20261123.sql`. Khi đang sắp xếp khác mặc định, việc dò đơn mới vẫn dùng request riêng (trang 1 không còn là đơn mới nhất).
 - Điện thoại (≤650px): cột Tổng tiền bị ẩn (số tiền hiện dưới nhãn thanh toán) nên tiêu đề cột Thanh toán thành nút **"Tiền ⇅"** (`.sort-mobile-only`) để vẫn sắp xếp được theo tổng tiền; chữ "Thanh toán" vẫn có cho trình đọc màn hình.
 
@@ -163,3 +162,11 @@ Người dùng đã được hỏi có ghi phần này vào tài liệu đề xu
 - Ô Chọn khoảng ngày (Đơn hàng + Lịch sử kho) chỉ hiện dòng dưới khi có lỗi.
 - Trang Khuyến mãi: mã khuyến mãi mà món đang thuộc hiện thành nhãn xám cạnh tên món (dữ liệu, không phải câu giải thích) để tránh chuyển món âm thầm.
 - Lớp CSS `.pay-picker` đã đổi tên thành `.choice-picker` (trang Đơn hàng vẫn dùng).
+
+## 11. Cập nhật 23/11/2026: đơn chưa thu KHÔNG hiện hình thức thanh toán
+
+- **Lỗi:** bảng danh sách ghi "Chưa thu" + "Tiền mặt" dưới nhãn, chi tiết ghi "Chưa thu (tiền mặt)" — như thể đã biết khách trả bằng gì. Phiên 15/11 đã phân tích và đề xuất nhưng **chưa từng sửa trong code** (chưa chốt hướng, không ghi vào file này), nên đợt đồng bộ backend sau đó không biết. Với backend thật lỗi lộ rõ vì backend tự điền `CASH` (`DatMon`: `req.PhuongThucThanhToan ?? "CASH"`, DB `DEFAULT 'CASH'`) → hầu hết đơn chưa thu đều hiện "Tiền mặt".
+- **Nguyên tắc (giữ cố định):** `PhuongThucThanhToan` của đơn `PENDING` chỉ là lựa chọn lúc đặt (tablet còn đổi được QR ↔ tiền mặt) hoặc giá trị mặc định → **không hiển thị như sự thật**. Chỉ hiện hình thức khi `PhuongThucThanhToans.DaChot(d)`: đơn `PAID`, hoặc đã hủy có hoàn tiền.
+- **Đã sửa:** `PhuongThucThanhToans.DaChot` + `Summary` (đơn chưa thu / hủy không thu → chỉ "Chưa thu" / "Không thu") trong `Models/DonHang.cs`; ô Thanh toán trên bảng `Orders.razor` dùng `DaChot`.
+- **Vẫn giữ:** ô chọn Tiền mặt | Chuyển khoản lúc thu tiền, mặc định = lựa chọn của khách (gợi ý để bấm nhanh); hình thức chỉ ghi vào đơn khi bấm xác nhận (`POST thanh-toan`). Hóa đơn K80 chỉ in hình thức khi đã thu.
+- **Cần báo nhóm backend (chưa gửi):** đơn không chọn hình thức nên lưu `null` thay vì tự điền `CASH`, để phân biệt "khách chọn tiền mặt" với "chưa chọn".

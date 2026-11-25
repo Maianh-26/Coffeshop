@@ -69,10 +69,29 @@ public class GioCaoDiem
 
 /// <summary>
 /// Một mốc trên biểu đồ / một dòng bảng báo cáo của trang Tổng quan (một giờ, một ngày hoặc một tháng).
-/// Moc: nhãn ngắn dưới cột ("15h", "05/11", "11/2026"); MocDayDu: nhãn đầy đủ cho bảng, tooltip và file CSV.
+/// Moc: nhãn ngắn dưới cột ("15h", "05/11", "11/2026"); MocDayDu: nhãn đầy đủ cho thẻ số liệu (tooltip) và trình đọc màn hình.
+/// BatDau: thời điểm bắt đầu của mốc (đầu giờ / 00:00 của ngày / ngày 1 của tháng) — file Excel ghi thành ô ngày thật.
 /// MocPhu: dòng phụ dưới nhãn (ngày, ở cột 00:00 khi biểu đồ theo giờ qua nửa đêm) — mốc có dòng phụ luôn được ghi nhãn.
 /// </summary>
-public sealed record DongBaoCao(string Moc, string MocDayDu, int SoDon, decimal DoanhThu, string? MocPhu = null);
+public sealed record DongBaoCao(string Moc, string MocDayDu, int SoDon, decimal DoanhThu, DateTime BatDau, string? MocPhu = null);
+
+/// <summary>Đơn vị thời gian của bảng doanh thu theo mốc (biểu đồ và file Excel).</summary>
+public enum DonViMoc { Gio, Ngay, Thang }
+
+/// <summary>
+/// Dữ liệu một lần xuất file Excel của trang Tổng quan.
+/// TuLuc / DenLuc: kỳ báo cáo chính xác (DenLuc không vượt quá lúc xuất); DonVi + TheoMoc: đủ mọi mốc như biểu đồ
+/// (kể cả mốc 0 đ); Topping = null khi máy chủ chưa hỗ trợ báo cáo topping.
+/// </summary>
+public sealed record BaoCaoXuat(
+    DateTime TuLuc,
+    DateTime DenLuc,
+    DateTime XuatLuc,
+    BaoCaoDoanhThu TongQuan,
+    DonViMoc DonVi,
+    IReadOnlyList<DongBaoCao> TheoMoc,
+    IReadOnlyList<MonBanChay> Mon,
+    IReadOnlyList<ToppingBanChay>? Topping);
 
 /// <summary>
 /// Khoảng thời gian gửi lên api/v1/bao-cao/*: mốc chính xác tới từng giây.

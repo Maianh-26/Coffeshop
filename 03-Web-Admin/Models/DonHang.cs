@@ -208,12 +208,20 @@ public static class PhuongThucThanhToans
         _ => "due"
     };
 
-    /// <summary>Tình trạng tiền của đơn bằng một câu ngắn, ví dụ "Đã thu tiền mặt", "Chưa thu (chuyển khoản)".</summary>
+    /// <summary>
+    /// Hình thức thanh toán đã là sự thật chưa: chỉ khi đơn đã thu (PAID) hoặc đã thu rồi hoàn tiền.
+    /// Đơn chưa thu thì <c>PhuongThucThanhToan</c> chỉ là lựa chọn của khách lúc đặt — hoặc giá trị
+    /// backend tự điền "CASH" khi không chọn — nên không được hiển thị như hình thức đã trả.
+    /// </summary>
+    public static bool DaChot(DonHang d) =>
+        d.TrangThaiThanhToan == TrangThaiDon.Paid || (d.DaHuy && d.DaHoanTien);
+
+    /// <summary>Tình trạng tiền của đơn bằng một câu ngắn, ví dụ "Đã thu tiền mặt", "Chưa thu", "Đã hoàn tiền (chuyển khoản)".</summary>
     public static string Summary(DonHang d) => d.TrangThaiThanhToan switch
     {
         TrangThaiDon.Paid when d.PhuongThucThanhToan == QrTransfer => "Đã nhận chuyển khoản",
         TrangThaiDon.Paid => "Đã thu tiền mặt",
-        TrangThaiDon.Cancelled when !d.DaHoanTien => ShortLabel(d),
+        _ when !DaChot(d) => ShortLabel(d),
         _ => $"{ShortLabel(d)} ({Label(d.PhuongThucThanhToan).ToLowerInvariant()})"
     };
 }

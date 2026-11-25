@@ -2,6 +2,8 @@
 
 ← [Mục lục](README.md)
 
+> **Cập nhật 24/11/2026:** đã **xóa chế độ API giả** (`Services/Mock/`, `Api:UseMock`). Web luôn gọi backend thật `CoffeeShop.Api` tại `Api:BaseUrl` (`wwwroot/appsettings.json`, mặc định `http://localhost:3000/`), mọi route nằm dưới `api/v1/`. Một số số dòng, tên route cũ trong file này viết cho bản trước, khi cần thì tra lại bằng Ctrl+Shift+F.
+
 - **URL:** `/orders` · **Quyền:** cả **Admin** và **Nhân viên**. Trang không có `Roles`, chỉ cần đăng nhập (`[Authorize]` chung trong `Pages/_Imports.razor`). Đây là trang chính của nhân viên: đăng nhập xong vào thẳng đây (`Utilities/Roles.cs` → `HomeUrl`).
 - **Một file duy nhất:** `Pages/Orders/Orders.razor` (1374 dòng):
   - Dòng **1–787**: giao diện.
@@ -10,7 +12,7 @@
 
 > ⚠️ **Trạng thái hiện tại — cần nói đúng khi bị hỏi:**
 > Trang **chưa nối `OrderService`**. Danh sách đơn được tạo sẵn trong trang (`InitSampleOrders`, dòng 893). Mọi thao tác (tiếp nhận, thanh toán, hủy, tạo đơn) chỉ sửa danh sách trong bộ nhớ, **F5 là mất**.
-> Phần nối đã viết sẵn: `Services/OrderService.cs` (`AcceptOrderAsync` → `POST api/orders/{code}/accept`, `ConfirmPaymentAsync` → `POST api/orders/{code}/pay`, …) và API giả xử lý ở `MockApiHandler.cs:568` (`Orders`).
+> Phần nối đã viết sẵn: `Services/OrderService.cs` (`AcceptOrderAsync` → `POST api/orders/{code}/accept`, `ConfirmPaymentAsync` → `POST api/orders/{code}/pay`, …), backend xử lý các route `api/v1/don-hang/...`.
 
 **Luồng nghiệp vụ chính:** Tablet tạo đơn → backend lưu → web admin thấy đơn **Chờ tiếp nhận** → **Tiếp nhận** (Đang pha chế) → **Thu tiền** (Đã thanh toán) → **Hoàn thành**.
 
@@ -22,7 +24,7 @@
 ┌──────────────── .master-panel ─────────────────┐┌──── .detail-panel ───┐
 │ [🔍 Tìm…] [Từ–Đến] [Trạng thái▾] [TT▾] [Lọc][Đặt lại] ││ Đơn hàng #DH00125  ×│ ← dòng 288–577
 │ (.filters-panel, dòng 24–84)                  ││ badge trạng thái    │
-│ [+Tạo đơn][Sửa][Hủy]   ● Tablet Realtime [Mô phỏng]││ thông tin, món      │
+│ [+Tạo đơn][Sửa][Hủy]   ● Tự cập nhật         ││ thông tin, món      │
 │ (.action-bar, dòng 88–147)                    ││ tạm tính / tổng     │
 │ Bảng đơn hàng (.orders-table, dòng 151–243)   ││ [Tiếp nhận]          │
 │ 12 đơn hàng · Trang 1/2        [‹] 1 [›]      ││ [Thu tiền / QR]      │
@@ -62,7 +64,7 @@ Biến chính (`@code`, dòng 790–828): `orders`, `search`, `fromDate`, `toDat
 
 **Phân trang** (dòng 1015–1022, 1067): `VisibleOrders = FilteredOrders.Skip((page-1)*10).Take(10)`. `Pages = ceil(số đơn / 10)`, nhỏ nhất là 1. Nút ‹ › gọi `Move(-1)` / `Move(1)`, không cho vượt quá trang đầu / cuối.
 
-> Chuỗi trạng thái phải **khớp từng ký tự** (có dấu) giữa trang, `Models/Order.cs` và `MockApiHandler`: `Chờ tiếp nhận`, `Đang pha chế`, `Hoàn thành`, `Đã hủy`, `Chưa thanh toán`, `Đã thanh toán`.
+> Chuỗi trạng thái phải **khớp từng ký tự** (có dấu) giữa trang, `Models/Order.cs` và backend: `Chờ tiếp nhận`, `Đang pha chế`, `Hoàn thành`, `Đã hủy`, `Chưa thanh toán`, `Đã thanh toán`.
 
 ---
 
@@ -96,14 +98,13 @@ Khung chi tiết dòng 288–577 dùng biến `detail = SelectedOrderDetail` (d�
 |-----|----------|------------|-----|---------|
 | **Tiếp nhận đơn hàng** | `Status == "Chờ tiếp nhận"` | 449–457 | `AcceptOrder` (1077) | → `Đang pha chế`, ghi `AcceptedAt` |
 | **Xác nhận đã thu tiền mặt** | chưa thanh toán, chưa hủy, `PaymentMethod == "Tiền mặt"` | 460–476 | `ConfirmCashPayment` (1084) | → `Đã thanh toán`; nếu đang chờ thì tự chuyển `Đang pha chế` |
-| **Mã QR + "Mô phỏng khách quét QR thành công"** | chưa thanh toán, chưa hủy, chuyển khoản QR | 478–541 | `SimulateQrSuccess` (1099) | như trên. Mã QR là hình SVG minh họa (dòng 486), chưa phải VietQR thật |
 | **Hoàn thành đơn** | `Đang pha chế` **và** `Đã thanh toán` | 544–553 | `CompleteOrder` (1114) | → `Hoàn thành` |
-| **In hóa đơn** | luôn | 555–562 | `PrintReceipt` (1365) | JS `appHelpers.printPage` → `window.print()` |
+| **In hóa đơn** | luôn | 555–562 | `PrintReceipt` (1365) | JS `appHelpers.printReceipt` (dựng hóa đơn K80 trong iframe ẩn rồi in) |
 | **×** đóng chi tiết | luôn | 305–311 | lambda `selected = null` | ẩn khung chi tiết |
 
 Sau mỗi thao tác, `ShowAlert(...)` (dòng 1359) hiện banner xanh ở đầu trang (dòng 8–17). Có nút × để tắt banner.
 
-> Thầy hỏi *"Nút Tiếp nhận em code ở đâu, gọi tới đâu?"*: "Nút ở `Orders.razor` dòng 449–457, chỉ hiện khi đơn đang `Chờ tiếp nhận`. Bấm thì gọi `AcceptOrder(detail)` ở dòng 1077, đổi `Status` thành `Đang pha chế` và ghi giờ tiếp nhận. Hiện trang đang chạy dữ liệu mẫu. Khi nối backend, hàm này sẽ gọi `OrderService.AcceptOrderAsync(code)` để gửi `POST api/orders/{code}/accept`. API (giả ở `MockApiHandler.cs:602`) trả **409** nếu đơn không còn ở trạng thái chờ."
+> Thầy hỏi *"Nút Tiếp nhận em code ở đâu, gọi tới đâu?"*: "Nút ở `Orders.razor` dòng 449–457, chỉ hiện khi đơn đang `Chờ tiếp nhận`. Bấm thì gọi `AcceptOrder(detail)` ở dòng 1077, đổi `Status` thành `Đang pha chế` và ghi giờ tiếp nhận. Hiện trang đang chạy dữ liệu mẫu. Khi nối backend, hàm này sẽ gọi `OrderService.AcceptOrderAsync(code)` để gửi `POST api/orders/{code}/accept`. Backend trả **409** nếu đơn không còn ở trạng thái chờ."
 
 ---
 
@@ -129,15 +130,14 @@ Danh mục món / size / topping cho bộ chọn được tạo sẵn ở `InitC
 
 ---
 
-## 3.6. "Tablet Realtime" & Mô phỏng đơn từ Tablet
+## 3.6. "Tự cập nhật" đơn mới từ Tablet
 
 | Thành phần | Ở đâu | Thực tế làm gì |
 |------------|-------|----------------|
 | Bộ hẹn giờ 4 giây | `OnInitialized` (dòng 849–862), `System.Threading.Timer` | Mỗi 4 giây gọi `InvokeAsync(StateHasChanged)` để vẽ lại trang. Phải dùng `InvokeAsync` vì timer chạy ngoài luồng giao diện |
 | Nút "Tablet Realtime: Đang bật / Tạm dừng" | dòng 123–131 → `ToggleAutoRefresh` (dòng 1124) | Bật / tắt cờ `autoRefreshEnabled`. Chấm xanh nhấp nháy là CSS `.live-indicator` |
-| Nút "Mô phỏng gửi đơn từ Tablet" | dòng 134–144 → `SimulateTabletOrder` (dòng 1130) | Thêm 1 đơn `Tablet` (bàn ngẫu nhiên) vào đầu danh sách. **Chỉ hiện khi `Api:UseMock = true`** (dòng 134) |
 | Hủy timer khi rời trang | `@implements IDisposable` (dòng 2) + `Dispose()` (dòng 1370) | Không để timer chạy ngầm sau khi đã rời trang |
-| API giả tự sinh đơn Tablet | `MockApiHandler.cs:643` `SimulateTabletOrders` | Mỗi `MockNewTabletOrderEverySeconds` giây (`appsettings.json`) thêm đơn khi có `GET api/orders`. Có tác dụng khi trang đã nối `OrderService` |
+| Đơn mới từ Tablet | App tablet gửi `POST api/v1/don-hang` lên backend | Lần tải lại kế tiếp (`GET api/v1/don-hang`) sẽ thấy đơn. Muốn thử không cần tablet: gửi `POST api/v1/don-hang` bằng Swagger `http://localhost:3000/docs` |
 
 > Thầy hỏi *"Realtime là sao?"*: "Hiện tại là **làm mới định kỳ** (polling) mỗi 4 giây. Khi nối backend, mỗi nhịp sẽ gọi `OrderService.GetAllAsync()` để lấy đơn mới từ tablet. Nếu backend có SignalR thì có thể đổi sang đẩy dữ liệu thời gian thực."
 
@@ -157,7 +157,7 @@ CSS: `.realtime-pill` `app.css:1819`, `.qr-payment-box` 1849.
 
 Khi nối: thêm `@inject OrderService Orders` và `ILogger`. Đổi các hàm sang `async Task` và bắt lỗi, hiện câu tiếng Việt cố định. Khóa nút trong lúc gửi (`disabled`). Tải dữ liệu trong `OnInitializedAsync`.
 
-> Phân quyền phía máy chủ: nhân viên được gọi **mọi** API `orders` (`MockApiHandler.cs:448`).
+> Phân quyền phía máy chủ: nhân viên được xem, thu tiền, đổi trạng thái phục vụ; **hủy đơn chỉ Quản lý** (backend trả 403).
 
 ---
 
@@ -166,10 +166,10 @@ Khi nối: thêm `@inject OrderService Orders` và `ILogger`. Đổi các hàm s
 | Muốn tìm | Gõ Ctrl+Shift+F |
 |----------|-----------------|
 | Nút Tiếp nhận | `Tiếp nhận đơn hàng` hoặc `AcceptOrder` |
-| Thu tiền | `ConfirmCashPayment`, `SimulateQrSuccess` |
+| Thu tiền | `ConfirmCashPayment` |
 | Điều kiện lọc | `FilteredOrders` |
 | Màu badge trạng thái | `StatusBadgeColor` |
 | Hộp thoại tạo / sửa | `isOrderModalOpen`, `SaveDraftOrder` |
 | Timer realtime | `autoRefreshTimer` |
 | Dữ liệu mẫu | `InitSampleOrders`, `InitCatalog` |
-| API đơn hàng | `api/orders` (ra `OrderService.cs` và `MockApiHandler.cs`) |
+| API đơn hàng | `api/v1/don-hang` (trong `OrderService.cs`) |
