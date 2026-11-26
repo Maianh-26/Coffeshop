@@ -57,7 +57,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                       const BrandLogo(size: 40),
                       const SizedBox(width: 10),
                       Text(
-                        'coffee shop',
+                        'Coffee Shop',
                         style: serif(size: 19, color: Colors.white),
                       ),
                     ],

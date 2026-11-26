@@ -193,7 +193,6 @@ CREATE TABLE CongThucMon (
         (MaChiTietMon IS NULL AND MaTopping IS NOT NULL)
     ),
     CONSTRAINT UQ_CongThuc_ChiTietMon UNIQUE (MaChiTietMon, MaNguyenLieu),
-    CONSTRAINT UQ_CongThuc_Topping UNIQUE (MaTopping, MaNguyenLieu)
 );
 
 CREATE TABLE LichSuKho (
