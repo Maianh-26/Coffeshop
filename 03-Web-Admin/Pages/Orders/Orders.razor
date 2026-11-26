@@ -7,6 +7,8 @@
 @inject IJSRuntime JS
 @inject IConfiguration Configuration
 @inject ILogger<Orders> Logger
+@inject AppState State
+
 
 <PageTitle>Đơn hàng - Coffee Shop</PageTitle>
 
@@ -1041,6 +1043,11 @@
                 <td style="padding-bottom: 4px;">Ngày: @((receipt.ThoiGianThanhToan ?? receipt.ThoiGianTao).ToString("dd/MM/yyyy"))</td>
                 <td class="r-right" style="padding-bottom: 4px;">Giờ: @((receipt.ThoiGianThanhToan ?? receipt.ThoiGianTao).ToString("HH:mm:ss"))</td>
             </tr>
+            <tr>
+                <td colspan="2" style="padding-bottom: 4px;">
+                    Thu ngân: @(State.Role?.ToLower() is "admin" or "quanly" or "quản lý" ? "Quản lý" : "Nhân viên")
+                </td>
+            </tr>
         </table>
 
         <table class="r-items" style="width: 100%; table-layout: fixed;">
@@ -1112,6 +1119,7 @@
         }
     </div>
 }
+
 
 
 
