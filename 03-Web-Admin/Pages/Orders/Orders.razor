@@ -1034,14 +1034,14 @@
             <div class="r-title" style="margin-top: 6px;">HÓA ĐƠN THANH TOÁN</div>
         </div>
 
-        <table class="r-info" style="margin-bottom: 8px;">
+                <table class="r-info" style="width: 100%; table-layout: fixed; margin-bottom: 8px;">
             <tr>
-                <td style="padding-bottom: 4px;">HĐ: <strong>@receipt.MaDonHang.ToString("D4")</strong></td>
-                <td class="r-right" style="padding-bottom: 4px;">@(receipt.SoNhanMon is { } receiptNo ? $"Số nhận món: {receiptNo}" : "")</td>
+                <td style="width: 58%; padding-bottom: 4px;">HĐ: <strong>@receipt.MaDonHang.ToString("D4")</strong></td>
+                <td style="width: 42%; text-align: left; padding-bottom: 4px;">@(receipt.SoNhanMon is { } receiptNo ? $"Số nhận món: {receiptNo}" : "")</td>
             </tr>
             <tr>
                 <td style="padding-bottom: 4px;">Ngày: @((receipt.ThoiGianThanhToan ?? receipt.ThoiGianTao).ToString("dd/MM/yyyy"))</td>
-                <td class="r-right" style="padding-bottom: 4px;">Giờ: @((receipt.ThoiGianThanhToan ?? receipt.ThoiGianTao).ToString("HH:mm:ss"))</td>
+                <td style="text-align: left; padding-bottom: 4px;">Giờ: @((receipt.ThoiGianThanhToan ?? receipt.ThoiGianTao).ToString("HH:mm:ss"))</td>
             </tr>
             <tr>
                 <td colspan="2" style="padding-bottom: 4px;">
@@ -1049,6 +1049,7 @@
                 </td>
             </tr>
         </table>
+
 
         <table class="r-items" style="width: 100%; table-layout: fixed;">
             <colgroup>
