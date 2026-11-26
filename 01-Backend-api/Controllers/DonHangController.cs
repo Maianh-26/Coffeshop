@@ -4,6 +4,7 @@ using CoffeeShop.Api.Dtos;
 using CoffeeShop.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
 
 namespace CoffeeShop.Api.Controllers;
@@ -67,6 +68,29 @@ public class DonHangController(DonHangService service) : ControllerBase
     /// <summary>POST /don-hang/{id}/thanh-toan — gọi sp_ThanhToanVaTruKho (PAID + giờ/người thu tiền + trừ kho + ghi LichSuKho)</summary>
     [HttpPost("{id:int}/thanh-toan"), Authorize(Roles = VaiTros.TatCa)]
     public Task<ThanhToanResponse> ThanhToan(int id, ThanhToanRequest req) => service.ThanhToan(id, req, User.MaNguoiDung());
+
+    /// <summary>
+    /// POST /don-hang/{id}/xac-nhan-tien-mat — nút "Xác nhận đã thanh toán tiền mặt" trên web admin.
+    /// Giống /thanh-toan với CASH; tablet đang chờ sẽ hiện "Đã thanh toán bằng tiền mặt".
+    /// </summary>
+    [HttpPost("{id:int}/xac-nhan-tien-mat"), Authorize(Roles = VaiTros.TatCa)]
+    public Task<ThanhToanResponse> XacNhanTienMat(
+        int id, [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] XacNhanTienMatRequest? req) =>
+        service.ThanhToan(id,
+            new ThanhToanRequest { PhuongThucThanhToan = "CASH", TienKhachDua = req?.TienKhachDua },
+            User.MaNguoiDung());
+
+    /// <summary>
+    /// GET /don-hang/{id}/trang-thai — công khai cho tablet hỏi định kỳ "đã thanh toán chưa, bằng cách nào".
+    /// Chỉ trả thông tin rút gọn (không lộ chi tiết món / nhân viên).
+    /// </summary>
+    [HttpGet("{id:int}/trang-thai"), AllowAnonymous]
+    public async Task<TrangThaiDonDto> TrangThai(int id) => TrangThaiDonDto.Of(await service.Tim(id));
+
+    /// <summary>PUT /don-hang/{id}/phuong-thuc-thanh-toan — công khai: khách đổi QR ↔ tiền mặt khi đơn còn PENDING</summary>
+    [HttpPut("{id:int}/phuong-thuc-thanh-toan"), AllowAnonymous]
+    public async Task<TrangThaiDonDto> DoiPhuongThuc(int id, DoiPhuongThucRequest req) =>
+        TrangThaiDonDto.Of(await service.DoiPhuongThuc(id, req.PhuongThucThanhToan));
 
     /// <summary>POST /don-hang/{id}/huy — quản lý hủy đơn (đơn đã PAID sẽ được đánh dấu hoàn tiền)</summary>
     [HttpPost("{id:int}/huy"), Authorize(Roles = VaiTros.QuanLy)]

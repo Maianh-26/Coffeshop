@@ -633,6 +633,65 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /don-hang/{id}/xac-nhan-tien-mat:
+    post:
+      tags: [Đơn hàng]
+      summary: Xác nhận khách đã trả tiền mặt (NhanVien, QuanLy) — nút trên web admin
+      description: |
+        Rút gọn của `POST /thanh-toan` với `phuongThucThanhToan = CASH` (PAID + giờ/người thu tiền + trừ kho).
+        Body không bắt buộc. Tablet đang chờ sẽ thấy `PAID` + `CASH` qua `GET /trang-thai`
+        và hiện "Đã thanh toán bằng tiền mặt".
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/XacNhanTienMatRequest' }
+            example: { tienKhachDua: 100000 }
+      responses:
+        '200': { description: Đã thanh toán, content: { application/json: { schema: { $ref: '#/components/schemas/ThanhToanResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /don-hang/{id}/trang-thai:
+    get:
+      tags: [Đơn hàng]
+      summary: Trạng thái thanh toán của đơn (công khai — tablet hỏi định kỳ)
+      description: |
+        Tablet gọi mỗi vài giây khi đang hiện mã QR hoặc chờ thu tiền mặt. Khi `trangThaiThanhToan = PAID`
+        → tablet hiện "Thanh toán thành công" (QR_TRANSFER) hoặc "Đã thanh toán bằng tiền mặt" (CASH).
+        Chỉ trả thông tin rút gọn (không lộ chi tiết món / nhân viên).
+      security: []
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrangThaiDon' }
+              example: { maDonHang: 4, trangThaiThanhToan: PAID, phuongThucThanhToan: CASH, tongTien: 57600, soNhanMon: null, trangThaiPhucVu: WAITING }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /don-hang/{id}/phuong-thuc-thanh-toan:
+    put:
+      tags: [Đơn hàng]
+      summary: Khách đổi QR ↔ tiền mặt trên tablet (công khai, chỉ đơn PENDING)
+      description: Dùng lại đơn đã tạo thay vì tạo đơn trùng khi khách đổi cách trả. Đơn không còn PENDING → 409.
+      security: []
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DoiPhuongThucRequest' }
+            example: { phuongThucThanhToan: CASH }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrangThaiDon' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
   /don-hang/{id}/huy:
     post:
       tags: [Đơn hàng]
@@ -1204,6 +1263,26 @@ components:
               soLuongTon: { type: number }
               mucCanhBaoToiThieu: { type: number }
               donViTinh: { type: string }
+    XacNhanTienMatRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        tienKhachDua: { type: number, minimum: 0, description: Để tính tiền thừa (bỏ trống nếu khách đưa vừa đủ) }
+    DoiPhuongThucRequest:
+      type: object
+      additionalProperties: false
+      required: [phuongThucThanhToan]
+      properties:
+        phuongThucThanhToan: { $ref: '#/components/schemas/PhuongThucThanhToan' }
+    TrangThaiDon:
+      type: object
+      properties:
+        maDonHang: { type: integer }
+        trangThaiThanhToan: { $ref: '#/components/schemas/TrangThaiThanhToan' }
+        phuongThucThanhToan: { $ref: '#/components/schemas/PhuongThucThanhToan' }
+        tongTien: { type: number }
+        soNhanMon: { type: integer, nullable: true }
+        trangThaiPhucVu: { $ref: '#/components/schemas/TrangThaiPhucVu' }
     HuyDonRequest:
       type: object
       required: [lyDoHuy]
