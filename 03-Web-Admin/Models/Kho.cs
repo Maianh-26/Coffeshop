@@ -62,6 +62,12 @@ public static class TinhTrangKho
         : n.SoLuongTon <= n.MucCanhBaoToiThieu ? SapHet
         : DuDung;
 
+    /// <summary>
+    /// Tồn âm: backend chỉ kiểm tra tồn lúc đặt món (không tính các đơn đang chờ) và trừ kho lúc thu tiền không chặn âm,
+    /// nên giờ đông có thể bán vượt tồn. Vẫn hiển thị là "Hết hàng", kèm nhắc kiểm kê lại.
+    /// </summary>
+    public static bool Am(NguyenLieu n) => n.SoLuongTon < 0;
+
     /// <summary>Cần nhập thêm: sắp hết hoặc đã hết (chỉ tính nguyên liệu đang sử dụng).</summary>
     public static bool CanNhap(NguyenLieu n) => Of(n) is SapHet or HetHang;
 

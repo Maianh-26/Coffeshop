@@ -248,7 +248,7 @@
                         @for (int k = 0; k < outOfStock.Count; k++)
                         {
                             @* Mỗi mục không ngắt dòng bên trong; danh sách chỉ xuống dòng sau dấu phẩy *@
-                            <span class="restock-item">@outOfStock[k].TenNguyenLieu@(k < outOfStock.Count - 1 ? "," : "")</span>
+                            <span class="restock-item">@outOfStock[k].TenNguyenLieu@(TinhTrangKho.Am(outOfStock[k]) ? $" (âm {Number(Math.Abs(outOfStock[k].SoLuongTon))} {outOfStock[k].DonViTinh})" : "")@(k < outOfStock.Count - 1 ? "," : "")</span>
                             @(" ")
                         }
                     </p>
@@ -358,6 +358,10 @@
                                 <td>@item.TenNguyenLieu</td>
                                 <td>
                                     <strong>@Number(item.SoLuongTon)</strong> @item.DonViTinh
+                                    @if (TinhTrangKho.Am(item))
+                                    {
+                                        <span class="stock-negative">Tồn âm — bán vượt tồn, cần kiểm kê lại</span>
+                                    }
                                     @* Màn hình hẹp: cột Mức cảnh báo bị ẩn → hiện gọn dưới số tồn *@
                                     <span class="stock-sub">Mức cảnh báo: @Number(item.MucCanhBaoToiThieu) @item.DonViTinh</span>
                                 </td>
@@ -429,7 +433,8 @@
         @if (dialog == "ingredient")
         {
             <EditForm Model="ingredientModel"
-                      OnValidSubmit="SaveIngredient">
+                      OnValidSubmit="SaveIngredient"
+                      novalidate>
 
                 <DataAnnotationsValidator />
 
@@ -457,6 +462,7 @@
                             <label for="i-stock">Tồn kho ban đầu</label>
                             <InputNumber id="i-stock"
                                          @bind-Value="ingredientModel.SoLuongTon"
+                                         min="0"
                                          step="0.01" />
                             <ValidationMessage For="@(() => ingredientModel.SoLuongTon)" />
                         </div>
@@ -466,6 +472,7 @@
                         <label for="i-min">Mức cảnh báo</label>
                         <InputNumber id="i-min"
                                      @bind-Value="ingredientModel.MucCanhBaoToiThieu"
+                                     min="0"
                                      step="0.01" />
                         <ValidationMessage For="@(() => ingredientModel.MucCanhBaoToiThieu)" />
                     </div>
@@ -529,7 +536,8 @@
         @if (dialog == "transaction")
         {
             <EditForm Model="transactionModel"
-                      OnValidSubmit="SaveTransaction">
+                      OnValidSubmit="SaveTransaction"
+                      novalidate>
 
                 <DataAnnotationsValidator />
 
@@ -561,6 +569,7 @@
                         <label for="t-qty">Số lượng@(UnitOf(transactionModel.MaNguyenLieu) is { Length: > 0 } unit ? $" ({unit})" : "") *</label>
                         <InputNumber id="t-qty"
                                      @bind-Value="transactionModel.SoLuong"
+                                     min="0"
                                      step="0.01" />
                         <ValidationMessage For="@(() => transactionModel.SoLuong)" />
                     </div>
