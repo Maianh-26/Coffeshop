@@ -12,7 +12,8 @@ CoffeeShop.Api/                   ← Thư mục gốc của project (mở thư 
 │   ├── QuanCaPheDB.sql           ← Script tạo CSDL (đã sửa 1 lỗi UNIQUE, xem mục 6)
 │   ├── BoSoBan_ThuTuHienThi.sql  ← Chạy 1 lần nếu DB cũ còn cột SoBan / ThuTuHienThi
 │   ├── FixCongThucUnique.sql     ← Chỉ dùng nếu DB đã tạo từ bản script gốc
-│   └── DongBoWebAdmin_20261118.sql ← Chạy cho DB đã tạo trước 18/11/2026 (số nhận món, trạng thái phục vụ…)
+│   ├── DongBoWebAdmin_20261118.sql ← Chạy cho DB đã tạo trước 18/11/2026 (số nhận món, trạng thái phục vụ…)
+│   └── GioVietNam_20261128.sql   ← Chạy cho DB đã tạo trước 28/11/2026, SAU DongBoWebAdmin (mọi mốc giờ = giờ Việt Nam)
 ├── Data/                         ← Entity ánh xạ 1-1 với các bảng + DbContext + dữ liệu mẫu
 ├── Dtos/                         ← JSON đầu vào / đầu ra (khớp openapi.yaml)
 ├── Services/                     ← Nghiệp vụ: đặt món, thanh toán (gọi stored procedure), kho, gợi ý
@@ -43,6 +44,9 @@ sqlcmd -S .\SQLEXPRESS -E -C -I -f 65001 -i database\QuanCaPheDB.sql
 > DB đã có dữ liệu, tạo trước 18/11/2026 → chạy thêm patch đồng bộ Web Admin (giữ dữ liệu, chạy lại nhiều lần không sao).
 > **Bắt buộc có `-I`**, thiếu thì thanh toán sẽ lỗi vì index lọc:
 > `sqlcmd -S .\SQLEXPRESS -E -C -I -f 65001 -i database\DongBoWebAdmin_20261118.sql`
+>
+> Rồi chạy tiếp (mọi mốc giờ lưu theo giờ Việt Nam, không theo múi giờ máy chủ — cần khi máy chủ chạy UTC):
+> `sqlcmd -S .\SQLEXPRESS -E -C -I -f 65001 -d QuanCaPheDB -i database\GioVietNam_20261128.sql`
 >
 > ⚠️ Bảng `DonHang` có **index lọc**: mọi lệnh SQL tay ghi vào `DonHang` (UPDATE/INSERT/DELETE) phải chạy với
 > `SET QUOTED_IDENTIFIER ON`. `sqlcmd` mặc định là OFF → luôn thêm `-I`; SSMS mặc định ON nên không cần.

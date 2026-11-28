@@ -10,6 +10,8 @@
 -- Chạy (BẮT BUỘC có -I vì index lọc / QUOTED_IDENTIFIER):
 --   sqlcmd -S . -E -C -I -f 65001 -i database\DongBoWebAdmin_20261118.sql
 -- Đồng bộ tương ứng: database/QuanCaPheDB.sql, Data/Entities.cs, Data/AppDbContext.cs
+-- 28/11/2026: sp_ThanhToanVaTruKho ở đây đã đổi sang giờ Việt Nam (@Now) cho trùng GioVietNam_20261128.sql;
+--   chạy xong script này thì chạy tiếp GioVietNam_20261128.sql (đổi default ThoiGianTao / LichSuKho.ThoiGian).
 -- ============================================================================
 SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
@@ -82,6 +84,8 @@ CREATE OR ALTER PROCEDURE sp_ThanhToanVaTruKho
 AS
 BEGIN
     SET NOCOUNT ON;
+    -- Giờ Việt Nam (UTC+7), không phụ thuộc múi giờ của máy chủ SQL (giống GioVietNam_20261128.sql)
+    DECLARE @Now DATETIME = DATEADD(HOUR, 7, SYSUTCDATETIME());
     BEGIN TRANSACTION;
 
     BEGIN TRY
@@ -96,7 +100,7 @@ BEGIN
         -- 2. Cập nhật trạng thái đơn hàng sang PAID + ghi giờ thu tiền, người thu tiền
         UPDATE DonHang
         SET TrangThaiThanhToan = 'PAID',
-            ThoiGianThanhToan = GETDATE(),
+            ThoiGianThanhToan = @Now,
             MaNguoiThu = @MaNguoiThu
         WHERE MaDonHang = @MaDonHang;
 
@@ -135,7 +139,7 @@ BEGIN
             NULL,
             N'TieuHaoTheoDon',
             -SUM(TongLuongTieuHao),
-            GETDATE(),
+            @Now,
             CONCAT(N'Tự động trừ kho theo đơn hàng #', @MaDonHang)
         FROM @NguyenLieuTieuHao
         GROUP BY MaNguyenLieu;

@@ -38,7 +38,7 @@ public class KhoController(AppDbContext db, KhoService kho) : ControllerBase
             db.LichSuKhos.Add(new LichSuKho
             {
                 MaNguyenLieu = nl.MaNguyenLieu, MaNguoiDung = User.MaNguoiDung(), LoaiGiaoDich = LoaiGiaoDichs.NhapHang,
-                SoLuongThayDoi = req.SoLuongTon, ThoiGian = DateTime.Now, GhiChu = "Tồn kho ban đầu",
+                SoLuongThayDoi = req.SoLuongTon, ThoiGian = GioViet.Now, GhiChu = "Tồn kho ban đầu",
             });
             await db.SaveChangesAsync();
         }

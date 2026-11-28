@@ -15,7 +15,7 @@ public class AuthController(AppDbContext db, TokenService tokens) : ControllerBa
     /// <summary>GET /health — kiểm tra API + kết nối database</summary>
     [HttpGet("health"), AllowAnonymous]
     public async Task<IActionResult> Health() =>
-        Ok(new { status = "ok", database = await db.Database.CanConnectAsync() ? "connected" : "disconnected", time = DateTime.Now });
+        Ok(new { status = "ok", database = await db.Database.CanConnectAsync() ? "connected" : "disconnected", time = GioViet.Now });
 
     /// <summary>POST /auth/dang-nhap</summary>
     [HttpPost("auth/dang-nhap"), AllowAnonymous]

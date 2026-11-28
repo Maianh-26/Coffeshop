@@ -12,7 +12,7 @@ namespace CoffeeShop.Admin.Pages.Dashboard;
 /// Tổng quan cho chủ quán: doanh thu thuần (api/v1/bao-cao/doanh-thu), món bán chạy (mon-ban-chay),
 /// doanh thu theo giờ (gio-cao-diem — khi xem hôm nay, 24 giờ qua hoặc một ngày).
 /// Topping bán chạy (topping-ban-chay) không hiện trên trang, chỉ có trong file Excel.
-/// Bộ lọc thời gian: Utilities/DatePresets.ReportOptions, mặc định "Hôm nay".
+/// Bộ lọc thời gian: Utilities/DatePresets.Options, mặc định "Hôm nay" (dùng chung với Đơn hàng, Lịch sử kho).
 /// </summary>
 public partial class Dashboard : IDisposable
 {
@@ -29,7 +29,7 @@ public partial class Dashboard : IDisposable
     private CancellationTokenSource? loadCts;   // lượt tải đang chạy; đổi bộ lọc giữa chừng thì hủy lượt cũ
 
     /// <summary>Mở trang / bấm Làm mới khi đang lọc → về hôm nay.</summary>
-    private const string DefaultPreset = DatePresets.Today;
+    private const string DefaultPreset = DatePresets.Default;
 
     /// <summary>Số món / topping lấy cho file Excel (tối đa backend cho phép); trang chỉ hiện top 5 món.</summary>
     private const int ExportTop = 50;
@@ -115,13 +115,13 @@ public partial class Dashboard : IDisposable
     /// </summary>
     private static string Describe(string preset, DashboardFilter f)
     {
-        DateTime from = f.From ?? DateTime.Today;
+        DateTime from = f.From ?? GioViet.Today;
 
         if (preset == DatePresets.Today) return $"Hôm nay, {from:dd/MM/yyyy}";
 
         if (preset == DatePresets.Last24h) return $"Từ {from:HH:mm dd/MM/yyyy} đến nay";
 
-        DateTime to = (f.To ?? DateTime.Today).Date;
+        DateTime to = (f.To ?? GioViet.Today).Date;
 
         if (from.Date == to) return $"Ngày {from:dd/MM/yyyy}";
 
@@ -137,8 +137,8 @@ public partial class Dashboard : IDisposable
         if (datePreset == DatePresets.Custom)
         {
             // Mở 2 ô Từ / Đến, điền sẵn khoảng đang xem (hoặc hôm nay). Chưa tải cho tới khi bấm Áp dụng.
-            customFrom = (applied.From ?? DateTime.Today).Date;
-            customTo = (applied.To ?? DateTime.Today).Date;
+            customFrom = (applied.From ?? GioViet.Today).Date;
+            customTo = (applied.To ?? GioViet.Today).Date;
             return;
         }
 
@@ -202,7 +202,7 @@ public partial class Dashboard : IDisposable
 
         // Mốc nhanh tính lại theo thời điểm bấm, để "24 giờ qua" luôn tính tới lúc này
         if (appliedPreset != DatePresets.Custom)
-            applied = RangeOf(appliedPreset, DateTime.Now);
+            applied = RangeOf(appliedPreset, GioViet.Now);
 
         var current = new DashboardFilter { From = applied.From, To = applied.To };
         string preset = appliedPreset;
@@ -269,8 +269,8 @@ public partial class Dashboard : IDisposable
 
     /// <summary>Hôm nay (hoặc chọn đúng ngày hôm nay): chỉ tới giờ hiện tại — không vẽ các giờ chưa tới. Còn lại 24 giờ.</summary>
     private static int HourCount(string preset, DashboardFilter f) =>
-        preset != DatePresets.Last24h && f.From is { } from && from.Date == DateTime.Today
-            ? DateTime.Now.Hour + 1
+        preset != DatePresets.Last24h && f.From is { } from && from.Date == GioViet.Today
+            ? GioViet.Now.Hour + 1
             : 24;
 
     /// <summary><paramref name="count"/> khung giờ liên tiếp bắt đầu từ <paramref name="start"/> (đầu giờ).</summary>
@@ -304,9 +304,9 @@ public partial class Dashboard : IDisposable
         var byDay = days.ToDictionary(d => d.Ngay);
 
         // Mọi lựa chọn của trang đều có mốc đầu (không có "Tất cả thời gian")
-        DateOnly start = DateOnly.FromDateTime(f.From ?? DateTime.Today);
+        DateOnly start = DateOnly.FromDateTime(f.From ?? GioViet.Today);
 
-        DateOnly end = DateOnly.FromDateTime(f.To ?? DateTime.Today);
+        DateOnly end = DateOnly.FromDateTime(f.To ?? GioViet.Today);
         if (days.Count > 0 && days.Max(d => d.Ngay) > end) end = days.Max(d => d.Ngay);
 
         int dayCount = end.DayNumber - start.DayNumber + 1;
@@ -371,7 +371,7 @@ public partial class Dashboard : IDisposable
                 : DayOrMonthPoints(filter, revenue.TheoNgay);
 
             // Kỳ báo cáo chính xác: từ mốc đầu tới mốc cuối, nhưng không vượt quá lúc xuất ("Hôm nay" → tới giờ hiện tại)
-            DateTime now = DateTime.Now;
+            DateTime now = GioViet.Now;
             DateTime to = filter.To is { } end && end < now ? end : now;
             DateTime from = filter.From ?? now.Date;   // mọi lựa chọn đều có mốc đầu; dự phòng = 00:00 hôm nay
 

@@ -60,13 +60,19 @@ public class TokenAuthenticationStateProvider : AuthenticationStateProvider
     /// </summary>
     public async Task SignInAsync(string token, string fullName, string role)
     {
-        _appState.Login(token, fullName, role);
+        // Vai trò lấy từ chính token nếu đọc được (khớp với vai trò máy chủ dùng để phân quyền)
+        var claims = TokenClaims.TryRead(token);
+        role = claims?.Role is { Length: > 0 } tokenRole ? tokenRole : role;
+
+        // Chỉ nhận giờ hết hạn khi đồng hồ máy khách hợp lý (xem TokenClaims.ReliableExpiresUtc); lưu lại để F5 dùng tiếp
+        DateTime? expiresUtc = claims?.ReliableExpiresUtc(DateTime.UtcNow);
+        _appState.Login(token, fullName, role, expiresUtc);
         _restoreTask ??= Task.CompletedTask;
         SignedOutByUser = false;
 
         try
         {
-            string json = JsonSerializer.Serialize(new StoredSession(token, fullName, role));
+            string json = JsonSerializer.Serialize(new StoredSession(token, fullName, role, expiresUtc));
             await _js.InvokeVoidAsync("sessionStorage.setItem", StorageKey, json);
         }
         catch (JSException ex)
@@ -109,10 +115,22 @@ public class TokenAuthenticationStateProvider : AuthenticationStateProvider
 
             var session = JsonSerializer.Deserialize<StoredSession>(json);
 
-            if (session is { Token.Length: > 0 })
+            if (session is not { Token.Length: > 0 }) return;
+
+            // Vai trò đọc lại từ token, không tin phần "Role" lưu ở sessionStorage (sửa tay được).
+            // Giờ hết hạn: chỉ dùng bản đã kiểm tra lúc đăng nhập (null = đồng hồ máy khách không tin được → không tự bỏ token).
+            var claims = TokenClaims.TryRead(session.Token);
+            DateTime? expiresUtc = session.ExpiresUtc is { } stored && claims?.ExpiresUtc == stored ? stored : null;
+
+            if (expiresUtc is { } exp && exp <= DateTime.UtcNow)
             {
-                _appState.Login(session.Token, session.FullName, session.Role);
+                // Token đã hết hạn (mở lại tab sau ca làm) → coi như chưa đăng nhập, khỏi vẽ khung quản trị rồi mới bị 401
+                await _js.InvokeVoidAsync("sessionStorage.removeItem", StorageKey);
+                return;
             }
+
+            string role = claims?.Role is { Length: > 0 } tokenRole ? tokenRole : session.Role;
+            _appState.Login(session.Token, session.FullName, role, expiresUtc);
         }
         catch (Exception ex) when (ex is JSException or JsonException)
         {
@@ -135,5 +153,5 @@ public class TokenAuthenticationStateProvider : AuthenticationStateProvider
         return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "Token"));
     }
 
-    private sealed record StoredSession(string Token, string FullName, string Role);
+    private sealed record StoredSession(string Token, string FullName, string Role, DateTime? ExpiresUtc = null);
 }

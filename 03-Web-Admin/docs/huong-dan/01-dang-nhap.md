@@ -21,13 +21,13 @@ Tài khoản mẫu do backend tạo sẵn trong CSDL `QuanCaPheDB`: `quanly` / `
 | Khung trang (logo bên trái) | `Layout/AuthLayout.razor` + `Components/Brand.razor` | Logo `wwwroot/images/logo.png` |
 | Dữ liệu form | `Models/AuthenticationModels.cs` | `LoginRequest` (+ thông báo lỗi), `LoginResponse` |
 | Ô nhập cập nhật khi gõ | `Components/InputTextLive.razor` | Thay cho `InputText` thường |
-| Gọi API | `Services/AuthenticationService.cs` | `LoginAsync`, `LogoutAsync`, `GetMyAccountAsync` |
+| Gọi API | `Services/AuthenticationService.cs` | `LoginAsync`, `LogoutAsync` (tài khoản đang đăng nhập: `AccountService.GetMeAsync`) |
 | Lưu phiên đăng nhập | `Services/Auth/TokenAuthenticationStateProvider.cs` | Lưu vào `sessionStorage` |
 | Gắn token vào request | `Services/Auth/AuthHeaderHandler.cs` | Header `Authorization: Bearer …` |
 | Trạng thái dùng chung | `Services/AppState.cs` | Token, họ tên, vai trò |
 | API (backend) | `CoffeeShop.Api` → `POST api/v1/auth/dang-nhap` | Nhóm backend làm, không nằm trong repo web |
 | Chặn trang khi chưa đăng nhập | `App.razor`, `Pages/_Imports.razor`, `Components/RedirectToLogin.razor` | |
-| Vai trò | `Utilities/Roles.cs` | `"Admin"`, `"Nhân viên"` |
+| Vai trò | `Utilities/Roles.cs` | `QuanLy` / `NhanVien` (nhãn "Quản lý" / "Nhân viên"), `AfterLogin` chọn trang sau đăng nhập |
 | CSS | `wwwroot/css/app.css` | `.auth-shell` 992, `.auth-card` 1033, `.password-field` 1058, `.auth-submit` 1077 |
 
 ---

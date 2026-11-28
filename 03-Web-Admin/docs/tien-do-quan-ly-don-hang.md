@@ -24,8 +24,8 @@
 - Ô tìm kiếm chỉ nhận chữ số, khớp **mã đơn (tiền tố)** hoặc **số nhận món (chính xác)**. Trước đây tìm cả tên món/nhân viên không hiện trên bảng nên trông như "lọc sai".
 - Cột: Mã đơn, Số nhận món, Trạng thái, Tổng tiền (căn phải), Thanh toán (nhãn; hình thức bên dưới **chỉ khi đã thu / đã hoàn tiền**, xem mục 11), Thời gian tạo (đã bỏ cột Nguồn 14/11, xem mục 9). Màn hình hẹp hoặc đang mở chi tiết: ẩn Thời gian. Điện thoại: ẩn thêm Tổng tiền, số tiền hiện dưới nhãn thanh toán.
 - Bộ lọc trạng thái phục vụ + bộ lọc thanh toán. Màn hình ≤1000px gom vào nút "Bộ lọc (n)". Nút **Làm mới** (biểu tượng) thay chữ "Xóa lọc" (xem mục 7).
-- **Đơn mới từ Tablet**: dò mỗi 10 giây trên **toàn bộ dữ liệu** (không phụ thuộc trang hay bộ lọc). Thông báo ở **đầu trang, màu cam** (12/11: chủ quán yêu cầu đổi từ tím sang màu thông dụng hơn; nút Xem không còn icon con mắt), có nút **Xem** (mở chi tiết, kể cả đơn không có trong trang đang xem). Dòng mới có vạch cam + chip "Mới" cho đến khi mở. Đơn tạo tại quầy **không** tính là đơn mới (cố ý).
-- Thông báo kết quả thao tác nổi ở góc dưới trái (điện thoại: dưới cùng), thành công tự ẩn sau 6 giây. Thông báo có cảnh báo kho thì giữ lại.
+- **Đơn mới từ Tablet**: dò mỗi **3 giây** (25/11: rút từ 10 giây và **bỏ nút "Tự cập nhật"** — trang luôn tự làm mới, không tắt được; xem `ke-hoach-dong-bo-thoi-gian-thuc.md` giai đoạn 0) trên **toàn bộ dữ liệu** (không phụ thuộc trang hay bộ lọc). Thông báo **màu cam** (12/11: chủ quán yêu cầu đổi từ tím sang màu thông dụng hơn; nút Xem không còn icon con mắt). 25/11 (chủ quán chốt): thông báo nằm **trong trang, ngay dưới tiêu đề "Đơn hàng", trên mục lọc** — chấp nhận đẩy phần dưới xuống khi hiện (đã thử đặt trong header / nổi góc dưới nhưng trông lạc nhịp). Không tự ẩn: chỉ mất khi mở xem hoặc bấm ×, có nút **Xem** (mở chi tiết, kể cả đơn không có trong trang đang xem). Dòng mới có vạch cam + chip "Mới" cho đến khi mở. Đơn tạo tại quầy **không** tính là đơn mới (cố ý).
+- Thông báo kết quả thao tác (25/11, đồng bộ với các trang quản lý khác): **một dòng ngay dưới nhóm nút Tạo đơn / Sửa / Hủy**, không nổi ở góc, không tự ẩn — thao tác kế tiếp thay nó. Thu tiền mà có nguyên liệu sắp hết thì liệt kê ngay dưới (khung vàng). **Bấm Làm mới không báo gì** (giống trang Kho / Món — yêu cầu chủ quán). Đã bỏ ngăn thông báo nổi góc dưới (`.orders-toasts`). Màn ≤1000px đang mở khung chi tiết (khung nằm dưới danh sách): dòng kết quả + cảnh báo kho hiện ở **đầu khung chi tiết** (cùng một đoạn markup `ActionResult`, CSS chọn chỗ hiện) để không bị khuất; thu tiền xong tiêu điểm về tiêu đề "Đơn hàng #…". Mở Tạo / Sửa / Hủy đơn thì xóa thông báo cũ (như các trang khác).
 
 **Màu (chủ quán chốt: mỗi màu một nghĩa, luôn kèm chữ)**
 
@@ -65,13 +65,13 @@ Người dùng đã được hỏi có ghi phần này vào tài liệu đề xu
 ## 5. Việc còn mở / cần hỏi người dùng
 
 - [ ] Push nhánh `web-admin` và mở PR cho trưởng nhóm (chỉ làm khi người dùng yêu cầu).
-- [ ] `CLAUDE.md` có 3 chỗ đã lỗi thời: dòng 21 ("backend has only payment statuses"), dòng 49 ("orders cannot be edited"), dòng 70 (`TrangThaiDon` "`Label`/`Color`", nay dùng `Tone`; `TrangThaiDon.Color` không còn ai gọi). Hỏi người dùng trước khi sửa.
+- [x] ~~`CLAUDE.md` có 3 chỗ lỗi thời~~ — đã sửa 28/11/2026 (dòng về trạng thái thanh toán và sửa đơn đã đúng từ trước; dòng `TrangThaiDon` `Label`/`Color` đổi thành `Label` + `Tone` của `PhuongThucThanhToans` / `TrangThaiPhucVus`). `TrangThaiDon.Color` không còn ai gọi — xóa ở việc 5B.1 của `ke-hoach-cai-tien-chuc-nang.md`.
 - [ ] Thu tiền mặt một cú bấm, không hỏi lại, không hoàn tác: agent đề nghị thêm xác nhận hoặc hoàn tác vài giây. Chờ chủ quán quyết định.
 - [ ] Có cho hủy đơn "Đã phục vụ" không? Có bắt buộc thu tiền trước khi phục vụ không? Chờ chủ quán.
-- [ ] Trên điện thoại, thông báo nổi che nút In hóa đơn khoảng 6 giây (nhỏ).
+- [x] ~~Trên điện thoại, thông báo nổi che nút In hóa đơn khoảng 6 giây~~ — hết, đã bỏ thông báo nổi (25/11).
 - [ ] Chưa test dòng ghi chú món trên phiếu order (cần tạo một đơn có ghi chú món trên backend thật).
 - [ ] Đề xuất "Hoàn tác / Recall" sau khi bấm Đã phục vụ: cần backend cho đi lùi trạng thái.
-- [ ] Nâng cấp sau: kết nối thời gian thực (SignalR) thay cho tự làm mới 10 giây. Ghi lại ai thu tiền / ai chuẩn bị.
+- [ ] Nâng cấp sau: kết nối thời gian thực (SignalR) thay cho tự làm mới 3 giây — kế hoạch chi tiết: `docs/ke-hoach-dong-bo-thoi-gian-thuc.md` (giai đoạn 0 đã làm 25/11; giai đoạn 3 chờ backend). Ghi lại ai thu tiền / ai chuẩn bị.
 
 ## 6. Cách test
 
@@ -85,12 +85,13 @@ Người dùng đã được hỏi có ghi phần này vào tài liệu đề xu
 ### 7.1. Tìm kiếm, nút Làm mới, màu đơn mới
 
 - **Tìm kiếm**: ô nhập (`searchText`) tách khỏi giá trị lọc (`search`, chỉ chữ số) nên gõ chữ không làm bảng chớp rỗng; `searchVersion` chặn lượt xử lý cũ ghi đè khi gõ nhanh; gợi ý nổi "Chỉ nhập số" (ẩn khi rời ô). Chỉ tìm **trong trang đang xem** (placeholder và chân bảng nói rõ).
-- **Nút Làm mới** (biểu tượng, thay chữ "Xóa lọc"): bỏ mọi lọc + tìm kiếm + sắp xếp, về trang 1, tải lại, báo toast. Chấm nâu khi đang lọc/tìm/sắp xếp; chỉ xoay khi người dùng bấm (lượt tự làm mới 10 giây không xoay).
+- **Nút Làm mới** (biểu tượng, thay chữ "Xóa lọc"): bỏ mọi lọc + tìm kiếm + sắp xếp, về trang 1, tải lại (không báo gì — 25/11). Chấm nâu khi đang lọc/tìm/sắp xếp; chỉ xoay khi người dùng bấm (lượt tự làm mới 3 giây không xoay).
 - **Đơn mới màu cam** `--orange` #b2470f (banner, vạch dòng, chip "Mới"), nút Xem không icon. Nút Thu tiền là hổ phách #d97706 chữ tối, khác tông. Điện thoại: chip "Mới" nằm dưới mã đơn để nhãn trạng thái không bị ép xuống dòng ở 375px.
 
 ### 7.2. Lọc thời gian: 4 mốc nhanh + chọn khoảng ngày
 
-- **Tất cả thời gian** (mặc định), **Trong 24 giờ qua**, **Trong 7 ngày qua**, **Trong 30 ngày qua** (áp dụng ngay) và **Chọn khoảng ngày…** (2 ô có nhãn Từ ngày / Đến ngày, chỉ lọc khi bấm **Áp dụng**). Đã bỏ Hôm nay / Hôm qua / Tháng này / Tháng trước theo yêu cầu; khoảng ngày tự chọn bị mất ở lần rút gọn trước nên đã làm lại (12/11/2026).
+- *(Cập nhật 25/11/2026 — đồng bộ với trang Tổng quan:)* **Hôm nay** (mặc định), **Trong 24 giờ qua**, **Trong 7 ngày qua**, **Trong 30 ngày qua** (7 / 30 ngày lịch, tính cả hôm nay), **Chọn khoảng ngày…**; đã bỏ "Tất cả thời gian". Nút Làm mới đưa về "Hôm nay".
+- *(Cũ)* **Tất cả thời gian** (mặc định), **Trong 24 giờ qua**, **Trong 7 ngày qua**, **Trong 30 ngày qua** (áp dụng ngay) và **Chọn khoảng ngày…** (2 ô có nhãn Từ ngày / Đến ngày, chỉ lọc khi bấm **Áp dụng**). Đã bỏ Hôm nay / Hôm qua / Tháng này / Tháng trước theo yêu cầu; khoảng ngày tự chọn bị mất ở lần rút gọn trước nên đã làm lại (12/11/2026).
 - Mốc nhanh: khoảng trượt tính lùi từ **thời điểm hiện tại**, không có mốc kết thúc, tính lại ở đầu mỗi lần tải. Khoảng tự chọn: từ 00:00 ngày bắt đầu đến hết 23:59:59 ngày kết thúc (`denNgay`); chỉ chọn một ngày = lọc đúng ngày đó; khoảng ngược / ngày tương lai → báo lỗi, giữ bộ lọc cũ.
 - `OrderService.GetPageAsync` gửi `tuNgay` chính xác đến giờ phút. Giả định: trình duyệt và máy chủ cùng múi giờ (giờ VN).
 - Dòng chú thích: "Đang xem đơn tạo từ HH:mm dd/MM/yyyy đến nay (…)" hoặc "Đang xem đơn tạo từ dd/MM/yyyy đến hết dd/MM/yyyy".
@@ -110,7 +111,7 @@ Người dùng đã được hỏi có ghi phần này vào tài liệu đề xu
 ### 7.5. Hóa đơn in (làm lại 12/11/2026 theo mẫu chủ quán gửi)
 
 - **Tên luôn là "HÓA ĐƠN THANH TOÁN"** (bỏ "PHIẾU TẠM TÍNH"). **Không in** tên nhân viên / tài khoản, không in "Thanh toán: chưa thu".
-- **Bố cục** (theo mẫu hóa đơn quán trà sữa / cà phê, cá nhân hóa): tên quán (+ địa chỉ, ĐT nếu cấu hình) → HÓA ĐƠN THANH TOÁN → `HĐ: 0021` + Số nhận món → Ngày + Giờ → bảng **TÊN HÀNG | SL | Đ.GIÁ | T.TIỀN** (dòng topping thụt vào, dòng ghi chú in nghiêng) → **T.CỘNG** (tổng số lượng + tổng tiền) → **TỔNG THANH TOÁN** + **số tiền bằng chữ** (`Utilities/DocSoTien.cs`, vd. 480.000 → "Bốn trăm tám mươi nghìn đồng") → hình thức + số tiền (chỉ khi đã thu) → lời cảm ơn.
+- **Bố cục** (theo mẫu hóa đơn quán trà sữa / cà phê, cá nhân hóa): tên quán (+ địa chỉ, ĐT nếu cấu hình) → HÓA ĐƠN THANH TOÁN → `HĐ: 0021` + Số nhận món → Ngày + Giờ → bảng **TÊN HÀNG | SL | Đ.GIÁ | T.TIỀN** (món đánh số 1, 2, 3…, SL căn giữa, dòng topping thụt vào, dòng ghi chú in nghiêng) → **T.CỘNG** (tổng số lượng + tổng tiền) → **TỔNG THANH TOÁN** + **số tiền bằng chữ** (`Utilities/DocSoTien.cs`, vd. 480.000 → "Bốn trăm tám mươi nghìn đồng") → hình thức + số tiền (chỉ khi đã thu) → lời cảm ơn.
 - **Khổ giấy chuẩn K80**: rộng 80mm, vùng in 72mm (lề trái/phải 4mm), cột số cố định (SL 7mm, Đ.GIÁ 15mm, T.TIỀN 16mm), tên món lấy phần còn lại và tự xuống dòng. Dài theo nội dung: đo chiều cao rồi đặt `@page { size: 80mm <cao>mm; margin: 0 }` → 1 trang liền (đơn 2 món ≈ 85–90mm; thử ~40 dòng: 80×492mm). `Receipt:PaperWidthMm = 58` cho máy K58 (vùng in 48mm, cột nhỏ hơn).
 - **Lỗi "trên đầu có ngày + Hóa đơn, cuối có đường dẫn https"**: đó là header/footer Chrome tự in vào LỀ trang (tiêu đề tài liệu "Hóa đơn", ngày giờ, URL) — xảy ra khi in ra máy in / khổ không phải 80mm (vd. PDF, A4) với lề mặc định. Sửa: `@page { margin: 0 }` (không còn chỗ in header/footer; lề thật chuyển vào padding của body) + `<title>` rỗng. Đã tái hiện lỗi với bản cũ (A4, lề mặc định, bật header/footer → có ngày, "Hóa đơn", file:///…). Nếu máy in của quán vẫn hiện, bỏ tick "Đầu trang và chân trang" trong hộp thoại in một lần (Chrome nhớ lựa chọn) hoặc chạy Chrome ở chế độ `--kiosk-printing` trên máy thu ngân.
 - Cấu hình `wwwroot/appsettings.json` mục `Receipt`: `ShopName`, `Address`, `Phone`, `FooterNote`, `PaperWidthMm`.
@@ -138,7 +139,7 @@ Người dùng đã được hỏi có ghi phần này vào tài liệu đề xu
 - Đã trả `Api:UseMock` về `false` (phiên trước để quên `true`). Build: 0 lỗi, 0 cảnh báo.
 - `code-reviewer` đợt 4 (trên toàn bộ phần chưa commit): 0 nghiêm trọng, 4 nên sửa, đã sửa hết:
   1. **Bộ nhớ đệm sắp xếp ở web ghi đè dữ liệu mới bằng dữ liệu cũ**: lượt tải toàn bộ đang chạy dở khi thu tiền / sửa đơn sẽ bỏ kết quả (`clientSortGeneration`). Nhánh 409 xóa bộ nhớ đệm trước khi tải lại.
-  2. **Đơn đang xem bị cũ tới 60 giây** khi danh sách lấy từ bộ nhớ đệm: nay đơn đang xem luôn được hỏi lại máy chủ (`listFromCache`), nên vẫn đúng sau ≤ 10 giây.
+  2. **Đơn đang xem bị cũ tới 60 giây** khi danh sách lấy từ bộ nhớ đệm: nay đơn đang xem luôn được hỏi lại máy chủ (`listFromCache`), nên vẫn đúng sau ≤ 3 giây (trước 25/11 là 10 giây).
   3. **Tạo đơn xong, khung chi tiết trống** (đang sắp xếp, đơn mới ở trang khác): xóa bộ nhớ đệm và mở chi tiết bằng bản máy chủ trả về.
   4. **Dòng cảnh báo kho bị mất khi có thông báo khác**: nay dòng cảnh báo (đã thu gọn) nằm lại dưới thông báo mới, chỉ mất khi bấm Đóng (`stockMessageActive`). Làm mới vẫn báo "Đã tải lại…" khi cảnh báo đang thu gọn.
 - Gợi ý đã làm: một lô lỗi thì hủy ngay các lô còn lại; lỗi của request dò đơn mới không bị bỏ rơi; `<ul id="stock-warning-list">` luôn có trong DOM (dùng `hidden`) để `aria-controls` trỏ đúng.

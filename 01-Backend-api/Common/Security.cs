@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using CoffeeShop.Api.Data;
 using Microsoft.IdentityModel.Tokens;
@@ -19,7 +20,7 @@ public class TokenService(JwtOptions opt)
 {
     public (string Token, DateTime HetHan) Create(NguoiDung user)
     {
-        var expires = DateTime.Now.AddHours(opt.ExpiresInHours);
+        var hetHanUtc = DateTime.UtcNow.AddHours(opt.ExpiresInHours);
         var token = new JwtSecurityToken(
             issuer: opt.Issuer,
             audience: opt.Issuer,
@@ -28,10 +29,11 @@ public class TokenService(JwtOptions opt)
                 new Claim(JwtRegisteredClaimNames.Sub, user.MaNguoiDung.ToString()),
                 new Claim("role", user.VaiTro),
                 new Claim("name", user.HoTen),
+                new Claim(Passwords.ClaimDauVan, Passwords.DauVan(user.MatKhau)),
             },
-            expires: expires.ToUniversalTime(),
+            expires: hetHanUtc,
             signingCredentials: new SigningCredentials(opt.Key, SecurityAlgorithms.HmacSha256));
-        return (new JwtSecurityTokenHandler().WriteToken(token), expires);
+        return (new JwtSecurityTokenHandler().WriteToken(token), GioViet.TuUtc(hetHanUtc));
     }
 }
 
@@ -44,6 +46,16 @@ public static class Passwords
         try { return BCrypt.Net.BCrypt.Verify(password, hash); }
         catch (BCrypt.Net.SaltParseException) { return false; } // hash không hợp lệ trong DB
     }
+
+    /// <summary>Tên claim chứa dấu vân mật khẩu trong JWT.</summary>
+    public const string ClaimDauVan = "pv";
+
+    /// <summary>
+    /// Dấu vân của mật khẩu hiện tại (16 ký tự đầu SHA-256 của chuỗi băm, không lộ chuỗi băm BCrypt).
+    /// Ghi vào token lúc đăng nhập; đổi / đặt lại mật khẩu thì dấu vân đổi → token cũ bị từ chối (Program.cs OnTokenValidated).
+    /// </summary>
+    public static string DauVan(string matKhauDaBam) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(matKhauDaBam)))[..16];
 }
 
 public static class ClaimsExtensions

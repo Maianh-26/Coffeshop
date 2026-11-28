@@ -7,102 +7,63 @@
 @inject IJSRuntime JS
 @inject IConfiguration Configuration
 @inject ILogger<Orders> Logger
-@inject AppState State
-
 
 <PageTitle>Đơn hàng - Coffee Shop</PageTitle>
-
-<!-- Thông báo đơn mới từ Tablet: riêng với thông báo thao tác để không đè nhau. Có nút Xem mở ngay chi tiết đơn. -->
-<div aria-live="polite">
-    @if (!newBannerHidden && UnseenNewOrders is { Count: > 0 } unseen)
-    {
-        var first = unseen[0];
-        <div class="alert new-order-alert orders-alert alert-dismissible">
-            <div class="new-order-text">
-                <Icon Name="orders" Size="18" />
-                @if (unseen.Count == 1)
-                {
-                    <span>
-                        <strong>Đơn mới #@first.MaDonHang</strong> từ Tablet, @first.SoPhan phần, <span class="nowrap">@Money(first.TongTien)</span>
-                    </span>
-                }
-                else
-                {
-                    <span><strong>Có @unseen.Count đơn mới</strong> từ Tablet chưa xem</span>
-                }
-            </div>
-
-            <div class="new-order-actions">
-                <button type="button"
-                        class="btn primary btn-compact"
-                        aria-label="Xem đơn #@first.MaDonHang"
-                        @onclick="() => OpenFromBanner(first.MaDonHang)">
-                    @(unseen.Count == 1 ? "Xem" : $"Xem đơn đầu tiên (#{first.MaDonHang})")
-                </button>
-
-                <button type="button" class="icon-button" aria-label="Ẩn thông báo đơn mới" @onclick="() => newBannerHidden = true">
-                    <Icon Name="close" Size="14" />
-                </button>
-            </div>
-        </div>
-    }
-</div>
-
-<!-- Thông báo kết quả thao tác: nổi ở góc màn hình, hiện / tự ẩn không làm bảng và khung chi tiết nhảy lên xuống -->
-<div class="orders-toasts" aria-live="polite">
-
-<!-- Banner thông báo kết quả thao tác -->
-@if (!string.IsNullOrEmpty(alertMessage) || stockWarnings.Count > 0)
-{
-    <div class="alert @(alertMessage is null || (stockMessageActive && stockCollapsed) ? "warning" : alertType) orders-alert alert-dismissible @(stockWarnings.Count > 0 && (stockMessageActive || alertMessage is null) ? "has-stock-warning" : "")"
-         role="@(alertMessage is not null && alertType == "error" ? "alert" : "status")">
-        <div>
-            @* Có cảnh báo kho: sau vài giây thu gọn còn 1 dòng (không che khung chi tiết / vùng thanh toán, nhất là
-               trên điện thoại). Thông báo khác đến sau KHÔNG xóa dòng cảnh báo: dòng đó vẫn nằm dưới thông báo mới.
-               Nút Xem / Thu gọn luôn ở cùng một chỗ để giữ tiêu điểm bàn phím và aria-expanded đúng. *@
-            @if (alertMessage is not null && !(stockMessageActive && stockCollapsed))
-            {
-                <span>@alertMessage</span>
-            }
-
-            @if (stockWarnings.Count > 0)
-            {
-                @* Thông báo phía trên không phải của cảnh báo kho (hoặc đã tự ẩn) → thêm tiêu đề cho danh sách *@
-                @if (!stockCollapsed && (!stockMessageActive || alertMessage is null))
-                {
-                    <strong class="stock-heading">Cảnh báo kho: @stockWarnings.Count nguyên liệu sắp hết</strong>
-                }
-                <ul class="alert-list" id="stock-warning-list" hidden="@stockCollapsed">
-                    @foreach (var w in stockWarnings)
-                    {
-                        <li>@w.TenNguyenLieu chỉ còn @Number(w.SoLuongTon) @w.DonViTinh (mức cảnh báo @Number(w.MucCanhBaoToiThieu))</li>
-                    }
-                </ul>
-            }
-
-            @if (stockWarnings.Count > 0)
-            {
-                <button type="button" class="text-button stock-expand"
-                        aria-expanded="@(stockCollapsed ? "false" : "true")"
-                        aria-controls="stock-warning-list"
-                        @onclick="() => stockCollapsed = !stockCollapsed">
-                    @(stockCollapsed ? $"Cảnh báo kho: {stockWarnings.Count} nguyên liệu sắp hết · Xem" : "Thu gọn")
-                </button>
-            }
-        </div>
-
-        <button type="button" class="icon-button" aria-label="Đóng thông báo" @onclick="ClearAlert">
-            <Icon Name="close" Size="14" />
-        </button>
-    </div>
-}
-
-</div>
 
 <div class="orders-page master-detail-layout @(SelectedOrder != null ? "has-detail" : "")">
 
     <!-- Cột trái: Bộ lọc, Thanh tác vụ và Danh sách đơn hàng -->
     <div class="master-panel">
+
+        @* Thông báo đơn mới từ Tablet: ngay dưới tiêu đề trang, trên mục lọc (chủ quán chọn 25/11/2026 — dễ thấy nhất).
+           Không tự ẩn: chỉ mất khi mở xem đơn hoặc bấm ×. Vùng aria-live luôn có mặt để trình đọc màn hình đọc khi có đơn. *@
+        <div aria-live="polite">
+            @if (!newBannerHidden && UnseenNewOrders is { Count: > 0 } unseen)
+            {
+                var first = unseen[0];
+                <div class="alert new-order-alert">
+                    <div class="new-order-text">
+                        <Icon Name="orders" Size="18" />
+                        @if (unseen.Count == 1)
+                        {
+                            <span>
+                                <strong>Đơn mới #@first.MaDonHang</strong><span class="new-order-extra"> từ Tablet, @first.SoPhan phần</span>, <span class="nowrap">@Money(first.TongTien)</span>
+                            </span>
+                        }
+                        else
+                        {
+                            <span><strong>Có @unseen.Count đơn mới</strong> từ Tablet chưa xem</span>
+                        }
+                    </div>
+
+                    <div class="new-order-actions">
+                        <button type="button"
+                                class="btn primary btn-compact"
+                                aria-label="@(unseen.Count == 1 ? $"Xem đơn mới #{first.MaDonHang}" : $"Xem đơn đầu tiên (#{first.MaDonHang})")"
+                                @onclick="() => OpenFromBanner(first.MaDonHang)">
+                            @(unseen.Count == 1 ? "Xem" : $"Xem đơn đầu tiên (#{first.MaDonHang})")
+                        </button>
+
+                        <button type="button" class="icon-button" aria-label="Ẩn thông báo đơn mới" @onclick="HideNewBanner">
+                            <Icon Name="close" Size="14" />
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @* Đơn treo: chưa thu tiền, chưa hủy, tạo từ TRƯỚC hôm nay (khách bỏ về, quên thu…). Danh sách mặc định "Hôm nay"
+           không thấy chúng nên nhắc ở đây để cuối ngày thu hoặc hủy — tránh treo số nhận món và sai số "chờ thanh toán". *@
+        @if (stalePendingCount > 0 && stalePendingOldest is { } oldest && !ViewingStalePending && paymentFilter != TrangThaiDon.Paid)
+        {
+            <div class="alert yellow stale-orders-alert" role="status">
+                <span>
+                    <strong>Còn @stalePendingCount đơn chưa thu</strong> từ trước hôm nay (cũ nhất ngày @oldest.ToString("dd/MM/yyyy")).
+                    Hãy thu tiền hoặc @(IsAdmin ? "hủy" : "báo quản lý hủy") các đơn này.
+                </span>
+                <button type="button" class="btn outline btn-compact" @onclick="ShowStalePending">Xem các đơn này</button>
+            </div>
+        }
 
         <section class="panel orders-toolbar">
 
@@ -145,7 +106,7 @@
                    Màn hình rộng: CSS đặt nút ở cuối hàng; màn hình hẹp: nằm cạnh nút "Bộ lọc". *@
                 <button type="button"
                         class="btn outline refresh-button @(userLoading ? "is-loading" : "")"
-                        title="@(FiltersActive ? "Làm mới và bỏ lọc, xem toàn bộ đơn" : "Làm mới danh sách đơn")"
+                        title="@(FiltersActive ? "Làm mới và bỏ lọc, xem đơn hôm nay" : "Làm mới danh sách đơn")"
                         aria-label="@(FiltersActive ? "Làm mới và bỏ lọc" : "Làm mới danh sách đơn")"
                         @onclick="RefreshAll">
                     <Icon Name="reset" Size="18" />
@@ -157,8 +118,8 @@
 
                 <div id="order-filters" class="filter-extra @(filtersOpen ? "open" : "")">
 
-                @* Thời gian: mốc chọn nhanh (24h / 7 / 30 ngày, áp dụng ngay) hoặc "Chọn khoảng ngày…"
-                   (2 ô Từ ngày / Đến ngày, chỉ lọc khi bấm Áp dụng) *@
+                @* Thời gian (giống trang Tổng quan, mặc định Hôm nay): mốc chọn nhanh (Hôm nay / 24h / 7 / 30 ngày,
+                   áp dụng ngay) hoặc "Chọn khoảng ngày…" (2 ô Từ ngày / Đến ngày, chỉ lọc khi bấm Áp dụng) *@
                 <select class="date-preset"
                         aria-label="Lọc theo thời gian tạo đơn"
                         @bind="datePreset"
@@ -177,7 +138,7 @@
                             <span>Từ ngày</span>
                             <input type="date"
                                    @bind="customFrom"
-                                   max="@IsoDate(customTo ?? DateTime.Today)"
+                                   max="@IsoDate(customTo ?? GioViet.Today)"
                                    aria-invalid="@(dateError is not null ? "true" : null)"
                                    aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
                         </label>
@@ -187,7 +148,7 @@
                             <input type="date"
                                    @bind="customTo"
                                    min="@(customFrom is { } cf ? IsoDate(cf) : null)"
-                                   max="@IsoDate(DateTime.Today)"
+                                   max="@IsoDate(GioViet.Today)"
                                    aria-invalid="@(dateError is not null ? "true" : null)"
                                    aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
                         </label>
@@ -238,19 +199,28 @@
                             ? $"Đang xem đơn tạo ngày {rangeFrom:dd/MM/yyyy}"
                             : $"Đang xem đơn tạo từ {rangeFrom:dd/MM/yyyy} đến hết {rangeTo:dd/MM/yyyy}")
                     }
+                    else if (appliedPreset == DatePresets.Last24h)
+                    {
+                        @($"Đang xem đơn tạo từ {rangeFrom:HH:mm dd/MM/yyyy} đến nay (trong 24 giờ qua)")
+                    }
+                    else if (appliedPreset == DatePresets.Today)
+                    {
+                        @($"Đang xem đơn tạo hôm nay ({rangeFrom:dd/MM/yyyy})")
+                    }
                     else
                     {
-                        @($"Đang xem đơn tạo từ {rangeFrom:HH:mm dd/MM/yyyy} đến nay ({DatePresets.Label(appliedPreset).ToLowerInvariant()})")
+                        @($"Đang xem đơn tạo từ {rangeFrom:dd/MM/yyyy} đến nay ({DatePresets.Label(appliedPreset).ToLowerInvariant()})")
                     }
                 </p>
             }
 
-            <!-- Thao tác: Tạo đơn tại quầy và tự động làm mới -->
+            <!-- Thao tác: Tạo đơn tại quầy, sửa / hủy đơn đang chọn -->
             <div class="action-bar action-bar-split toolbar-actions">
 
             <div class="action-group">
 
                 <button class="btn primary"
+                        @ref="createButtonRef"
                         @onclick="OpenCreateOrder">
 
                     <Icon Name="plus" />
@@ -260,7 +230,12 @@
 
                 <button class="btn outline"
                         disabled="@(SelectedOrder is not { CoTheSua: true })"
-                        title="@(SelectedOrder is { CoTheSua: false } ? "Chỉ sửa được đơn chưa thanh toán và chưa phục vụ" : "Sửa món trong đơn đang chọn")"
+                        title="@(SelectedOrder switch
+                               {
+                                   null => "Chọn một đơn để sửa",
+                                   { CoTheSua: false } => "Chỉ sửa được đơn chưa thanh toán và chưa phục vụ",
+                                   _ => "Sửa món trong đơn đang chọn"
+                               })"
                         @onclick="OpenEditOrder">
 
                     <Icon Name="edit" />
@@ -283,23 +258,12 @@
 
             </div>
 
-            <!-- Tự động tải lại danh sách để thấy đơn mới từ Tablet -->
-            <div class="realtime-controls">
-
-                <button type="button"
-                        class="live-toggle @(!autoRefreshEnabled ? "paused" : "")"
-                        @onclick="ToggleAutoRefresh"
-                        aria-pressed="@(autoRefreshEnabled ? "true" : "false")"
-                        title="Bật/Tắt tự động tải đơn mới từ Tablet (mỗi @RefreshSeconds giây)">
-
-                    <span class="live-indicator" aria-hidden="true"></span>
-                    <span>Tự cập nhật</span>
-
-                </button>
-
             </div>
 
-            </div>
+            @* Kết quả thao tác — cùng kiểu các trang quản lý khác: một dòng ngay dưới nhóm nút, không nổi, không tự ẩn;
+               thao tác kế tiếp / Làm mới thay hoặc xóa nó. Bấm Làm mới KHÔNG báo gì (yêu cầu chủ quán).
+               Màn ≤1000px đang mở khung chi tiết (khung nằm dưới danh sách): hiện ở đầu khung chi tiết thay vì ở đây (CSS). *@
+            <div class="action-result action-result-list">@ActionResult</div>
 
         </section>
 
@@ -432,6 +396,8 @@
                                                 ? "Đang tìm…"
                                             : search.Length > 0
                                                 ? $"Không có đơn khớp \"{search}\"."
+                                            : !FiltersActive
+                                                ? "Hôm nay chưa có đơn hàng nào."
                                                 : "Không tìm thấy đơn hàng nào phù hợp với bộ lọc.")
                                     </p>
 
@@ -510,6 +476,9 @@
                     <Icon Name="close" Size="20" />
                 </button>
             </div>
+
+            @* Bản sao kết quả thao tác cho màn ≤1000px (xem .action-result-list ở thanh công cụ) *@
+            <div class="action-result action-result-detail">@ActionResult</div>
 
             <!-- Thông tin tổng quan đơn hàng -->
             <dl class="order-facts">
@@ -811,6 +780,14 @@
                 <p class="alert error" role="alert">@menuError</p>
             }
 
+            @if (editingPreparing)
+            {
+                @* Đơn đã bắt đầu pha: sửa vẫn được (backend cho phép) nhưng quầy phải báo lại pha chế *@
+                <p class="alert yellow" role="status">
+                    Đơn này <strong>đang được chuẩn bị</strong>. Sau khi lưu, nhớ báo lại pha chế những món đã thay đổi.
+                </p>
+            }
+
             <div class="form-grid">
                 <div class="field">
                     <label for="order-payment">Hình thức thanh toán</label>
@@ -944,6 +921,12 @@
                         </tfoot>
                     </table>
                 </div>
+
+                @if (editingOrderId is not null)
+                {
+                    @* Backend tính lại giá theo khuyến mãi tại GIỜ TẠO ĐƠN; dòng mới thêm ở đây hiện giá khuyến mãi lúc này *@
+                    <p class="muted draft-price-note">Tổng chính thức do hệ thống tính lại khi lưu (khuyến mãi tính theo giờ tạo đơn).</p>
+                }
             </div>
 
         </div>
@@ -965,7 +948,8 @@
         }
 
         <div class="modal-footer">
-            <button type="button" class="btn outline" disabled="@creating" @onclick="CloseOrderModal">Hủy</button>
+            @* "Đóng" (không phải "Hủy") để không nhầm với Hủy đơn — giống hộp Hủy đơn và hộp Công thức *@
+            <button type="button" class="btn outline" disabled="@creating" @onclick="CloseOrderModal">Đóng</button>
             <button type="button" class="btn primary" disabled="@(creating || draftLines.Count == 0)" @onclick="SaveDraftOrder">
                 @(editingOrderId is null
                     ? (creating ? "Đang tạo đơn…" : "Tạo đơn hàng")
@@ -986,9 +970,22 @@
             Hủy đơn hàng <strong>#@toCancel.MaDonHang</strong> (tổng tiền @Money(toCancel.TongTien))?
         </p>
 
+        @* Kho chỉ bị trừ lúc THU TIỀN và hủy đơn không cộng lại kho → báo rõ ảnh hưởng tới kho theo từng trường hợp *@
         @if (toCancel.TrangThaiThanhToan == TrangThaiDon.Paid)
         {
-            <p class="alert error">Đơn đã thanh toán — hệ thống sẽ đánh dấu <strong>hoàn tiền</strong> cho khách. Nguyên liệu đã dùng không được cộng lại kho.</p>
+            <p class="alert error">Đơn đã thanh toán — hệ thống sẽ đánh dấu <strong>hoàn tiền</strong> cho khách. Nguyên liệu đã trừ khi thu tiền <strong>không được cộng lại kho</strong>.</p>
+            @if (toCancel.PhucVu == TrangThaiPhucVus.Waiting)
+            {
+                <p class="alert yellow">Đơn chưa bắt đầu pha: nếu nguyên liệu còn nguyên, hãy <strong>nhập lại kho</strong> phần đã trừ ở trang Kho (Lịch sử kho ghi rõ lượng trừ theo đơn #@toCancel.MaDonHang).</p>
+            }
+        }
+        else if (toCancel.PhucVu != TrangThaiPhucVus.Waiting)
+        {
+            <p class="alert yellow">Đơn chưa thu tiền nên <strong>kho chưa bị trừ</strong>, nhưng đơn đang ở bước “@TrangThaiPhucVus.Label(toCancel.PhucVu)”. Nếu món đã pha, hãy <strong>xuất hủy</strong> nguyên liệu tương ứng ở trang Kho để tồn kho đúng thực tế.</p>
+        }
+        else
+        {
+            <p class="muted">Đơn chưa thu tiền và chưa pha: kho không bị ảnh hưởng.</p>
         }
 
         <div class="field">
@@ -1020,9 +1017,16 @@
 <!-- ========================================================================= -->
 @if (SelectedOrder is { } receipt)
 {
-    <div id="receipt-source" hidden style="line-height: 1.6;">
-        <div class="r-center r-head" style="margin-bottom: 10px;">
-            <div class="r-shop" style="margin-bottom: 4px;">@ReceiptShopName</div>
+    @* HÓA ĐƠN IN CHO KHÁCH — giấy nhiệt K80 (rộng 80mm, vùng in 72mm), dài theo nội dung.
+       Bố cục theo mẫu hóa đơn quán cà phê / trà sữa phổ biến (KiotViet, Sapo, iPOS…), cá nhân hóa cho dự án:
+       tên quán → HÓA ĐƠN THANH TOÁN → HĐ / Ngày / Giờ (+ số nhận món) → bảng TÊN HÀNG | SL | Đ.GIÁ | T.TIỀN
+       → T.CỘNG → TỔNG THANH TOÁN + số tiền bằng chữ → hình thức (khi đã thu) → lời cảm ơn.
+       Quyết định của chủ quán: tiêu đề LUÔN là "HÓA ĐƠN THANH TOÁN" (không có "phiếu tạm tính"), kể cả đơn chưa thu.
+       Không in: trạng thái "chưa thu", tên nhân viên / tài khoản, mã nội bộ khác.
+       Header / footer của trình duyệt (ngày, tiêu đề, đường dẫn) bị tắt bằng @page margin 0 trong appHelpers. *@
+    <div id="receipt-source" hidden>
+        <div class="r-center r-head">
+            <div class="r-shop">@ReceiptShopName</div>
             @if (!string.IsNullOrWhiteSpace(ReceiptAddress))
             {
                 <div class="r-small">@ReceiptAddress</div>
@@ -1031,101 +1035,97 @@
             {
                 <div class="r-small">ĐT: @ReceiptPhone</div>
             }
-            <div class="r-title" style="margin-top: 6px;">HÓA ĐƠN THANH TOÁN</div>
+            <div class="r-title">HÓA ĐƠN THANH TOÁN</div>
         </div>
 
-                <table class="r-info" style="width: 100%; table-layout: fixed; margin-bottom: 8px;">
+        <table class="r-info">
             <tr>
-                <td style="width: 58%; padding-bottom: 4px;">HĐ: <strong>@receipt.MaDonHang.ToString("D4")</strong></td>
-                <td style="width: 42%; text-align: left; padding-bottom: 4px;">@(receipt.SoNhanMon is { } receiptNo ? $"Số nhận món: {receiptNo}" : "")</td>
+                <td>HĐ: <strong>@receipt.MaDonHang.ToString("D4")</strong></td>
+                <td class="r-right">@(receipt.SoNhanMon is { } receiptNo ? $"Số nhận món: {receiptNo}" : "")</td>
             </tr>
             <tr>
-                <td style="padding-bottom: 4px;">Ngày: @((receipt.ThoiGianThanhToan ?? receipt.ThoiGianTao).ToString("dd/MM/yyyy"))</td>
-                <td style="text-align: left; padding-bottom: 4px;">Giờ: @((receipt.ThoiGianThanhToan ?? receipt.ThoiGianTao).ToString("HH:mm:ss"))</td>
+                @* Hóa đơn thanh toán: ghi giờ thu tiền; đơn chưa thu (in trước) thì ghi giờ tạo đơn *@
+                <td>Ngày: @((receipt.ThoiGianThanhToan ?? receipt.ThoiGianTao).ToString("dd/MM/yyyy"))</td>
+                <td class="r-right">Giờ: @((receipt.ThoiGianThanhToan ?? receipt.ThoiGianTao).ToString("HH:mm:ss"))</td>
             </tr>
-          
         </table>
 
-
-        <table class="r-items" style="width: 100%; table-layout: fixed;">
+        <table class="r-items">
             <colgroup>
-                <col style="width: 55%;" />
-                <col class="c-qty" style="width: 8%;" />
-                <col class="c-price" style="width: 18%;" />
-                <col class="c-total" style="width: 19%;" />
+                <col />
+                <col class="c-qty" />
+                <col class="c-price" />
+                <col class="c-total" />
             </colgroup>
             <thead>
                 <tr>
-                    <th style="text-align: left; padding-right: 12px; padding-bottom: 6px;">TÊN HÀNG</th>
-                    <th class="r-num" style="text-align: center; padding-bottom: 6px;">SL</th>
-                    <th class="r-num" style="text-align: right; padding-bottom: 6px;">Đ.GIÁ</th>
-                    <th class="r-num" style="text-align: right; padding-bottom: 6px;">T.TIỀN</th>
+                    <th>TÊN HÀNG</th>
+                    <th class="r-num">SL</th>
+                    <th class="r-num">Đ.GIÁ</th>
+                    <th class="r-num">T.TIỀN</th>
                 </tr>
             </thead>
             <tbody>
-                @{
-                    var stt = 1;
-                }
-                @foreach (var line in receipt.ChiTiet ?? [])
+                @* Món đánh số 1, 2, 3… để khách dễ dò; dòng topping / ghi chú không đánh số *@
+                @foreach (var (line, stt) in (receipt.ChiTiet ?? []).Select((l, i) => (l, i + 1)))
                 {
                     <tr class="r-line">
-                        <td style="padding-right: 12px; padding-top: 6px;">@(stt++). @line.TenMonLuu</td>
-                        <td class="r-num" style="text-align: center; padding-top: 6px;">@line.SoLuong</td>
-                        <td class="r-num" style="text-align: right; padding-top: 6px;">@Number(line.DonGiaBan)</td>
-                        <td class="r-num" style="text-align: right; padding-top: 6px;">@Number(line.DonGiaBan * line.SoLuong)</td>
+                        <td>@stt. @line.TenMonLuu</td>
+                        <td class="r-num">@line.SoLuong</td>
+                        <td class="r-num">@Number(line.DonGiaBan)</td>
+                        <td class="r-num">@Number(line.DonGiaBan * line.SoLuong)</td>
                     </tr>
                     @foreach (var top in line.Toppings)
                     {
                         <tr class="r-topping">
-                            <td style="padding-right: 12px; padding-top: 3px;">+ @top.TenToppingLuu</td>
-                            <td class="r-num" style="text-align: center; padding-top: 3px;">@line.SoLuong</td>
-                            <td class="r-num" style="text-align: right; padding-top: 3px;">@Number(top.DonGiaTopping)</td>
-                            <td class="r-num" style="text-align: right; padding-top: 3px;">@Number(top.DonGiaTopping * line.SoLuong)</td>
+                            <td>+ @top.TenToppingLuu</td>
+                            <td class="r-num">@line.SoLuong</td>
+                            <td class="r-num">@Number(top.DonGiaTopping)</td>
+                            <td class="r-num">@Number(top.DonGiaTopping * line.SoLuong)</td>
                         </tr>
                     }
                     @if (!string.IsNullOrWhiteSpace(line.GhiChu))
                     {
                         <tr class="r-note">
-                            <td colspan="4" style="padding-top: 3px; padding-bottom: 4px;">Ghi chú: @line.GhiChu</td>
+                            <td colspan="4">Ghi chú: @line.GhiChu</td>
                         </tr>
                     }
                 }
             </tbody>
             <tfoot>
                 <tr class="r-sum">
-                    <td style="padding-top: 6px; padding-bottom: 6px;">T.CỘNG</td>
-                    <td class="r-num" style="text-align: center; padding-top: 6px; padding-bottom: 6px;">@receipt.SoPhan</td>
+                    <td>T.CỘNG</td>
+                    <td class="r-num">@receipt.SoPhan</td>
                     <td></td>
-                    <td class="r-num" style="text-align: right; padding-top: 6px; padding-bottom: 6px;">@Number(receipt.TongTien)</td>
+                    <td class="r-num">@Number(receipt.TongTien)</td>
                 </tr>
             </tfoot>
         </table>
 
-        <div class="r-row r-total" style="margin-top: 6px; margin-bottom: 4px;"><span>TỔNG THANH TOÁN</span><span class="r-money">@Money(receipt.TongTien)</span></div>
-        <div class="r-words" style="margin-bottom: 6px;">(@DocSoTien.Doc(receipt.TongTien))</div>
+        <div class="r-row r-total"><span>TỔNG THANH TOÁN</span><span class="r-money">@Money(receipt.TongTien)</span></div>
+        <div class="r-words">(@DocSoTien.Doc(receipt.TongTien))</div>
 
         @if (receipt.TrangThaiThanhToan == TrangThaiDon.Paid)
         {
-            <div class="r-row r-paid" style="margin-bottom: 8px;"><span>@PhuongThucThanhToans.Label(receipt.PhuongThucThanhToan)</span><span class="r-money">@Number(receipt.TongTien)</span></div>
+            <div class="r-row r-paid"><span>@PhuongThucThanhToans.Label(receipt.PhuongThucThanhToan)</span><span class="r-money">@Number(receipt.TongTien)</span></div>
         }
 
-        <div class="r-center r-thanks" style="margin-top: 10px;">Cảm ơn quý khách!</div>
+        <div class="r-center r-thanks">Cảm ơn quý khách!</div>
         @if (!string.IsNullOrWhiteSpace(ReceiptFooter))
         {
-            <div class="r-center r-small" style="margin-top: 4px;">@ReceiptFooter</div>
+            <div class="r-center r-small">@ReceiptFooter</div>
         }
     </div>
 }
-
-
-
 
 @code {
     [CascadingParameter]
     private Task<AuthenticationState>? AuthState { get; set; }
 
     private const int PageSize = 20;
-    private const int RefreshSeconds = 10;
+    // Luôn tự làm mới để nhận đơn từ Tablet (không có nút tắt — quầy không được bỏ lỡ đơn).
+    // Giai đoạn 3 của docs/ke-hoach-dong-bo-thoi-gian-thuc.md thay bằng kênh đẩy SignalR.
+    private const int RefreshSeconds = 3;
 
     private static readonly System.Globalization.CultureInfo Vi = new("vi-VN");
 
@@ -1154,12 +1154,12 @@
     private bool searchHint;            // vừa gõ ký tự không phải số → hiện gợi ý
     private int searchVersion;          // tăng mỗi lần gõ, để lượt xử lý cũ không ghi đè lượt mới
 
-    // Thời gian: mốc chọn nhanh (Tất cả, 24 giờ qua, 7 ngày qua, 30 ngày qua) hoặc tự chọn khoảng ngày.
-    // Mốc nhanh: fromDate tính lùi từ lúc tải, không có mốc kết thúc (= đến hiện tại).
+    // Thời gian: mốc chọn nhanh (Hôm nay — mặc định, 24 giờ qua, 7 ngày qua, 30 ngày qua) hoặc tự chọn khoảng ngày,
+    // giống trang Tổng quan (Utilities/DatePresets). Mốc nhanh: fromDate tính lại mỗi lần tải, không có mốc kết thúc (= đến hiện tại).
     // Chọn khoảng ngày: fromDate = 00:00 ngày bắt đầu, toDate = ngày kết thúc (gửi tới hết 23:59:59 của ngày đó);
     // customFrom / customTo là bản nháp trong 2 ô, chỉ áp dụng khi bấm Áp dụng.
-    private string datePreset = DatePresets.All;      // lựa chọn đang hiện trong ô chọn
-    private string appliedPreset = DatePresets.All;   // lựa chọn ĐANG ÁP DỤNG (Custom chỉ có hiệu lực sau khi bấm Áp dụng)
+    private string datePreset = DatePresets.Default;      // lựa chọn đang hiện trong ô chọn
+    private string appliedPreset = DatePresets.Default;   // lựa chọn ĐANG ÁP DỤNG (Custom chỉ có hiệu lực sau khi bấm Áp dụng)
     private DateTime? fromDate;
     private DateTime? toDate;
     private DateTime? customFrom;
@@ -1170,7 +1170,7 @@
     private bool filtersOpen;           // màn hình hẹp: khung bộ lọc đang mở
 
     private int ActiveFilterCount =>
-        (fromDate.HasValue ? 1 : 0) + (statusFilter != "" ? 1 : 0) + (paymentFilter != "" ? 1 : 0);
+        (appliedPreset != DatePresets.Default ? 1 : 0) + (statusFilter != "" ? 1 : 0) + (paymentFilter != "" ? 1 : 0);
 
     // Đang lọc / tìm / sắp xếp khác mặc định → nút Làm mới có chấm báo (bấm sẽ đưa về mặc định)
     private bool FiltersActive => search.Length > 0 || ActiveFilterCount > 0 || sortKey != SortKeys.None;
@@ -1202,12 +1202,7 @@
     // Thông báo
     private string? alertMessage;
     private string alertType = "success";
-    private int alertVersion;
-    private const int AlertSeconds = 6;
     private List<CanhBaoKho> stockWarnings = [];
-    private bool stockCollapsed;   // thông báo có cảnh báo kho đã thu gọn còn 1 dòng
-    // Thông báo đang hiện là chính thông báo kèm cảnh báo kho (false = thông báo khác đến sau, dòng cảnh báo vẫn giữ)
-    private bool stockMessageActive;
 
     // Thanh toán
     private string payMethod = PhuongThucThanhToans.Cash;
@@ -1228,12 +1223,12 @@
     private ElementReference pickupInputRef;
     private string? servingError;
 
-    // Tự động làm mới
-    private bool autoRefreshEnabled = true;
+    // Tự động làm mới (mỗi RefreshSeconds giây)
     private Timer? autoRefreshTimer;
 
     // Tạo đơn tại quầy / sửa đơn (editingOrderId != null = đang sửa đơn đó)
     private int? editingOrderId;
+    private bool editingPreparing;    // đơn đang sửa đã ở bước "Đang chuẩn bị" → nhắc báo lại pha chế
     private bool isOrderModalOpen;
     private bool creating;
     private bool menuLoading;
@@ -1417,7 +1412,7 @@
 
         if (!quiet)
         {
-            // Chỉ lượt tải do người dùng bấm mới xoay nút Làm mới / khóa nút Áp dụng (lượt nền 10 giây thì không)
+            // Chỉ lượt tải do người dùng bấm mới xoay nút Làm mới / khóa nút Áp dụng (lượt nền tự làm mới thì không)
             userLoading = true;
             loadError = null;
         }
@@ -1426,7 +1421,7 @@
         // để "24 giờ qua" luôn đúng là 24 giờ tính tới lúc này
         if (appliedPreset != DatePresets.Custom)
         {
-            fromDate = DatePresets.From(appliedPreset, DateTime.Now);
+            fromDate = DatePresets.From(appliedPreset, GioViet.Now);
             toDate = null;
         }
 
@@ -1438,9 +1433,18 @@
             // Đang ở trang khác / đang lọc → dò đơn mới bằng 1 request riêng, chạy song song với request chính
             // (trang 1 theo thứ tự mặc định "mới nhất trước" mới chứa sẵn các đơn mới nhất)
             string? requestedSort = SortParam;
+            // Mốc nhanh (Hôm nay / 24h / 7 / 30 ngày) không có mốc cuối → trang 1 "mới nhất trước" vẫn chứa các đơn mới nhất.
+            // Trừ "Hôm nay" trong 30 phút đầu ngày: mốc 00:00 (giờ Việt Nam) tính trên đồng hồ máy khách, có thể lệch vài phút với máy chủ,
+            // làm đơn vừa tạo (còn mang ngày hôm qua theo giờ máy chủ) nằm ngoài danh sách → dò riêng cho chắc.
+            DateTime clock = GioViet.Now;
+            bool openEndedPreset = appliedPreset != DatePresets.Custom
+                                   && !(appliedPreset == DatePresets.Today && clock.TimeOfDay < TimeSpan.FromMinutes(30));
             bool unfilteredFirstPage = page == 1 && statusFilter == "" && paymentFilter == ""
-                                       && !fromDate.HasValue && requestedSort is null && search.Length == 0;
-            Task<PagedResult<DonHang>>? scanTask = unfilteredFirstPage
+                                       && openEndedPreset && requestedSort is null && search.Length == 0;
+
+            // Lần tải đầu luôn dò bằng request riêng KHÔNG lọc: mốc "đơn đã thấy" phải là mã lớn nhất toàn hệ thống,
+            // không phải của danh sách "Hôm nay" (hôm nay chưa có đơn → mốc 0 → mọi đơn cũ bị báo là đơn mới)
+            Task<PagedResult<DonHang>>? scanTask = unfilteredFirstPage && newOrdersInitialized
                 ? null
                 : OrderApi.GetPageAsync(1, NewOrderScan, ct: cts.Token);
 
@@ -1491,10 +1495,11 @@
             // Dò đơn mới từ Tablet KHÔNG phụ thuộc trang / bộ lọc đang xem.
             // Trang 1 không lọc: dùng lại danh sách vừa tải nếu nó đã phủ hết phần đơn mới
             // (ít hơn 1 trang, hoặc đơn cuối trang đã cũ hơn mốc) — nếu không, hỏi riêng máy chủ để khỏi sót.
-            bool pageCoversNew = unfilteredFirstPage
-                                 && (!newOrdersInitialized || orders.Count < PageSize
+            bool pageCoversNew = unfilteredFirstPage && newOrdersInitialized
+                                 && (orders.Count < PageSize
                                      || orders.Min(o => o.MaDonHang) <= lastSeenOrderId);
             await CheckNewOrders(pageCoversNew ? orders : null, scanTask, cts.Token);
+            await CheckStalePending(cts.Token);
             completed = !cts.IsCancellationRequested;
         }
         catch (ApiException ex)
@@ -1559,7 +1564,7 @@
     private async Task AutoRefresh()
     {
         // Không làm mới khi đang thao tác (tránh danh sách nhảy dưới tay người dùng)
-        if (!autoRefreshEnabled || loading || paying || creating || cancelling || servingBusy || searchPending
+        if (loading || paying || creating || cancelling || servingBusy || searchPending
             || isOrderModalOpen || isCancelModalOpen || pageCts.IsCancellationRequested)
         {
             return;
@@ -1583,8 +1588,8 @@
         if (datePreset == DatePresets.Custom)
         {
             // Mở 2 ô Từ / Đến, điền sẵn khoảng đang lọc (hoặc hôm nay). Chưa lọc cho tới khi bấm Áp dụng.
-            customFrom = (fromDate ?? DateTime.Today).Date;
-            customTo = (toDate ?? DateTime.Today).Date;
+            customFrom = (fromDate ?? GioViet.Today).Date;
+            customTo = (toDate ?? GioViet.Today).Date;
             return;
         }
 
@@ -1686,16 +1691,14 @@
     /// <summary>Nút Làm mới: bỏ mọi bộ lọc / tìm kiếm, về trang 1 và tải lại danh sách mới nhất.</summary>
     private async Task RefreshAll()
     {
-        bool hadFilters = FiltersActive;
-
         search = "";
         searchText = "";
         searchHint = false;
         searchVersion++;
         searchReloadVersion++;
         searchPending = false;
-        datePreset = DatePresets.All;
-        appliedPreset = DatePresets.All;
+        datePreset = DatePresets.Default;
+        appliedPreset = DatePresets.Default;
         fromDate = null;
         toDate = null;
         customFrom = null;
@@ -1707,15 +1710,12 @@
         paymentFilter = "";
         page = 1;
 
-        bool completed = await LoadOrders();
+        staleCheckedAt = DateTime.MinValue;   // đếm lại đơn treo ngay
 
-        // Chỉ báo khi lượt tải này thật sự xong (không bị lượt mới hơn thay thế),
-        // và không đè cảnh báo kho / lỗi đang hiện từ thao tác trước
-        // (danh sách cảnh báo kho đang MỞ thì để yên cho người dùng đọc; đã thu gọn thì thông báo mới hiện phía trên nó)
-        if (completed && !(stockWarnings.Count > 0 && !stockCollapsed) && !(alertMessage is not null && alertType == "error"))
-        {
-            ShowAlert(hadFilters ? "Đã bỏ lọc và tải lại toàn bộ đơn hàng." : "Đã tải lại danh sách đơn hàng.", "success");
-        }
+        // Tải lại là thao tác thường xuyên: KHÔNG hiện thông báo "Đã tải lại…" (giống các trang khác — yêu cầu chủ quán).
+        // Biểu tượng xoay khi đang tải là đủ phản hồi; chỉ hiện lỗi nếu tải thất bại.
+        ClearAlert();
+        await LoadOrders();
     }
 
     private async Task Move(int direction)
@@ -1725,14 +1725,6 @@
 
         page = next;
         await LoadOrders();
-    }
-
-    private void ToggleAutoRefresh()
-    {
-        autoRefreshEnabled = !autoRefreshEnabled;
-        ShowAlert(autoRefreshEnabled
-            ? $"Đã bật tự động cập nhật đơn mới (mỗi {RefreshSeconds} giây)."
-            : "Đã tắt tự động cập nhật.", "success");
     }
 
     // =========================================================================
@@ -1829,6 +1821,74 @@
         newOrdersInitialized = true;
     }
 
+    // =========================================================================
+    // ĐƠN TREO (chưa thu tiền từ trước hôm nay)
+    // =========================================================================
+
+    private static readonly TimeSpan StaleCheckEvery = TimeSpan.FromSeconds(60);
+    private int stalePendingCount;
+    private DateTime? stalePendingOldest;
+    private DateTime staleCheckedAt = DateTime.MinValue;
+
+    /// <summary>Đang xem đúng danh sách đơn treo (đã bấm "Xem các đơn này") → không hiện lại thông báo.</summary>
+    private bool ViewingStalePending =>
+        paymentFilter == TrangThaiDon.Pending && appliedPreset == DatePresets.Custom
+        && toDate is { } to && to.Date < GioViet.Today;
+
+    /// <summary>
+    /// Đếm đơn PENDING tạo trước 00:00 hôm nay (1 request, lấy kèm đơn cũ nhất). Hỏi tối đa mỗi <see cref="StaleCheckEvery"/>;
+    /// lần tải đầu, nút Làm mới, thu tiền / hủy đơn đặt lại <see cref="staleCheckedAt"/> để hỏi ngay lượt sau. Lỗi thì bỏ qua.
+    /// </summary>
+    private async Task CheckStalePending(CancellationToken ct)
+    {
+        if (DateTime.UtcNow - staleCheckedAt < StaleCheckEvery) return;
+
+        try
+        {
+            var result = await OrderApi.GetPageAsync(1, 1,
+                trangThai: TrangThaiDon.Pending,
+                denNgay: GioViet.Today.AddDays(-1),
+                sapXep: SortKeys.Id,   // cũ nhất trước
+                ct: ct);
+
+            stalePendingCount = result.Meta.Total;
+            stalePendingOldest = result.Data.FirstOrDefault()?.ThoiGianTao;
+            staleCheckedAt = DateTime.UtcNow;
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning("Không đếm được đơn treo: {Message}", ex.Message);
+        }
+    }
+
+    /// <summary>Lọc đúng các đơn treo: chưa thu, tạo từ ngày của đơn cũ nhất tới hết hôm qua.</summary>
+    private async Task ShowStalePending()
+    {
+        if (stalePendingOldest is not { } oldest) return;
+
+        DateTime yesterday = GioViet.Today.AddDays(-1);
+        DateTime from = oldest.Date <= yesterday ? oldest.Date : yesterday;
+
+        search = "";
+        searchText = "";
+        searchHint = false;
+        searchVersion++;
+        searchReloadVersion++;
+        searchPending = false;
+        statusFilter = "";
+        paymentFilter = TrangThaiDon.Pending;
+        datePreset = DatePresets.Custom;
+        appliedPreset = DatePresets.Custom;
+        customFrom = from;
+        customTo = yesterday;
+        fromDate = from;
+        toDate = yesterday;
+        dateError = null;
+
+        page = 1;
+        await LoadOrders();
+    }
+
     /// <summary>Đơn mới chưa xem, cũ nhất trước (đơn đến trước xử lý trước).</summary>
     private List<DonHang> UnseenNewOrders =>
         newOrderIds.Select(id => newOrderCache.GetValueOrDefault(id))
@@ -1842,6 +1902,8 @@
     private int? focusRowId;
     private bool focusCancelButton;
     private bool focusDetailHeading;
+    private bool focusCreateButton;
+    private ElementReference createButtonRef;
 
     /// <summary>Đưa focus vào phần tử; bỏ qua nếu phần tử không còn trên màn hình.</summary>
     private static async Task FocusSafely(ElementReference element)
@@ -1862,6 +1924,13 @@
     {
         SelectOrder(id);
         focusDetailHeading = true;
+    }
+
+    /// <summary>Ẩn thông báo đơn mới; nút × biến mất nên đưa focus về nút "Tạo đơn tại quầy" (không để rơi về &lt;body&gt;).</summary>
+    private void HideNewBanner()
+    {
+        newBannerHidden = true;
+        focusCreateButton = true;
     }
 
     /// <summary>Escape trong hộp hỏi lại = Quay lại.</summary>
@@ -1901,6 +1970,12 @@
         {
             focusCancelButton = false;
             await FocusSafely(cancelButtonRef);
+        }
+
+        if (focusCreateButton)
+        {
+            focusCreateButton = false;
+            await FocusSafely(createButtonRef);
         }
 
         if (focusConfirmButton)
@@ -1968,9 +2043,14 @@
             }, pageCts.Token);
 
             Replace(result.DonHang);
+            staleCheckedAt = DateTime.MinValue;   // lượt tải sau đếm lại đơn treo
 
             ShowAlert($"Đơn #{order.MaDonHang} đã thanh toán {Money(result.DonHang.TongTien)} ({PhuongThucThanhToans.Label(result.DonHang.PhuongThucThanhToan)}).",
                 "success", result.CanhBaoKho);
+
+            // Khối thanh toán vừa biến mất → đưa tiêu điểm về tiêu đề chi tiết (không rơi về <body>);
+            // màn hẹp: tiêu đề cuộn vào tầm nhìn, ngay dưới là dòng kết quả + cảnh báo kho
+            if (selectedId == order.MaDonHang) focusDetailHeading = true;
         }
         catch (ApiException ex)
         {
@@ -2227,6 +2307,7 @@
 
     private void OpenCancelOrder()
     {
+        ClearAlert(); // như các trang khác: mở thao tác mới thì bỏ thông báo của thao tác trước
         if (SelectedOrder is null) return;
 
         cancelReason = "";
@@ -2253,6 +2334,7 @@
             var updated = await OrderApi.CancelAsync(order.MaDonHang, cancelReason.Trim(), pageCts.Token);
             Replace(updated);
             isCancelModalOpen = false;
+            staleCheckedAt = DateTime.MinValue;
             ShowAlert(updated.DaHoanTien
                 ? $"Đã hủy đơn #{updated.MaDonHang} và đánh dấu hoàn tiền {Money(updated.TongTien)} cho khách."
                 : $"Đã hủy đơn #{updated.MaDonHang}.", "success");
@@ -2277,6 +2359,7 @@
     private async Task OpenCreateOrder()
     {
         editingOrderId = null;
+        editingPreparing = false;
         draftLines = [];
         draftPaymentMethod = PhuongThucThanhToans.Cash;
         await OpenOrderModal();
@@ -2288,6 +2371,7 @@
         if (SelectedOrder is not { CoTheSua: true } order) return;
 
         editingOrderId = order.MaDonHang;
+        editingPreparing = order.PhucVu == TrangThaiPhucVus.Preparing;
         draftPaymentMethod = order.PhuongThucThanhToan;
         draftLines = (order.ChiTiet ?? []).Select(c =>
         {
@@ -2308,6 +2392,7 @@
 
     private async Task OpenOrderModal()
     {
+        ClearAlert(); // như các trang khác: mở thao tác mới thì bỏ thông báo của thao tác trước
         orderModalError = null;
         shortages = [];
         ResetBuilder();
@@ -2477,70 +2562,43 @@
     // TIỆN ÍCH
     // =========================================================================
 
+    /// <summary>
+    /// Hiện kết quả thao tác (dòng thông báo dưới nhóm nút, như các trang khác). Không tự ẩn: thao tác kế tiếp thay nó.
+    /// <paramref name="warnings"/> = nguyên liệu sắp hết sau khi thu tiền (hiện danh sách ngay dưới).
+    /// </summary>
     private void ShowAlert(string msg, string type, List<CanhBaoKho>? warnings = null)
     {
         alertMessage = msg;
         alertType = type;
-        stockMessageActive = warnings is { Count: > 0 };
-
-        if (stockMessageActive)
-        {
-            stockWarnings = warnings!;
-            stockCollapsed = false;
-            alertMessage += " Cảnh báo kho:";
-        }
-        else if (stockWarnings.Count > 0)
-        {
-            // Thông báo khác đến sau: GIỮ dòng cảnh báo kho (thu gọn) dưới thông báo mới, chỉ người dùng đóng mới mất
-            stockCollapsed = true;
-        }
-
-        // Thông báo thành công tự ẩn sau vài giây. Có cảnh báo kho thì KHÔNG ẩn mà thu gọn còn 1 dòng
-        // (vẫn bấm "Xem" để mở lại) — để không che khung chi tiết / nút thu tiền của đơn kế tiếp. Lỗi giữ đến khi đóng.
-        int version = ++alertVersion;
-        if (type == "success")
-        {
-            _ = DismissAlertLater(version, collapseOnly: stockMessageActive);
-        }
-    }
-
-    private async Task DismissAlertLater(int version, bool collapseOnly = false)
-    {
-        try
-        {
-            await Task.Delay(TimeSpan.FromSeconds(AlertSeconds), pageCts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            return; // rời trang
-        }
-        catch (ObjectDisposedException)
-        {
-            return;
-        }
-
-        // Chỉ ẩn đúng thông báo đã hẹn giờ (có thông báo mới hơn thì để thông báo đó tự lo)
-        if (version != alertVersion) return;
-
-        if (collapseOnly)
-        {
-            stockCollapsed = true;
-        }
-        else
-        {
-            // Chỉ ẩn thông báo thường; dòng cảnh báo kho (nếu còn) ở lại
-            alertMessage = null;
-        }
-
-        await InvokeAsync(StateHasChanged);
+        stockWarnings = warnings ?? [];
     }
 
     private void ClearAlert()
     {
         alertMessage = null;
         stockWarnings = [];
-        stockMessageActive = false;
     }
+
+    /// <summary>Dòng kết quả thao tác + khung vàng cảnh báo kho (dùng ở thanh công cụ và đầu khung chi tiết).</summary>
+    private RenderFragment ActionResult => @<text>
+        @if (alertMessage is not null)
+        {
+            <p class="alert @alertType" role="@(alertType == "error" ? "alert" : "status")">@alertMessage</p>
+        }
+        @if (stockWarnings.Count > 0)
+        {
+            @* Thu tiền xong mà có nguyên liệu xuống dưới mức cảnh báo: liệt kê ngay (giữ tới thao tác kế tiếp) *@
+            <div class="alert yellow" role="status">
+                <strong>Cảnh báo kho: @stockWarnings.Count nguyên liệu sắp hết</strong>
+                <ul class="alert-list">
+                    @foreach (var w in stockWarnings)
+                    {
+                        <li>@w.TenNguyenLieu chỉ còn @Number(w.SoLuongTon) @w.DonViTinh (mức cảnh báo @Number(w.MucCanhBaoToiThieu) @w.DonViTinh)</li>
+                    }
+                </ul>
+            </div>
+        }
+    </text>;
 
     /// <summary>In riêng hóa đơn (mẫu #receipt-source) cho khách — không in cả giao diện trang.</summary>
     private async Task PrintReceipt()

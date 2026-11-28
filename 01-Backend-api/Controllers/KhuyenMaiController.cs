@@ -15,13 +15,13 @@ public class KhuyenMaiController(AppDbContext db) : ControllerBase
     private async Task<KhuyenMai> Tim(int id) => await db.KhuyenMais.FindAsync(id) ?? throw ApiException.NotFound("Khuyến mãi");
 
     private async Task<KhuyenMaiDto> Dto(KhuyenMai k) =>
-        k.ToDto(await db.Mons.CountAsync(m => m.MaKhuyenMai == k.MaKhuyenMai), DateTime.Now);
+        k.ToDto(await db.Mons.CountAsync(m => m.MaKhuyenMai == k.MaKhuyenMai), GioViet.Now);
 
     /// <summary>?dangApDung=true → chỉ khuyến mãi đang có hiệu lực ngay lúc này</summary>
     [HttpGet, AllowAnonymous]
     public async Task<List<KhuyenMaiDto>> DanhSach([FromQuery] bool? dangApDung)
     {
-        var now = DateTime.Now;
+        var now = GioViet.Now;
         var soMon = await db.Mons.Where(m => m.MaKhuyenMai != null).GroupBy(m => m.MaKhuyenMai!.Value)
             .ToDictionaryAsync(g => g.Key, g => g.Count());
         var list = (await db.KhuyenMais.OrderByDescending(k => k.NgayBatDau).ToListAsync())

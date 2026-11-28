@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject AccountService AccountApi
 @inject AuthenticationService AuthService
+@inject ILogger<Accounts> Logger
 
 <PageTitle>Tài khoản - Coffee Shop</PageTitle>
 
@@ -116,6 +117,12 @@
                                 <span class="badge @(item.VaiTro == Roles.Admin ? "yellow" : "green")">
                                     @Roles.Label(item.VaiTro)
                                 </span>
+                                @if (!item.TrangThai)
+                                {
+                                    @* Tài khoản bị khóa từ trước (web không còn nút khóa): vẫn hiện để mở khóa hoặc xóa,
+                                       nếu ẩn thì tên đăng nhập bị chiếm mà không ai tìm thấy để xử lý *@
+                                    <span class="badge gray" title="Không đăng nhập được. Sửa → Trạng thái để mở khóa, hoặc Xóa.">Bị khóa</span>
+                                }
                             </td>
 
                         </tr>
@@ -204,12 +211,26 @@
 
                     <div class="field">
                         <label for="a-role">Vai trò</label>
+                        @* Không cho tự đổi vai trò của chính mình (backend cũng chặn: 409) — tránh tự mất quyền quản lý *@
                         <InputSelect id="a-role"
-                                     @bind-Value="model.VaiTro">
+                                     @bind-Value="model.VaiTro"
+                                     disabled="@editingSelf"
+                                     title="@(editingSelf ? "Không thể đổi vai trò của tài khoản đang đăng nhập" : null)">
                             <option value="@Roles.Staff">@Roles.Label(Roles.Staff)</option>
                             <option value="@Roles.Admin">@Roles.Label(Roles.Admin)</option>
                         </InputSelect>
                     </div>
+
+                    @if (editingLocked)
+                    {
+                        <div class="field">
+                            <label for="a-status">Trạng thái</label>
+                            <InputSelect id="a-status" @bind-Value="model.TrangThai">
+                                <option value="false">Bị khóa</option>
+                                <option value="true">Hoạt động (mở khóa)</option>
+                            </InputSelect>
+                        </div>
+                    }
 
                     <div class="field">
                         <label for="a-password">@(editing ? "Đặt lại mật khẩu" : "Mật khẩu *")</label>
@@ -217,6 +238,7 @@
                                    type="password"
                                    @bind-Value="model.MatKhau"
                                    placeholder="@(editing ? "Để trống nếu giữ mật khẩu cũ" : "Tối thiểu 6 ký tự")"
+                                   title="@(editingSelf ? "Đổi mật khẩu của chính mình: lưu xong phải đăng nhập lại" : null)"
                                    autocomplete="new-password" />
                         <ValidationMessage For="@(() => model.MatKhau)" />
                     </div>
@@ -290,6 +312,8 @@
 
     private string dialog = "";
     private bool editing;
+    private bool editingLocked;   // đang sửa tài khoản bị khóa → hiện ô Trạng thái để mở khóa
+    private bool editingSelf;     // đang sửa tài khoản đang đăng nhập → khóa ô Vai trò
     private bool loading;
     private bool saving;
     private string? error;
@@ -326,7 +350,8 @@
         : "Chưa có tài khoản.";
 
     /// <summary>
-    /// Tài khoản đã xóa backend không trả về; tài khoản bị khóa (TrangThai = false, web không dùng) cũng ẩn. Tìm không phân biệt dấu theo họ tên, tên đăng nhập, mã.
+    /// Tài khoản đã xóa backend không trả về. Tài khoản bị khóa (TrangThai = false, khóa từ trước — web không còn nút khóa)
+    /// vẫn hiện kèm nhãn "Bị khóa" để chủ quán mở khóa (Sửa → Trạng thái) hoặc xóa. Tìm không phân biệt dấu theo họ tên, tên đăng nhập, mã.
     /// </summary>
     private IEnumerable<NguoiDung> FilteredAccounts
     {
@@ -336,8 +361,7 @@
 
             return sort.Apply(
                 accounts.Where(a =>
-                    a.TrangThai
-                    && (roleFilter == "" || a.VaiTro == roleFilter)
+                    (roleFilter == "" || a.VaiTro == roleFilter)
                     && (term == ""
                         || a.MaNguoiDung.ToString(System.Globalization.CultureInfo.InvariantCulture).Contains(term, StringComparison.Ordinal)
                         || SearchText.Contains(a.HoTen, term)
@@ -356,8 +380,19 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var me = await AuthService.GetMyAccountAsync(pageCts.Token);
-        myId = me.Success ? me.Data?.MaNguoiDung : null;
+        try
+        {
+            myId = (await AccountApi.GetMeAsync(pageCts.Token)).MaNguoiDung;
+        }
+        catch (ApiException ex)
+        {
+            // Không biết tài khoản đang đăng nhập: backend vẫn chặn tự xóa / tự hạ quyền (409)
+            Logger.LogWarning("Không tải được tài khoản đang đăng nhập: {Message}", ex.Message);
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+            return;
+        }
 
         await Load();
     }
@@ -433,6 +468,8 @@
     private void Add()
     {
         editing = false;
+        editingLocked = false;
+        editingSelf = false;
         error = null;
         message = null;
         model = new NguoiDungForm { VaiTro = Roles.Staff, IsNew = true };
@@ -454,6 +491,8 @@
             VaiTro = source.VaiTro,
             TrangThai = source.TrangThai
         };
+        editingLocked = !source.TrangThai;
+        editingSelf = IsMe(source);
         dialog = "form";
     }
 
@@ -496,9 +535,19 @@
                 saved = await AccountApi.UpdateAsync(model.MaNguoiDung, new NguoiDungCapNhatRequest
                 {
                     HoTen = model.HoTen.Trim(),
-                    VaiTro = model.VaiTro,
-                    MatKhauMoi = string.IsNullOrEmpty(model.MatKhau) ? null : model.MatKhau
+                    VaiTro = editingSelf ? null : model.VaiTro,   // không tự đổi vai trò (null = giữ nguyên)
+                    MatKhauMoi = string.IsNullOrEmpty(model.MatKhau) ? null : model.MatKhau,
+                    // Chỉ gửi khi mở khóa tài khoản đang bị khóa (web không khóa tài khoản: dùng Xóa)
+                    TrangThai = editingLocked && model.TrangThai ? true : null
                 }, pageCts.Token);
+
+                // Đổi mật khẩu của chính mình → token đang dùng hết hiệu lực ngay (backend): đăng xuất gọn
+                // thay vì để lần tải danh sách kế tiếp bị 401 rồi bị đẩy ra giữa chừng
+                if (editingSelf && !string.IsNullOrEmpty(model.MatKhau))
+                {
+                    await AuthService.LogoutAsync();
+                    return;
+                }
 
                 message = $"Đã cập nhật tài khoản {saved.HoTen}.";
             }

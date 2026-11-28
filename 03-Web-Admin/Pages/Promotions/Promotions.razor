@@ -116,12 +116,18 @@
                                 <strong>@item.Code</strong>
                                 @* Màn hình hẹp: cột ngày / giờ vàng / số món bị ẩn → hiện gọn dưới mã *@
                                 <span class="stock-sub sub-dates">@item.NgayBatDau.ToString("dd/MM") – @item.NgayKetThuc.ToString("dd/MM/yyyy")</span>
-                                <span class="stock-sub sub-hours">@hours · @item.SoMonApDung món</span>
+                                <span class="stock-sub sub-hours">@hours@(TrangThaiKhuyenMai.OutsideGoldenHours(item, now) ? " (ngoài giờ vàng lúc này)" : "") · @item.SoMonApDung món</span>
                             </td>
                             <td>@item.PhanTramGiam.ToString("0.##", Vi)%</td>
                             <td>@item.NgayBatDau.ToString("dd/MM/yyyy")</td>
                             <td>@item.NgayKetThuc.ToString("dd/MM/yyyy")</td>
-                            <td>@hours</td>
+                            <td>
+                                @hours
+                                @if (TrangThaiKhuyenMai.OutsideGoldenHours(item, now))
+                                {
+                                    <span class="muted promo-off-hours">Ngoài giờ vàng lúc này</span>
+                                }
+                            </td>
                             <td>@item.SoMonApDung</td>
 
                             <td>
@@ -190,7 +196,8 @@
         @if (dialog is "form")
         {
             <EditForm Model="model"
-                      OnValidSubmit="Save">
+                      OnValidSubmit="Save"
+                      novalidate>
 
                 <DataAnnotationsValidator />
 
@@ -208,6 +215,8 @@
                         <label for="pm-discount">Giảm giá (%) *</label>
                         <InputNumber id="pm-discount"
                                      @bind-Value="model.PhanTramGiam"
+                                     min="0"
+                                     max="100"
                                      step="1" />
                         <ValidationMessage For="@(() => model.PhanTramGiam)" />
                     </div>
@@ -348,7 +357,7 @@
     private const string SortEnd = "end";
 
     /// <summary>Mốc thời gian để tính trạng thái (đặt lại mỗi lần tải danh sách).</summary>
-    private DateTime now = DateTime.Now;
+    private DateTime now = GioViet.Now;
     private int? selected;
     private int page = 1;
     private const int PageSize = 10;
@@ -417,7 +426,7 @@
         try
         {
             promotions = await PromotionApi.GetAllAsync(pageCts.Token);
-            now = DateTime.Now;
+            now = GioViet.Now;
             page = Math.Clamp(page, 1, Pages);
         }
         catch (ApiException ex)
@@ -513,7 +522,7 @@
         editing = false;
         error = null;
         message = null;
-        model = new KhuyenMaiForm { NgayBatDau = DateTime.Today, NgayKetThuc = DateTime.Today.AddDays(7) };
+        model = new KhuyenMaiForm { NgayBatDau = GioViet.Today, NgayKetThuc = GioViet.Today.AddDays(7) };
         dialog = "form";
         await LoadProducts();
     }

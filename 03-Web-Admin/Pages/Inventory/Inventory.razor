@@ -66,7 +66,7 @@
 
                 @if (transactionTab)
                 {
-                    @* Thời gian: mốc nhanh (áp dụng ngay) hoặc "Chọn khoảng ngày…" (chỉ lọc khi bấm Áp dụng) — giống trang Đơn hàng *@
+                    @* Thời gian (mặc định Hôm nay): mốc nhanh (áp dụng ngay) hoặc "Chọn khoảng ngày…" (chỉ lọc khi bấm Áp dụng) — giống trang Tổng quan / Đơn hàng *@
                     <select class="date-preset"
                             aria-label="Lọc theo thời gian giao dịch"
                             @bind="datePreset"
@@ -85,7 +85,7 @@
                                 <span>Từ ngày</span>
                                 <input type="date"
                                        @bind="customFrom"
-                                       max="@DatePresets.IsoDate(customTo ?? DateTime.Today)"
+                                       max="@DatePresets.IsoDate(customTo ?? GioViet.Today)"
                                        aria-invalid="@(dateError is not null ? "true" : null)"
                                        aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
                             </label>
@@ -95,7 +95,7 @@
                                 <input type="date"
                                        @bind="customTo"
                                        min="@(customFrom is { } cf ? DatePresets.IsoDate(cf) : null)"
-                                       max="@DatePresets.IsoDate(DateTime.Today)"
+                                       max="@DatePresets.IsoDate(GioViet.Today)"
                                        aria-invalid="@(dateError is not null ? "true" : null)"
                                        aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
                             </label>
@@ -171,9 +171,17 @@
                         ? $"Đang xem giao dịch ngày {rangeFrom:dd/MM/yyyy}"
                         : $"Đang xem giao dịch từ {rangeFrom:dd/MM/yyyy} đến hết {rangeTo:dd/MM/yyyy}")
                 }
+                else if (appliedPreset == DatePresets.Last24h)
+                {
+                    @($"Đang xem giao dịch từ {rangeFrom:HH:mm dd/MM/yyyy} đến nay (trong 24 giờ qua)")
+                }
+                else if (appliedPreset == DatePresets.Today)
+                {
+                    @($"Đang xem giao dịch hôm nay ({rangeFrom:dd/MM/yyyy})")
+                }
                 else
                 {
-                    @($"Đang xem giao dịch từ {rangeFrom:HH:mm dd/MM/yyyy} đến nay ({DatePresets.Label(appliedPreset).ToLowerInvariant()})")
+                    @($"Đang xem giao dịch từ {rangeFrom:dd/MM/yyyy} đến nay ({DatePresets.Label(appliedPreset).ToLowerInvariant()})")
                 }
             </p>
         }
@@ -240,7 +248,7 @@
                         @for (int k = 0; k < outOfStock.Count; k++)
                         {
                             @* Mỗi mục không ngắt dòng bên trong; danh sách chỉ xuống dòng sau dấu phẩy *@
-                            <span class="restock-item">@outOfStock[k].TenNguyenLieu@(k < outOfStock.Count - 1 ? "," : "")</span>
+                            <span class="restock-item">@outOfStock[k].TenNguyenLieu@(TinhTrangKho.Am(outOfStock[k]) ? $" (âm {Number(Math.Abs(outOfStock[k].SoLuongTon))} {outOfStock[k].DonViTinh})" : "")@(k < outOfStock.Count - 1 ? "," : "")</span>
                             @(" ")
                         }
                     </p>
@@ -350,6 +358,10 @@
                                 <td>@item.TenNguyenLieu</td>
                                 <td>
                                     <strong>@Number(item.SoLuongTon)</strong> @item.DonViTinh
+                                    @if (TinhTrangKho.Am(item))
+                                    {
+                                        <span class="stock-negative">Tồn âm — bán vượt tồn, cần kiểm kê lại</span>
+                                    }
                                     @* Màn hình hẹp: cột Mức cảnh báo bị ẩn → hiện gọn dưới số tồn *@
                                     <span class="stock-sub">Mức cảnh báo: @Number(item.MucCanhBaoToiThieu) @item.DonViTinh</span>
                                 </td>
@@ -421,7 +433,8 @@
         @if (dialog == "ingredient")
         {
             <EditForm Model="ingredientModel"
-                      OnValidSubmit="SaveIngredient">
+                      OnValidSubmit="SaveIngredient"
+                      novalidate>
 
                 <DataAnnotationsValidator />
 
@@ -449,6 +462,7 @@
                             <label for="i-stock">Tồn kho ban đầu</label>
                             <InputNumber id="i-stock"
                                          @bind-Value="ingredientModel.SoLuongTon"
+                                         min="0"
                                          step="0.01" />
                             <ValidationMessage For="@(() => ingredientModel.SoLuongTon)" />
                         </div>
@@ -458,6 +472,7 @@
                         <label for="i-min">Mức cảnh báo</label>
                         <InputNumber id="i-min"
                                      @bind-Value="ingredientModel.MucCanhBaoToiThieu"
+                                     min="0"
                                      step="0.01" />
                         <ValidationMessage For="@(() => ingredientModel.MucCanhBaoToiThieu)" />
                     </div>
@@ -521,7 +536,8 @@
         @if (dialog == "transaction")
         {
             <EditForm Model="transactionModel"
-                      OnValidSubmit="SaveTransaction">
+                      OnValidSubmit="SaveTransaction"
+                      novalidate>
 
                 <DataAnnotationsValidator />
 
@@ -553,6 +569,7 @@
                         <label for="t-qty">Số lượng@(UnitOf(transactionModel.MaNguyenLieu) is { Length: > 0 } unit ? $" ({unit})" : "") *</label>
                         <InputNumber id="t-qty"
                                      @bind-Value="transactionModel.SoLuong"
+                                     min="0"
                                      step="0.01" />
                         <ValidationMessage For="@(() => transactionModel.SoLuong)" />
                     </div>
@@ -626,8 +643,8 @@
     // Bộ lọc tab Lịch sử kho (lọc ở máy chủ, có phân trang)
     private int historyIngredient;
     private string historyType = "";
-    private string datePreset = DatePresets.All;      // lựa chọn đang hiện trong ô chọn
-    private string appliedPreset = DatePresets.All;   // lựa chọn ĐANG ÁP DỤNG (Custom chỉ có hiệu lực sau khi bấm Áp dụng)
+    private string datePreset = DatePresets.Default;      // lựa chọn đang hiện trong ô chọn (mặc định Hôm nay)
+    private string appliedPreset = DatePresets.Default;   // lựa chọn ĐANG ÁP DỤNG (Custom chỉ có hiệu lực sau khi bấm Áp dụng)
     private DateTime? fromDate;     // mốc đang lọc (tính lại mỗi lần tải với mốc nhanh)
     private DateTime? toDate;       // chỉ có với khoảng ngày tự chọn
     private DateTime? customFrom;
@@ -680,14 +697,14 @@
     // ---------------------------------------------------------------- Bộ lọc
 
     private int ActiveFilterCount => transactionTab
-        ? (appliedPreset != DatePresets.All ? 1 : 0) + (historyIngredient > 0 ? 1 : 0) + (historyType != "" ? 1 : 0)
+        ? (appliedPreset != DatePresets.Default ? 1 : 0) + (historyIngredient > 0 ? 1 : 0) + (historyType != "" ? 1 : 0)
         : (usageFilter != LocSuDung.TatCa ? 1 : 0) + (stockFilter != "" ? 1 : 0);
 
     // Đang lọc / tìm khác mặc định → nút Làm mới có chấm báo (bấm sẽ đưa về mặc định)
     private bool FiltersActive => ActiveFilterCount > 0 || (!transactionTab && (search.Trim() != "" || sort.Active));
 
     private string RefreshTitle => transactionTab
-        ? (FiltersActive ? "Làm mới và bỏ lọc, xem toàn bộ lịch sử kho" : "Làm mới lịch sử kho")
+        ? (FiltersActive ? "Làm mới và bỏ lọc, xem lịch sử kho hôm nay" : "Làm mới lịch sử kho")
         : (FiltersActive ? "Làm mới và bỏ lọc, xem toàn bộ nguyên liệu" : "Làm mới danh sách nguyên liệu");
 
     private IEnumerable<NguyenLieu> FilteredIngredients
@@ -732,7 +749,7 @@
     private string EmptyText =>
         loading ? "Đang tải dữ liệu…"
         : FiltersActive ? (transactionTab ? "Không có giao dịch khớp bộ lọc." : "Không có nguyên liệu khớp bộ lọc.")
-        : transactionTab ? "Chưa có giao dịch kho." : "Chưa có nguyên liệu.";
+        : transactionTab ? "Hôm nay chưa có giao dịch kho." : "Chưa có nguyên liệu.";
 
     // ---------------------------------------------------------------- Tải dữ liệu
 
@@ -761,7 +778,7 @@
         // Mốc nhanh tính lại theo thời điểm hiện tại mỗi lần tải (khoảng trượt), giống trang Đơn hàng
         if (appliedPreset != DatePresets.Custom)
         {
-            fromDate = DatePresets.From(appliedPreset, DateTime.Now);
+            fromDate = DatePresets.From(appliedPreset, GioViet.Now);
             toDate = null;
         }
 
@@ -887,8 +904,8 @@
         if (datePreset == DatePresets.Custom)
         {
             // Mở 2 ô Từ / Đến, điền sẵn khoảng đang lọc (hoặc hôm nay). Chưa lọc cho tới khi bấm Áp dụng.
-            customFrom = (fromDate ?? DateTime.Today).Date;
-            customTo = (toDate ?? DateTime.Today).Date;
+            customFrom = (fromDate ?? GioViet.Today).Date;
+            customTo = (toDate ?? GioViet.Today).Date;
             return;
         }
 
@@ -938,8 +955,8 @@
         {
             historyIngredient = 0;
             historyType = "";
-            datePreset = DatePresets.All;
-            appliedPreset = DatePresets.All;
+            datePreset = DatePresets.Default;
+            appliedPreset = DatePresets.Default;
             fromDate = null;
             toDate = null;
             customFrom = null;

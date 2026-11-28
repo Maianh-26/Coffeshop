@@ -19,7 +19,7 @@ public class NguoiDung
     public string VaiTro { get; set; } = "";
 
     /// <summary>
-    /// true: hoạt động, false: bị khóa (backend còn chức năng khóa; web không dùng, ẩn khỏi danh sách).
+    /// true: hoạt động, false: bị khóa (khóa từ trước; web không còn nút khóa, hiện nhãn "Bị khóa" để mở khóa hoặc xóa).
     /// Tài khoản đã xóa (DELETE) backend không trả về nữa.
     /// </summary>
     public bool TrangThai { get; set; } = true;
@@ -37,13 +37,6 @@ public class DangNhapResponse
     public string Token { get; set; } = "";
     public DateTime HetHan { get; set; }
     public NguoiDung NguoiDung { get; set; } = new();
-}
-
-/// <summary>POST api/v1/auth/doi-mat-khau → 204</summary>
-public class DoiMatKhauRequest
-{
-    public string MatKhauCu { get; set; } = "";
-    public string MatKhauMoi { get; set; } = "";
 }
 
 /// <summary>POST api/v1/nguoi-dung (chỉ QuanLy)</summary>

@@ -25,23 +25,30 @@ public class KhuyenMai
 }
 
 /// <summary>
-/// Trạng thái hiển thị của khuyến mãi (một chỗ duy nhất cho chữ và màu). "Đang áp dụng" do backend tính
-/// (ngày + khung giờ vàng); các trạng thái còn lại suy ra từ ngày.
+/// Trạng thái hiển thị của khuyến mãi (một chỗ duy nhất cho chữ và màu), tính theo khoảng ngày:
+/// Chưa bắt đầu → Đang áp dụng (trong khoảng ngày) → Đã kết thúc.
+/// Trước đây có thêm "Ngoài khung giờ" (trong khoảng ngày nhưng lúc này ngoài giờ vàng) — đã bỏ (chủ quán 25/11/2026):
+/// đó chỉ là trạng thái tạm thời đổi qua lại nhiều lần trong ngày, khuyến mãi vẫn còn hiệu lực và tự áp lại khi tới giờ vàng,
+/// nên lọc theo nó không có ích và dễ nhầm với "Đã kết thúc". Lúc ngoài giờ vàng chỉ ghi chú nhỏ ở cột Giờ vàng (<see cref="OutsideGoldenHours"/>).
 /// </summary>
 public static class TrangThaiKhuyenMai
 {
     public const string DangApDung = "Đang áp dụng";
-    public const string NgoaiKhungGio = "Ngoài khung giờ";
     public const string ChuaBatDau = "Chưa bắt đầu";
     public const string DaKetThuc = "Đã kết thúc";
 
-    public static readonly string[] Options = [DangApDung, NgoaiKhungGio, ChuaBatDau, DaKetThuc];
+    public static readonly string[] Options = [DangApDung, ChuaBatDau, DaKetThuc];
 
+    // Backend tính DangApDung bằng giờ máy chủ: nếu nó báo đang hiệu lực thì tin nó (lệch giờ máy khách không làm sai)
     public static string Of(KhuyenMai p, DateTime now) =>
         p.DangApDung ? DangApDung
         : now > p.NgayKetThuc ? DaKetThuc
         : now < p.NgayBatDau ? ChuaBatDau
-        : NgoaiKhungGio;
+        : DangApDung;
+
+    /// <summary>Trong khoảng ngày nhưng lúc này ngoài khung giờ vàng (giảm giá sẽ tự áp lại khi tới giờ).</summary>
+    public static bool OutsideGoldenHours(KhuyenMai p, DateTime now) =>
+        !p.DangApDung && p.GioBatDau is not null && Of(p, now) == DangApDung;
 
     public static string Color(string status) => status switch
     {

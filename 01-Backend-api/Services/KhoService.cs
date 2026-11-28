@@ -13,7 +13,7 @@ public class KhoService(AppDbContext db)
     /// <summary>Danh sách nguyên liệu kèm dự báo số ngày còn dùng được (dựa trên LichSuKho 7 ngày gần nhất).</summary>
     public async Task<List<NguyenLieuDto>> DanhSach(bool? sapHet, bool? dangSuDung)
     {
-        var tu = DateTime.Now.AddDays(-SoNgayThongKe);
+        var tu = GioViet.Now.AddDays(-SoNgayThongKe);
         var tieuHao = await db.LichSuKhos
             .Where(l => l.LoaiGiaoDich == LoaiGiaoDichs.TieuHaoTheoDon && l.ThoiGian >= tu)
             .GroupBy(l => l.MaNguyenLieu)
@@ -51,7 +51,7 @@ public class KhoService(AppDbContext db)
         db.LichSuKhos.Add(new LichSuKho
         {
             MaNguyenLieu = id, MaNguoiDung = maNguoiDung, LoaiGiaoDich = loai,
-            SoLuongThayDoi = thayDoi, ThoiGian = DateTime.Now, GhiChu = ghiChu,
+            SoLuongThayDoi = thayDoi, ThoiGian = GioViet.Now, GhiChu = ghiChu,
         });
         await db.SaveChangesAsync();
         await tx.CommitAsync();

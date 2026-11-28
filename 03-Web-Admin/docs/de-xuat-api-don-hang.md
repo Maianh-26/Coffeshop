@@ -630,7 +630,7 @@ Chuẩn bị: đăng nhập `nhanvien` để lấy token. Tạo 3 đơn A, B, C 
 |---|---|---|
 | Q1 | Có **bắt buộc** thanh toán trước khi chuyển `SERVED` không? | Không bắt buộc ở backend. Web đã hỏi xác nhận lại khi phục vụ đơn chưa thanh toán |
 | Q2 | Có cho **hủy đơn đã `SERVED`** không? | Chờ chủ quán quyết định. Hiện giữ như cũ (cho hủy, đơn PAID thì đánh dấu hoàn tiền) |
-| Q3 | **Khách chuyển khoản trên tablet → tự `PAID`**: ai gọi thanh toán? | Cần chốt giữa tablet và backend. (a) Cổng thanh toán (VietQR/PayOS…) gọi webhook backend, backend chạy logic `ThanhToan`. (b) Tạm thời: tablet gọi `POST thanh-toan` sau khi khách xác nhận đã chuyển (kém an toàn hơn). Web admin tự làm mới mỗi 10 giây nên sẽ thấy ngay |
+| Q3 | **Khách chuyển khoản trên tablet → tự `PAID`**: ai gọi thanh toán? | Cần chốt giữa tablet và backend. (a) Cổng thanh toán (VietQR/PayOS…) gọi webhook backend, backend chạy logic `ThanhToan`. (b) Tạm thời: tablet gọi `POST thanh-toan` sau khi khách xác nhận đã chuyển (kém an toàn hơn). Web admin tự làm mới mỗi 3 giây (từ 25/11/2026) nên sẽ thấy ngay |
 | Q4 | Số bảng gỗ có cố định **50** không? | Tạm cố định 1–50 (CHECK + validation). Nếu cần đổi thì đưa vào cấu hình |
 | Q5 | Có cần **tìm kiếm theo mã đơn / số nhận món ở máy chủ** không? | Nên có: `GET don-hang?tuKhoa=18` khớp `MaDonHang` hoặc `SoNhanMon`. Hiện web chỉ tìm trong trang đang xem (20 đơn) |
 

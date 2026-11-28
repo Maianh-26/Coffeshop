@@ -30,7 +30,7 @@ Trang **không** có bảng "Báo cáo theo ngày", bảng "Topping bán chạy"
 
 ## 2.2. Bộ lọc thời gian
 
-Ô chọn dùng `DatePresets.ReportOptions` (`Utilities/DatePresets.cs`). Mốc nhanh áp dụng ngay; "Chọn khoảng ngày…" mở 2 ô Từ ngày / Đến ngày, chỉ lọc khi bấm **Áp dụng** (giống trang Đơn hàng, Kho).
+Ô chọn dùng `DatePresets.Options` (`Utilities/DatePresets.cs`). Mốc nhanh áp dụng ngay; "Chọn khoảng ngày…" mở 2 ô Từ ngày / Đến ngày, chỉ lọc khi bấm **Áp dụng** (giống trang Đơn hàng, Kho).
 
 | Lựa chọn | Khoảng gửi lên API | Biểu đồ |
 |----------|--------------------|---------|
@@ -41,7 +41,7 @@ Trang **không** có bảng "Báo cáo theo ngày", bảng "Topping bán chạy"
 
 - Vì sao mặc định **Hôm nay**: chủ quán mở trang để xem hôm nay bán được bao nhiêu (giống Sapo, KiotViet). "24 giờ qua" lúc 8 giờ sáng vẫn gồm doanh thu tối hôm trước.
 - **Không có "Tất cả thời gian"** (chủ quán quyết định 23/11/2026: quá chung chung cho báo cáo); xem khoảng dài thì dùng "Chọn khoảng ngày…".
-- Trang Đơn hàng / Kho vẫn dùng `DatePresets.Options` (có "Tất cả thời gian", không có "Hôm nay"); mốc 7 / 30 ngày ở đó là **khoảng trượt** (7×24 giờ), còn ở Tổng quan là **ngày lịch** để mỗi cột biểu đồ là một ngày trọn vẹn.
+- Từ 25/11/2026 trang Đơn hàng và Lịch sử kho dùng **cùng bộ lựa chọn và cùng mặc định "Hôm nay"** (`DatePresets.Options`, `DatePresets.Default`); mốc 7 / 30 ngày ở mọi trang đều là **ngày lịch**, tính cả hôm nay.
 - Nút **Làm mới** (⟳): tải lại; nếu đang lọc khác "Hôm nay" (có chấm nâu) thì đưa về Hôm nay.
 - Khoảng đang xem ghi gọn cạnh tiêu đề biểu đồ (`Describe` trong `.razor.cs`): "Hôm nay, 23/11/2026", "17/11 – 23/11/2026", "Từ 15:00 22/11/2026 đến nay".
 
@@ -114,7 +114,7 @@ File là **báo cáo số liệu** — không có chữ giải thích cách tín
 
 | Muốn tìm | Gõ Ctrl+Shift+F |
 |----------|-----------------|
-| Mốc mặc định / danh sách lựa chọn | `DefaultPreset`, `ReportOptions` |
+| Mốc mặc định / danh sách lựa chọn | `DefaultPreset` (= `DatePresets.Default`), `DatePresets.Options` |
 | Khoảng thời gian của từng mốc | `RangeOf` |
 | Chữ khoảng ngày cạnh tiêu đề biểu đồ | `Describe` |
 | Trục tiền | `AxisScale`, `AxisLabel` |

@@ -22,22 +22,24 @@
 
 ```
 ┌──────────────── .master-panel ─────────────────┐┌──── .detail-panel ───┐
-│ [🔍 Tìm…] [Từ–Đến] [Trạng thái▾] [TT▾] [Lọc][Đặt lại] ││ Đơn hàng #DH00125  ×│ ← dòng 288–577
-│ (.filters-panel, dòng 24–84)                  ││ badge trạng thái    │
-│ [+Tạo đơn][Sửa][Hủy]   ● Tự cập nhật         ││ thông tin, món      │
-│ (.action-bar, dòng 88–147)                    ││ tạm tính / tổng     │
-│ Bảng đơn hàng (.orders-table, dòng 151–243)   ││ [Tiếp nhận]          │
-│ 12 đơn hàng · Trang 1/2        [‹] 1 [›]      ││ [Thu tiền / QR]      │
-│ (.list-footer, dòng 245–281)                  ││ [Hoàn thành][In]     │
-└───────────────────────────────────────────────┘└──────────────────────┘
- Hộp thoại Tạo/Sửa đơn (dòng 583–766) · Hộp thoại Xác nhận hủy (dòng 774–786)
+│ [▣ Đơn mới #40 từ Tablet… 57.600 đ  Xem  ×]    ││ Đơn hàng #40       × │
+│ (.new-order-alert — chỉ khi có đơn mới)        ││ trạng thái, thời gian│
+│ [🔍 Tìm…] [Thời gian▾] [Trạng thái▾] [TT▾] [↻] ││ món đã đặt, tổng     │
+│ [+ Tạo đơn tại quầy] [Sửa đơn] [Hủy đơn]       ││ số nhận món          │
+│ Đã gán số nhận món 49 cho đơn #40.             ││ phục vụ: 3 bước      │
+│ (dòng kết quả thao tác + khung vàng cảnh báo   ││ thu tiền / in hóa đơn│
+│  kho nếu có — như các trang khác)              ││                      │
+│ Bảng đơn hàng (.orders-table)                  ││                      │
+│ 20 đơn / trang · phân trang                    ││                      │
+└────────────────────────────────────────────────┘└──────────────────────┘
+ Hộp thoại Tạo / Sửa đơn · Hộp thoại Hủy đơn (chỉ Quản lý)
 ```
 
 - Khung chi tiết **chỉ hiện khi đã chọn một đơn**: `@if (SelectedOrderDetail != null)` (dòng 284). Lớp `has-detail` (dòng 19) đổi bố cục thành 2 cột.
 - Màn hình hẹp (≤ 1000px): khung chi tiết nằm **dưới** danh sách. Bấm một đơn thì trang tự cuộn xuống: `OnAfterRenderAsync` (dòng 1035) gọi JS `appHelpers.scrollIntoViewOnNarrow` (`wwwroot/js/app.js`).
 - CSS bố cục: `.master-detail-layout` `app.css:1478`.
 
-Biến chính (`@code`, dòng 790–828): `orders`, `search`, `fromDate`, `toDate`, `statusFilter`, `paymentFilter`, `selected` (mã đơn đang chọn), `page`, `PageSize = 10`, `alertMessage`, `autoRefreshEnabled`, `isOrderModalOpen`, `isEditing`, `isDeleteModalOpen`, `draftOrder`.
+Biến chính (đầu khối `@code`): `orders`, `search`, `fromDate`, `toDate`, `statusFilter`, `paymentFilter`, `selectedId` (mã đơn đang chọn), `page`, `PageSize = 20`, `RefreshSeconds = 3`, `alertMessage`, `isOrderModalOpen`, `editingOrderId` (khác null = đang sửa đơn đó), `isCancelModalOpen`.
 
 ---
 
@@ -102,7 +104,7 @@ Khung chi tiết dòng 288–577 dùng biến `detail = SelectedOrderDetail` (d�
 | **In hóa đơn** | luôn | 555–562 | `PrintReceipt` (1365) | JS `appHelpers.printReceipt` (dựng hóa đơn K80 trong iframe ẩn rồi in) |
 | **×** đóng chi tiết | luôn | 305–311 | lambda `selected = null` | ẩn khung chi tiết |
 
-Sau mỗi thao tác, `ShowAlert(...)` (dòng 1359) hiện banner xanh ở đầu trang (dòng 8–17). Có nút × để tắt banner.
+Sau mỗi thao tác, `ShowAlert(...)` hiện một dòng thông báo **ngay dưới nhóm nút** Tạo đơn / Sửa / Hủy (giống các trang quản lý khác), không tự ẩn, thao tác kế tiếp thay nó; thu tiền có nguyên liệu sắp hết thì có thêm khung vàng liệt kê. Bấm Làm mới không báo gì. Màn ≤1000px đang mở khung chi tiết thì dòng kết quả hiện ở đầu khung chi tiết (khung nằm dưới danh sách). Thông báo đơn mới từ Tablet (màu cam, nút Xem / ×) nằm **ngay dưới tiêu đề trang, trên mục lọc**.
 
 > Thầy hỏi *"Nút Tiếp nhận em code ở đâu, gọi tới đâu?"*: "Nút ở `Orders.razor` dòng 449–457, chỉ hiện khi đơn đang `Chờ tiếp nhận`. Bấm thì gọi `AcceptOrder(detail)` ở dòng 1077, đổi `Status` thành `Đang pha chế` và ghi giờ tiếp nhận. Hiện trang đang chạy dữ liệu mẫu. Khi nối backend, hàm này sẽ gọi `OrderService.AcceptOrderAsync(code)` để gửi `POST api/orders/{code}/accept`. Backend trả **409** nếu đơn không còn ở trạng thái chờ."
 
@@ -130,18 +132,18 @@ Danh mục món / size / topping cho bộ chọn được tạo sẵn ở `InitC
 
 ---
 
-## 3.6. "Tự cập nhật" đơn mới từ Tablet
+## 3.6. Tự nhận đơn mới từ Tablet
+
+Trang **luôn** tự làm mới; không có nút bật / tắt. Nút "Tự cập nhật" cũ đã bị bỏ ngày 25/11/2026, vì tắt nó là quầy mất báo đơn mới mà không hay biết.
 
 | Thành phần | Ở đâu | Thực tế làm gì |
 |------------|-------|----------------|
-| Bộ hẹn giờ 4 giây | `OnInitialized` (dòng 849–862), `System.Threading.Timer` | Mỗi 4 giây gọi `InvokeAsync(StateHasChanged)` để vẽ lại trang. Phải dùng `InvokeAsync` vì timer chạy ngoài luồng giao diện |
-| Nút "Tablet Realtime: Đang bật / Tạm dừng" | dòng 123–131 → `ToggleAutoRefresh` (dòng 1124) | Bật / tắt cờ `autoRefreshEnabled`. Chấm xanh nhấp nháy là CSS `.live-indicator` |
-| Hủy timer khi rời trang | `@implements IDisposable` (dòng 2) + `Dispose()` (dòng 1370) | Không để timer chạy ngầm sau khi đã rời trang |
-| Đơn mới từ Tablet | App tablet gửi `POST api/v1/don-hang` lên backend | Lần tải lại kế tiếp (`GET api/v1/don-hang`) sẽ thấy đơn. Muốn thử không cần tablet: gửi `POST api/v1/don-hang` bằng Swagger `http://localhost:3000/docs` |
+| Bộ hẹn giờ 3 giây | hằng `RefreshSeconds = 3`; tạo `Timer` ở cuối `OnInitializedAsync` | Mỗi 3 giây gọi `InvokeAsync(AutoRefresh)`. Phải dùng `InvokeAsync` vì timer chạy ngoài luồng giao diện |
+| hàm `AutoRefresh` | `@code` | Tải lại danh sách (`LoadOrders(quiet: true)`) và dò đơn mới. **Bỏ qua lượt** khi đang thao tác (đang tải, thu tiền, tạo / sửa / hủy đơn, đang mở hộp thoại) để bảng không nhảy dưới tay; lượt sau sẽ cập nhật |
+| Hủy timer khi rời trang | `@implements IDisposable` (dòng 2) + hàm `Dispose()` cuối file | Không để timer chạy ngầm sau khi đã rời trang |
+| Đơn mới từ Tablet | App tablet gửi `POST api/v1/don-hang` lên backend | Lượt làm mới kế tiếp (≤ 3 giây) thấy đơn và hiện thông báo đơn mới. Muốn thử không cần tablet: gửi `POST api/v1/don-hang` **không kèm token** bằng Swagger `http://localhost:3000/docs` |
 
-> Thầy hỏi *"Realtime là sao?"*: "Hiện tại là **làm mới định kỳ** (polling) mỗi 4 giây. Khi nối backend, mỗi nhịp sẽ gọi `OrderService.GetAllAsync()` để lấy đơn mới từ tablet. Nếu backend có SignalR thì có thể đổi sang đẩy dữ liệu thời gian thực."
-
-CSS: `.realtime-pill` `app.css:1819`, `.qr-payment-box` 1849.
+> Thầy hỏi *"Realtime là sao?"*: "Hiện tại là **làm mới định kỳ** (polling) mỗi 3 giây. Bước tiếp theo là backend đẩy tin qua SignalR để quầy nhận đơn dưới 1 giây — kế hoạch ở `docs/ke-hoach-dong-bo-thoi-gian-thuc.md`."
 
 ---
 

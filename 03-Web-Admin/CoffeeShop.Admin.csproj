@@ -7,6 +7,8 @@
     <!-- Tải đủ dữ liệu ngôn ngữ để định dạng vi-VN hoạt động (29.000 đ, dd/MM/yyyy).
          Mặc định Blazor WASM chỉ tải dữ liệu vài ngôn ngữ châu Âu nên vi-VN bị rơi về kiểu tiếng Anh (29,000). -->
     <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
+    <!-- Project test nằm trong thư mục con tests/: không gộp mã test vào ứng dụng web -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

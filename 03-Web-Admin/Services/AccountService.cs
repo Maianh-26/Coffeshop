@@ -4,7 +4,7 @@ namespace CoffeeShop.Admin.Services;
 
 /// <summary>
 /// Quản lý tài khoản (chỉ Quản lý) — api/v1/nguoi-dung. Web không dùng "khóa / mở khóa": chỉ có Xóa
-/// (xem <see cref="DeleteAsync"/>). Tài khoản đã xóa backend không trả về; tài khoản bị khóa (TrangThai = false) web ẩn.
+/// (xem <see cref="DeleteAsync"/>). Tài khoản đã xóa backend không trả về; tài khoản bị khóa (TrangThai = false) hiện nhãn "Bị khóa", Sửa để mở khóa.
 /// </summary>
 public class AccountService
 {
@@ -14,6 +14,10 @@ public class AccountService
     {
         _api = api;
     }
+
+    /// <summary>Tài khoản đang đăng nhập (GET api/v1/auth/toi) — trang Tài khoản dùng để không cho tự xóa / tự đổi vai trò.</summary>
+    public Task<NguoiDung> GetMeAsync(CancellationToken ct = default) =>
+        _api.GetAsync<NguoiDung>("api/v1/auth/toi", ct);
 
     public Task<List<NguoiDung>> GetAllAsync(CancellationToken ct = default) =>
         _api.GetAsync<List<NguoiDung>>("api/v1/nguoi-dung", ct);
