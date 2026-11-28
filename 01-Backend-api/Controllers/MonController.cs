@@ -19,7 +19,7 @@ public class MonController(AppDbContext db, MenuService menu) : ControllerBase
     [HttpGet("mon"), AllowAnonymous]
     public async Task<Paged<MonDto>> DanhSach([FromQuery] MonQuery q)
     {
-        var now = DateTime.Now;
+        var now = GioViet.Now;
         var query = menu.MonDayDu();
         if (!q.BaoGomNgungBan) query = query.Where(m => !m.NgungBan);
         if (q.MaDanhMuc is { } dm) query = query.Where(m => m.MaDanhMuc == dm);

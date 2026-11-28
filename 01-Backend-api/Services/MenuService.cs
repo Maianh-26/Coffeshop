@@ -18,7 +18,7 @@ public class MenuService(AppDbContext db)
     public async Task<Mon> TimMon(int id) =>
         await MonDayDu().FirstOrDefaultAsync(m => m.MaTenMon == id) ?? throw ApiException.NotFound("Món");
 
-    public async Task<MonDto> LayMonDto(int id) => (await TimMon(id)).ToDto(DateTime.Now);
+    public async Task<MonDto> LayMonDto(int id) => (await TimMon(id)).ToDto(GioViet.Now);
 
     /// <summary>Số lượng đã bán theo MaTenMon (đơn chưa hủy) — dùng cho sắp xếp "bán chạy" và gợi ý.</summary>
     public Task<Dictionary<int, int>> SoLuongDaBan(DateTime? tu = null)

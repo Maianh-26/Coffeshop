@@ -30,7 +30,7 @@ public class DonHangService(AppDbContext db)
     /// </summary>
     public async Task<DonHang> DatMon(DatMonRequest req, int? maNhanVien)
     {
-        var now = DateTime.Now;
+        var now = GioViet.Now;
         var chiTiets = await DungChiTiet(req, now);
         var donHang = new DonHang
         {
@@ -313,7 +313,7 @@ public class DonHangService(AppDbContext db)
         if (don.TrangThaiThanhToan == TrangThais.Paid)
         {
             don.DaHoanTien = true;
-            don.GioHoanTien = DateTime.Now;
+            don.GioHoanTien = GioViet.Now;
         }
         don.TrangThaiThanhToan = TrangThais.Cancelled;
         don.LyDoHuy = lyDo;

@@ -19,7 +19,7 @@ public class TokenService(JwtOptions opt)
 {
     public (string Token, DateTime HetHan) Create(NguoiDung user)
     {
-        var expires = DateTime.Now.AddHours(opt.ExpiresInHours);
+        var hetHanUtc = DateTime.UtcNow.AddHours(opt.ExpiresInHours);
         var token = new JwtSecurityToken(
             issuer: opt.Issuer,
             audience: opt.Issuer,
@@ -29,9 +29,9 @@ public class TokenService(JwtOptions opt)
                 new Claim("role", user.VaiTro),
                 new Claim("name", user.HoTen),
             },
-            expires: expires.ToUniversalTime(),
+            expires: hetHanUtc,
             signingCredentials: new SigningCredentials(opt.Key, SecurityAlgorithms.HmacSha256));
-        return (new JwtSecurityTokenHandler().WriteToken(token), expires);
+        return (new JwtSecurityTokenHandler().WriteToken(token), GioViet.TuUtc(hetHanUtc));
     }
 }
 

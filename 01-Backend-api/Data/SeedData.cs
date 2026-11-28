@@ -43,13 +43,13 @@ public static class SeedData
         // Khung giờ vàng 14:00-16:00 giảm 20% cho trà
         var gioVang = new KhuyenMai
         {
-            Code = "GIOVANG20", PhanTramGiam = 20, NgayBatDau = DateTime.Today.AddDays(-1), NgayKetThuc = DateTime.Today.AddMonths(3),
+            Code = "GIOVANG20", PhanTramGiam = 20, NgayBatDau = GioViet.Today.AddDays(-1), NgayKetThuc = GioViet.Today.AddMonths(3),
             GioBatDau = new TimeSpan(14, 0, 0), GioKetThuc = new TimeSpan(16, 0, 0),
         };
         // Giảm 10% cả ngày cho bạc xỉu
         var khaiTruong = new KhuyenMai
         {
-            Code = "KHAITRUONG10", PhanTramGiam = 10, NgayBatDau = DateTime.Today.AddDays(-1), NgayKetThuc = DateTime.Today.AddMonths(1),
+            Code = "KHAITRUONG10", PhanTramGiam = 10, NgayBatDau = GioViet.Today.AddDays(-1), NgayKetThuc = GioViet.Today.AddMonths(1),
         };
         db.KhuyenMais.AddRange(gioVang, khaiTruong);
 

@@ -112,7 +112,7 @@ CREATE TABLE DonHang (
     TongTien DECIMAL(18, 0) NOT NULL DEFAULT 0,
     PhuongThucThanhToan VARCHAR(20) NOT NULL DEFAULT 'CASH', -- 'CASH', 'QR_TRANSFER'[cite: 1]
     TrangThaiThanhToan VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- 'PENDING', 'PAID', 'CANCELLED'[cite: 1]
-    ThoiGianTao DATETIME NOT NULL DEFAULT GETDATE(),
+    ThoiGianTao DATETIME NOT NULL CONSTRAINT DF_DonHang_ThoiGianTao DEFAULT (DATEADD(HOUR, 7, SYSUTCDATETIME())), -- giờ Việt Nam, không theo múi giờ máy chủ
     LyDoHuy NVARCHAR(255) NULL,   -- Quản lý hủy đơn[cite: 6]
     DaHoanTien BIT NOT NULL DEFAULT 0, --[cite: 6]
     GioHoanTien DATETIME NULL,    --[cite: 6]
@@ -203,7 +203,7 @@ CREATE TABLE LichSuKho (
     MaNguoiDung INT NULL,   -- NULL nếu hệ thống tự sinh log trừ kho theo đơn[cite: 6]
     LoaiGiaoDich NVARCHAR(50) NOT NULL, -- 'NhapHang', 'XuatHuy', 'TieuHaoTheoDon'[cite: 6]
     SoLuongThayDoi DECIMAL(12, 2) NOT NULL, -- (+) khi nhập, (-) khi tiêu hao[cite: 6]
-    ThoiGian DATETIME NOT NULL DEFAULT GETDATE(),
+    ThoiGian DATETIME NOT NULL CONSTRAINT DF_LichSuKho_ThoiGian DEFAULT (DATEADD(HOUR, 7, SYSUTCDATETIME())), -- giờ Việt Nam
     GhiChu NVARCHAR(255) NULL,
     CONSTRAINT FK_LichSuKho_NguyenLieu FOREIGN KEY (MaNguyenLieu) REFERENCES NguyenLieu(MaNguyenLieu),
     CONSTRAINT FK_LichSuKho_DonHang FOREIGN KEY (MaDonHang) REFERENCES DonHang(MaDonHang),
@@ -220,6 +220,8 @@ CREATE OR ALTER PROCEDURE sp_ThanhToanVaTruKho
 AS
 BEGIN
     SET NOCOUNT ON;
+    -- Giờ Việt Nam (UTC+7), không phụ thuộc múi giờ của máy chủ SQL
+    DECLARE @Now DATETIME = DATEADD(HOUR, 7, SYSUTCDATETIME());
     BEGIN TRANSACTION;
 
     BEGIN TRY
@@ -234,7 +236,7 @@ BEGIN
         -- 2. Cập nhật trạng thái đơn hàng sang PAID + ghi giờ thu tiền, người thu tiền
         UPDATE DonHang
         SET TrangThaiThanhToan = 'PAID',
-            ThoiGianThanhToan = GETDATE(),
+            ThoiGianThanhToan = @Now,
             MaNguoiThu = @MaNguoiThu
         WHERE MaDonHang = @MaDonHang;
 
@@ -273,7 +275,7 @@ BEGIN
             NULL,
             N'TieuHaoTheoDon',
             -SUM(TongLuongTieuHao),
-            GETDATE(),
+            @Now,
             CONCAT(N'Tự động trừ kho theo đơn hàng #', @MaDonHang)
         FROM @NguyenLieuTieuHao
         GROUP BY MaNguyenLieu;

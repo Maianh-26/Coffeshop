@@ -2,6 +2,9 @@ openapi: 3.0.3
 info:
   title: API Hệ thống đặt món thông minh - Quán cà phê
   version: 1.0.0
+  description: |
+    **Thời gian:** mọi mốc giờ (thoiGianTao, thoiGianThanhToan, gioHoanTien, thoiGian của lịch sử kho, hetHan…) là **giờ Việt Nam (UTC+7)**,
+    dạng `yyyy-MM-ddTHH:mm:ss` **không kèm múi giờ**, không phụ thuộc múi giờ của máy chủ. Tham số lọc tuNgay / denNgay cũng hiểu theo giờ Việt Nam.
 servers:
   - url: http://localhost:3000/api/v1
     description: Local
