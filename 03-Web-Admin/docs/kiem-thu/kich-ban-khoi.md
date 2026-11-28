@@ -52,7 +52,7 @@ sqlcmd -S . -E -C -d QuanCaPheDB_KiemThu -W -Q "SELECT TrangThaiThanhToan, Trang
 - [ ] **Đăng nhập:** `quanly` → đủ 6 mục menu; đăng xuất, đăng nhập `nhanvien` → chỉ có Đơn hàng, mở thẳng `/products` → "Không có quyền truy cập".
 - [ ] **Đơn hàng (Quản lý):** lọc mặc định Hôm nay hiện 27 đơn (30 đơn mẫu trừ 3 đơn treo; trước bước "Luồng một đơn"); banner vàng báo **3 đơn chưa thu** từ trước hôm nay, bấm "Xem các đơn này" → đúng đơn 1, 2, 3.
 - [ ] **Luồng một đơn:** Tạo đơn tại quầy (1 món có topping + ghi chú) → gán số nhận món → Đang chuẩn bị → Thu tiền mặt → Đã phục vụ → xem trước hóa đơn: tiêu đề "HÓA ĐƠN THANH TOÁN", đúng món, topping, ghi chú, tổng tiền.
-- [ ] **Phiếu tạm tính:** mở một đơn chờ thu → nút "In phiếu tạm tính", tiêu đề phiếu "PHIẾU TẠM TÍNH".
+- [ ] **In đơn chưa thu:** mở một đơn chờ thu → nút "In hóa đơn", tiêu đề vẫn là "HÓA ĐƠN THANH TOÁN" (không có "phiếu tạm tính"), không có dòng hình thức thanh toán.
 - [ ] **Hủy đơn:** hủy một đơn chờ thu kèm lý do → trạng thái "Đã hủy", thanh toán "Không thu".
 - [ ] **Thực đơn:** thêm một món có công thức → món hiện trong hộp tạo đơn tại quầy với đúng giá (kể cả khuyến mãi nếu món thuộc khuyến mãi đang chạy).
 - [ ] **Kho:** nguyên liệu của món ở bước "Luồng một đơn" giảm đúng định mức; lịch sử kho có dòng tương ứng.

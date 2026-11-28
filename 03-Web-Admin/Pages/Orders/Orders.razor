@@ -749,12 +749,10 @@
                     <button type="button"
                             class="btn outline"
                             disabled="@detail.DaHuy"
-                            title="@(detail.DaHuy ? "Đơn đã hủy, không in hóa đơn"
-                                   : detail.TrangThaiThanhToan == TrangThaiDon.Paid ? "In hóa đơn cho khách"
-                                   : "Đơn chưa thu tiền: in phiếu tạm tính")"
+                            title="@(detail.DaHuy ? "Đơn đã hủy, không in hóa đơn" : "In hóa đơn cho khách")"
                             @onclick="PrintReceipt">
                         <Icon Name="printer" Size="16" />
-                        @(detail.TrangThaiThanhToan == TrangThaiDon.Paid || detail.DaHuy ? "In hóa đơn" : "In phiếu tạm tính")
+                        In hóa đơn
                     </button>
 
                 </div>
@@ -1023,8 +1021,8 @@
        Bố cục theo mẫu hóa đơn quán cà phê / trà sữa phổ biến (KiotViet, Sapo, iPOS…), cá nhân hóa cho dự án:
        tên quán → HÓA ĐƠN THANH TOÁN → HĐ / Ngày / Giờ (+ số nhận món) → bảng TÊN HÀNG | SL | Đ.GIÁ | T.TIỀN
        → T.CỘNG → TỔNG THANH TOÁN + số tiền bằng chữ → hình thức (khi đã thu) → lời cảm ơn.
-       Đơn CHƯA THU in tiêu đề "PHIẾU TẠM TÍNH" (không phải hóa đơn thanh toán) và dòng "TỔNG CỘNG", để khách không
-       hiểu nhầm là đã trả tiền. Không in: tên nhân viên / tài khoản, mã nội bộ khác.
+       Quyết định của chủ quán: tiêu đề LUÔN là "HÓA ĐƠN THANH TOÁN" (không có "phiếu tạm tính"), kể cả đơn chưa thu.
+       Không in: trạng thái "chưa thu", tên nhân viên / tài khoản, mã nội bộ khác.
        Header / footer của trình duyệt (ngày, tiêu đề, đường dẫn) bị tắt bằng @page margin 0 trong appHelpers. *@
     <div id="receipt-source" hidden>
         <div class="r-center r-head">
@@ -1037,7 +1035,7 @@
             {
                 <div class="r-small">ĐT: @ReceiptPhone</div>
             }
-            <div class="r-title">@(receipt.TrangThaiThanhToan == TrangThaiDon.Paid ? "HÓA ĐƠN THANH TOÁN" : "PHIẾU TẠM TÍNH")</div>
+            <div class="r-title">HÓA ĐƠN THANH TOÁN</div>
         </div>
 
         <table class="r-info">
@@ -1103,7 +1101,7 @@
             </tfoot>
         </table>
 
-        <div class="r-row r-total"><span>@(receipt.TrangThaiThanhToan == TrangThaiDon.Paid ? "TỔNG THANH TOÁN" : "TỔNG CỘNG")</span><span class="r-money">@Money(receipt.TongTien)</span></div>
+        <div class="r-row r-total"><span>TỔNG THANH TOÁN</span><span class="r-money">@Money(receipt.TongTien)</span></div>
         <div class="r-words">(@DocSoTien.Doc(receipt.TongTien))</div>
 
         @if (receipt.TrangThaiThanhToan == TrangThaiDon.Paid)
