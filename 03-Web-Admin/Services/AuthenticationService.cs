@@ -29,7 +29,7 @@ public class AuthenticationService
     }
 
     /// <summary>
-    /// Đăng nhập: POST api/v1/auth/dang-nhap → { tokclasen, hetHan, nguoiDung }.
+    /// Đăng nhập: POST api/v1/auth/dang-nhap → { token, hetHan, nguoiDung }.
     /// Sai thông tin → 401, tài khoản bị khóa → 403 (backend trả error.message tiếng Việt).
     /// </summary>
     public async Task<LoginResponse> LoginAsync(

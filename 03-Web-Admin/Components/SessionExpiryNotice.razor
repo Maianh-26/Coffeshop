@@ -1,0 +1,79 @@
+@implements IAsyncDisposable
+@inject AppState AppState
+@inject TokenAuthenticationStateProvider AuthState
+
+@* Báo trước khi token đăng nhập hết hạn (backend cấp 12 giờ) để nhân viên lưu dở việc đang làm,
+   thay vì đang thu tiền / nhập form thì bị đẩy về trang Đăng nhập. Hết hạn thì tự đăng xuất (giữ trang đang mở). *@
+@if (minutesLeft is { } m)
+{
+    <p class="alert yellow session-expiry" role="status">
+        <Icon Name="lock" Size="16" />
+        <span>
+            Phiên đăng nhập sẽ hết hạn @(m <= 1 ? "trong chưa đầy 1 phút" : $"sau khoảng {m} phút")
+            (lúc @expiresLocal?.ToString("HH:mm")). Hãy lưu việc đang làm, rồi đăng xuất và đăng nhập lại.
+        </span>
+    </p>
+}
+
+@code {
+    // Báo trước khi còn ≤ 10 phút; kiểm tra mỗi 15 giây
+    private static readonly TimeSpan WarnBefore = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan CheckEvery = TimeSpan.FromSeconds(15);
+
+    private readonly CancellationTokenSource cts = new();
+    private int? minutesLeft;
+    private DateTime? expiresLocal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Lấy token một lần: sau DisposeAsync không đọc lại cts.Token (CTS đã dispose → ObjectDisposedException)
+        CancellationToken token = cts.Token;
+
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                await CheckAsync();
+                await Task.Delay(CheckEvery, token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Layout bị gỡ (đăng xuất / chuyển sang trang Đăng nhập)
+        }
+    }
+
+    private async Task CheckAsync()
+    {
+        int? before = minutesLeft;
+
+        if (!AppState.IsLoggedIn || AppState.ExpiresUtc is not { } exp)
+        {
+            minutesLeft = null;
+        }
+        else
+        {
+            TimeSpan left = exp - DateTime.UtcNow;
+
+            if (left <= TimeSpan.Zero)
+            {
+                minutesLeft = null;
+                // Như khi máy chủ trả 401: không phải người dùng tự bấm → trang Đăng nhập nhớ trang đang mở
+                await AuthState.SignOutAsync(byUser: false);
+                return;
+            }
+
+            expiresLocal = exp.ToLocalTime();
+            minutesLeft = left <= WarnBefore ? (int)Math.Ceiling(left.TotalMinutes) : null;
+        }
+
+        if (before != minutesLeft) StateHasChanged();
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        // Chỉ Cancel (không Dispose): vòng lặp có thể còn đang ở giữa CheckAsync lúc layout bị gỡ
+        cts.Cancel();
+        return ValueTask.CompletedTask;
+    }
+}

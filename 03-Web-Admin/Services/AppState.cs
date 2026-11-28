@@ -13,13 +13,17 @@ public class AppState
 
     public string? Role { get; private set; }
 
+    /// <summary>Giờ hết hạn của token (UTC, từ claim <c>exp</c>); null = không đọc được.</summary>
+    public DateTime? ExpiresUtc { get; private set; }
+
     public event Action? OnChange;
 
-    public void Login(string token, string fullName, string role)
+    public void Login(string token, string fullName, string role, DateTime? expiresUtc = null)
     {
         Token = token;
         FullName = fullName;
         Role = role;
+        ExpiresUtc = expiresUtc;
         IsLoggedIn = true;
         OnChange?.Invoke();
     }
@@ -29,6 +33,7 @@ public class AppState
         Token = null;
         FullName = null;
         Role = null;
+        ExpiresUtc = null;
         IsLoggedIn = false;
         OnChange?.Invoke();
     }
