@@ -18,7 +18,7 @@ const productDescriptions = {
       'Nhiều sữa, ít cà phê: sữa tươi và sữa đặc hòa cùng một chút cà phê phin. Ngọt dịu, béo thơm, dễ uống cho cả người mới làm quen với cà phê.',
   'trà đào cam sả':
       'Trà đen ủ thơm kết hợp đào ngâm giòn ngọt, cam tươi và sả. Thanh mát, chua ngọt hài hòa, thơm nhẹ mùi sả – giải nhiệt tức thì.',
-  'trà sữa':
+  'hồng trà sữa':
       'Hồng trà đậm vị pha cùng sữa theo công thức truyền thống. Thơm béo, ngọt vừa, hợp nhất khi đi kèm trân châu đen dai mềm.',
   'tiramisu':
       'Bánh tiramisu mềm mịn với lớp kem mascarpone béo nhẹ, cốt bánh thấm cà phê espresso và phủ bột cacao – món ngọt hoàn hảo đi kèm cà phê.',
@@ -36,11 +36,21 @@ const productDescriptions = {
       'Espresso pha loãng với nước nóng, giữ trọn hương thơm nhưng nhẹ nhàng hơn. Vị đắng thanh, ít béo – phù hợp cho những ai thích cà phê đen dịu.',
   'trà bưởi':
       'Trà xanh thanh nhẹ hòa cùng tép bưởi hồng mọng nước. Vị chua dịu, đắng nhẹ đặc trưng của bưởi, thơm mát và ít ngọt.',
-  'trà chanh':
-      'Trà đen pha cùng nước cốt chanh tươi và chút mật ong. Chua thanh, ngọt nhẹ, đơn giản mà sảng khoái – món quen của ngày nóng.',
-  'lục trà sữa':
-      'Lục trà (trà xanh) ủ nhẹ hòa cùng sữa béo. Hương trà thanh, hậu vị ngọt dịu; thêm trân châu hoặc thạch để thêm phần thú vị.',
+  'trà sữa trân châu đường đen':
+      'Sữa tươi thanh trùng béo mịn hòa quyện cùng trân châu dẻo dai nấu đường đen thơm lừng. Vị ngọt đậm đà, hấp dẫn khó cưỡng.',
+  'red velvet':
+      'Sự hòa quyện tinh tế giữa cốt bánh bông lan nhung đỏ mềm ẩm và lớp kem phô mai béo ngậy, chua nhẹ. Vị ngọt thanh tao, tan ngay đầu lưỡi cho buổi chiều thư giãn.',
+  'bánh mousse chocolate bạc hà':
+      'Lớp mousse sô-cô-la đen đậm đà hòa quyện cùng kem bạc hà thanh mát, tạo cảm giác bùng nổ đầy sảng khoái. Vị đắng nhẹ xen lẫn hương thơm dịu mát, tan ngay đầu lưỡi.',
+  'bông lan kem tươi':
+      'Cốt bánh bông lan mềm mịn, xốp nhẹ phủ lớp kem tươi béo ngậy nhưng không hề gây ngán. Vị ngọt thanh tao hòa quyện cùng hương sữa thơm dịu cho phút giây thư giãn.',
+  'cà phê cốt dừa':
+      'Sự kết hợp độc đáo giữa cà phê phin đậm đà và cốt dừa xay béo ngậy, mát lạnh. Mang lại hương vị thơm bùi đặc trưng, ngọt dịu hài hòa, đánh thức mọi giác quan.',
+  'bánh cookie':
+      'Bánh quy nướng vàng giòn rụm bên ngoài, mềm ẩm bên trong với những hạt sô-cô-la chip tan chảy đậm đà. Hương bơ thơm lừng hòa quyện vị ngọt dịu, cực kỳ bắt vị khi dùng kèm cà phê.',
 };
+
+
 
 String describe(String tenMon) =>
     productDescriptions[tenMon.trim().toLowerCase()] ?? '';

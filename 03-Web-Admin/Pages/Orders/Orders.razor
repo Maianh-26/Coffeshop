@@ -1066,10 +1066,11 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var line in receipt.ChiTiet ?? [])
+                @* Món đánh số 1, 2, 3… để khách dễ dò; dòng topping / ghi chú không đánh số *@
+                @foreach (var (line, stt) in (receipt.ChiTiet ?? []).Select((l, i) => (l, i + 1)))
                 {
                     <tr class="r-line">
-                        <td>@line.TenMonLuu</td>
+                        <td>@stt. @line.TenMonLuu</td>
                         <td class="r-num">@line.SoLuong</td>
                         <td class="r-num">@Number(line.DonGiaBan)</td>
                         <td class="r-num">@Number(line.DonGiaBan * line.SoLuong)</td>

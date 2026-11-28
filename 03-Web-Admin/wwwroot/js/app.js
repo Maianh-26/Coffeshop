@@ -55,37 +55,42 @@ window.appHelpers = {
             "* { box-sizing: border-box; }" +
             "html { margin: 0; padding: 0; }" +
             "body { margin: 0; width: " + paper + "mm; padding: " + top + "mm " + side + "mm " + bottom + "mm;" +
-            " font: " + base + "px/1.35 Arial, 'Segoe UI', sans-serif; color: #000; overflow-wrap: anywhere;" +
+            " font: " + base + "px/1.5 Arial, 'Segoe UI', sans-serif; color: #000; overflow-wrap: anywhere;" +
             " -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
             ".r-center { text-align: center; }" +
             ".r-right { text-align: right; }" +
-            ".r-head { margin-bottom: 4px; }" +
-            ".r-shop { font-size: " + (base + 4) + "px; font-weight: 700; text-transform: uppercase; }" +
+            ".r-head { margin-bottom: 8px; }" +
+            ".r-shop { font-size: " + (base + 4) + "px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }" +
             ".r-small { font-size: " + (base - 1) + "px; }" +
-            ".r-title { font-size: " + (base + 3) + "px; font-weight: 700; margin-top: 4px; }" +
+            ".r-title { font-size: " + (base + 3) + "px; font-weight: 700; margin-top: 6px; }" +
             "table { width: 100%; border-collapse: collapse; table-layout: fixed; }" +
             "td, th { padding: 1px 0; vertical-align: top; }" +
-            ".r-info { margin: 2px 0 4px; }" +
+            ".r-info { margin: 2px 0 6px; }" +
+            ".r-info td { padding-bottom: 2px; }" +
             (paper === 58 ? ".r-info td { white-space: normal; }" : ".r-info td { white-space: nowrap; }") +
             ".r-items .c-qty { width: " + colQty + "mm; }" +
             ".r-items .c-price { width: " + colPrice + "mm; }" +
             ".r-items .c-total { width: " + colTotal + "mm; }" +
             ".r-items thead th { text-align: left; font-weight: 700; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 3px 0; }" +
+            // Tên hàng cách cột số một khoảng; SL căn giữa, tiền căn phải
+            ".r-items td:first-child, .r-items th:first-child { padding-right: " + (paper === 58 ? 1 : 2) + "mm; }" +
             ".r-items .r-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; padding-left: 2px; }" +
             ".r-items thead th.r-num { text-align: right; }" +
+            ".r-items .r-num:nth-child(2) { text-align: center; padding-left: 0; }" +
             (paper === 58 ? ".r-items .r-num { font-size: " + (base - 1) + "px; }" : "") +
-            ".r-line td { padding-top: 4px; }" +
+            ".r-line td { padding-top: 6px; }" +
+            ".r-topping td { padding-top: 2px; }" +
             ".r-line, .r-topping, .r-note { break-inside: avoid; page-break-inside: avoid; }" +
             ".r-topping td:first-child { padding-left: 8px; }" +
             ".r-topping td { font-size: " + (base - 1) + "px; }" +
-            ".r-note td { padding-left: 8px; font-style: italic; font-size: " + (base - 1) + "px; }" +
-            ".r-sum td { font-weight: 700; border-top: 1px dashed #000; padding-top: 4px; }" +
+            ".r-note td { padding: 2px 0 2px 8px; font-style: italic; font-size: " + (base - 1) + "px; }" +
+            ".r-sum td { font-weight: 700; border-top: 1px dashed #000; padding: 6px 0 4px; }" +
             ".r-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }" +
             ".r-money { white-space: nowrap; font-variant-numeric: tabular-nums; }" +
-            ".r-total { font-size: " + (base + 4) + "px; font-weight: 700; margin-top: 4px; }" +
-            ".r-words { font-style: italic; font-size: " + (base - 1) + "px; margin: 1px 0 3px; }" +
+            ".r-total { font-size: " + (base + 4) + "px; font-weight: 700; margin-top: 6px; }" +
+            ".r-words { font-style: italic; font-size: " + (base - 1) + "px; margin: 2px 0 6px; }" +
             ".r-paid { font-weight: 700; }" +
-            ".r-thanks { margin-top: 8px; padding-top: 5px; border-top: 1px dashed #000; font-style: italic; }";
+            ".r-thanks { margin-top: 10px; padding-top: 6px; border-top: 1px dashed #000; font-style: italic; }";
 
         var frame = document.createElement("iframe");
         frame.setAttribute("aria-hidden", "true");
