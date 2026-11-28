@@ -15,6 +15,10 @@ public class AccountService
         _api = api;
     }
 
+    /// <summary>Tài khoản đang đăng nhập (GET api/v1/auth/toi) — trang Tài khoản dùng để không cho tự xóa / tự đổi vai trò.</summary>
+    public Task<NguoiDung> GetMeAsync(CancellationToken ct = default) =>
+        _api.GetAsync<NguoiDung>("api/v1/auth/toi", ct);
+
     public Task<List<NguoiDung>> GetAllAsync(CancellationToken ct = default) =>
         _api.GetAsync<List<NguoiDung>>("api/v1/nguoi-dung", ct);
 

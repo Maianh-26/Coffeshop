@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject AccountService AccountApi
 @inject AuthenticationService AuthService
+@inject ILogger<Accounts> Logger
 
 <PageTitle>Tài khoản - Coffee Shop</PageTitle>
 
@@ -374,8 +375,19 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var me = await AuthService.GetMyAccountAsync(pageCts.Token);
-        myId = me.Success ? me.Data?.MaNguoiDung : null;
+        try
+        {
+            myId = (await AccountApi.GetMeAsync(pageCts.Token)).MaNguoiDung;
+        }
+        catch (ApiException ex)
+        {
+            // Không biết tài khoản đang đăng nhập: backend vẫn chặn tự xóa / tự hạ quyền (409)
+            Logger.LogWarning("Không tải được tài khoản đang đăng nhập: {Message}", ex.Message);
+        }
+        catch (OperationCanceledException) when (pageCts.IsCancellationRequested)
+        {
+            return;
+        }
 
         await Load();
     }

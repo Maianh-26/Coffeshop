@@ -39,13 +39,6 @@ public class DangNhapResponse
     public NguoiDung NguoiDung { get; set; } = new();
 }
 
-/// <summary>POST api/v1/auth/doi-mat-khau → 204</summary>
-public class DoiMatKhauRequest
-{
-    public string MatKhauCu { get; set; } = "";
-    public string MatKhauMoi { get; set; } = "";
-}
-
 /// <summary>POST api/v1/nguoi-dung (chỉ QuanLy)</summary>
 public class NguoiDungTaoRequest
 {

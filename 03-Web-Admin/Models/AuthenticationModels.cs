@@ -23,15 +23,3 @@ public class LoginResponse
 
     public string? Message { get; set; }
 }
-
-
-/// <summary>
-/// Kết quả gọi API xác thực: thành công kèm dữ liệu, hoặc câu báo lỗi tiếng Việt để hiển thị.
-/// </summary>
-public record AuthResult<T>(bool Success, T? Data, string? Error, string? ErrorCode = null)
-{
-    public static AuthResult<T> Ok(T data) => new(true, data, null);
-
-    public static AuthResult<T> Fail(string error, string? errorCode = null) =>
-        new(false, default, error, errorCode);
-}

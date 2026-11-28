@@ -6,24 +6,21 @@ using CoffeeShop.Admin.Services.Auth;
 namespace CoffeeShop.Admin.Services;
 
 /// <summary>
-/// Service xác thực: đăng nhập (api/v1/auth/dang-nhap), đăng xuất, thông tin tài khoản đang đăng nhập (api/v1/auth/toi).
+/// Service xác thực: đăng nhập (api/v1/auth/dang-nhap), đăng xuất. Tài khoản đang đăng nhập: AccountService.GetMeAsync.
 /// Không có quên mật khẩu: quán chỉ vài tài khoản, chủ quán đặt lại mật khẩu ở trang Tài khoản (Sửa → Mật khẩu mới).
 /// </summary>
 public class AuthenticationService
 {
     private readonly HttpClient _http;
-    private readonly AppState _appState;
     private readonly TokenAuthenticationStateProvider _authState;
     private readonly ILogger<AuthenticationService> _logger;
 
     public AuthenticationService(
         HttpClient http,
-        AppState appState,
         TokenAuthenticationStateProvider authState,
         ILogger<AuthenticationService> logger)
     {
         _http = http;
-        _appState = appState;
         _authState = authState;
         _logger = logger;
     }
@@ -105,63 +102,8 @@ public class AuthenticationService
 
     public Task LogoutAsync() => _authState.SignOutAsync();
 
-    public bool IsLoggedIn => _appState.IsLoggedIn;
-
     private static LoginResponse Failure(string message) =>
         new() { Success = false, Message = message };
-
-    // ------------------------------------------------------------------
-    // Tài khoản đang đăng nhập (trang Tài khoản dùng để không cho tự xóa chính mình)
-    // ------------------------------------------------------------------
-
-    /// <summary>
-    /// Thông tin tài khoản đang đăng nhập (GET api/v1/auth/toi).
-    /// </summary>
-    public async Task<AuthResult<NguoiDung>> GetMyAccountAsync(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var response = await _http.GetAsync("api/v1/auth/toi", cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var account = await response.Content.ReadFromJsonAsync<NguoiDung>(cancellationToken);
-                return account is null
-                    ? AuthResult<NguoiDung>.Fail("Không đọc được thông tin tài khoản.")
-                    : AuthResult<NguoiDung>.Ok(account);
-            }
-
-            var (message, errorCode) = await ReadErrorAsync(response, cancellationToken);
-            return AuthResult<NguoiDung>.Fail(MessageFor("api/v1/auth/toi", (int)response.StatusCode, message), errorCode);
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError(ex, "Không kết nối được máy chủ khi tải tài khoản.");
-            return AuthResult<NguoiDung>.Fail("Không thể kết nối máy chủ. Kiểm tra mạng hoặc máy chủ API.");
-        }
-        catch (JsonException ex)
-        {
-            _logger.LogError(ex, "Phản hồi api/v1/auth/toi không đúng định dạng.");
-            return AuthResult<NguoiDung>.Fail("Không đọc được thông tin tài khoản.");
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            return AuthResult<NguoiDung>.Fail("Máy chủ phản hồi quá lâu. Vui lòng thử lại.");
-        }
-    }
-
-    /// <summary>
-    /// Câu thông báo theo mã trạng thái (dùng chung quy tắc với <see cref="ApiClient.MessageFor"/>).
-    /// </summary>
-    private string MessageFor(string url, int status, string? message)
-    {
-        if (status >= 500)
-        {
-            _logger.LogWarning("{Url} lỗi máy chủ {Status}.", url, status);
-        }
-
-        return ApiClient.MessageFor(status, message);
-    }
 
     /// <summary>
     /// Đọc thông báo lỗi và mã lỗi. Backend: { error: { code, message } }.
