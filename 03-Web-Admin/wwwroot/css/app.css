@@ -2012,7 +2012,14 @@ tfoot td {
     margin-top: 10px;
     border: 1px solid var(--line-strong);
     border-radius: var(--r-sm);
-    overflow: hidden;
+    /* Cuộn ngang trên màn hẹp (trước là hidden → điện thoại không thấy Đơn giá / Thành tiền / nút Bỏ món) */
+    overflow-x: auto;
+}
+
+/* Nút Bỏ món (×): vùng bấm ≥ 44px cho màn cảm ứng */
+.builder-items-table .icon-button {
+    min-width: 44px;
+    min-height: 44px;
 }
 
 .builder-items-table th,
@@ -2362,6 +2369,8 @@ tbody tr {
     border-color: var(--line);
 }
 
+/* .realtime-controls / .live-toggle / .live-indicator: tạm không dùng (nút "Tự cập nhật" đã bỏ 25/11/2026).
+   GIỮ LẠI cho chỉ báo kết nối ở giai đoạn 3 — docs/ke-hoach-dong-bo-thoi-gian-thuc.md mục 6.4.4. */
 .realtime-controls {
     display: flex;
     flex-wrap: wrap;
@@ -2844,15 +2853,7 @@ fieldset.field {
     gap: 4px 18px;
 }
 
-/* Thông báo có nút đóng và danh sách chi tiết (cảnh báo kho, thiếu nguyên liệu) */
-.alert-dismissible {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 14px;
-}
-
+/* Danh sách chi tiết trong thông báo (cảnh báo kho, thiếu nguyên liệu) */
 .alert-list {
     margin: 6px 0 0;
     padding-left: 18px;
@@ -3164,7 +3165,8 @@ fieldset.field {
     border-top: 1px solid var(--line);
 }
 
-/* Tự cập nhật: chấm nhỏ + chữ, không phải nút màu */
+/* Tự cập nhật: chấm nhỏ + chữ, không phải nút màu.
+   Tạm không dùng (nút "Tự cập nhật" đã bỏ 25/11/2026) — GIỮ LẠI cho chỉ báo kết nối ở giai đoạn 3 (docs/ke-hoach-dong-bo-thoi-gian-thuc.md 6.4.4). */
 .live-toggle {
     display: inline-flex;
     align-items: center;
@@ -3188,28 +3190,6 @@ fieldset.field {
         box-shadow: none;
         animation: none;
     }
-
-/* ---- Thông báo: nền trắng, vạch màu bên trái ---- */
-.alert.orders-alert {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 14px;
-    border: 1px solid var(--line);
-    border-left: 4px solid var(--line-strong);
-    background: var(--surface);
-    color: var(--ink);
-}
-
-.alert.orders-alert.success {
-    border-left-color: var(--success);
-}
-
-.alert.orders-alert.error {
-    border-left-color: var(--danger);
-}
 
 .new-order-text {
     display: flex;
@@ -3437,32 +3417,7 @@ fieldset.field {
    ĐƠN HÀNG — chỉnh sau review giao diện lần 2
    ===================================================================== */
 
-/* Thông báo nổi ở góc dưới, không chiếm chỗ trong trang */
-.orders-toasts {
-    position: fixed;
-    right: 16px;
-    bottom: 16px;
-    z-index: 900;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    width: min(440px, calc(100vw - 32px));
-    pointer-events: none;
-}
-
-    .orders-toasts .alert.orders-alert {
-        margin: 0;
-        max-height: 50vh;
-        overflow-y: auto;
-        box-shadow: var(--shadow-md);
-        pointer-events: auto;
-    }
-
-.alert.orders-alert.has-stock-warning {
-    border-left-color: var(--warning);
-}
-
-/* Tự cập nhật: chấm tĩnh, không nhấp nháy */
+/* Tự cập nhật: chấm tĩnh, không nhấp nháy (tạm không dùng — giữ cho giai đoạn 3) */
 .live-toggle .live-indicator {
     background-color: var(--coffee-600);
     box-shadow: none;
@@ -3538,14 +3493,6 @@ fieldset.field {
     }
 }
 
-/* Màn hình rộng: thông báo nổi ở góc dưới bên TRÁI (cạnh thanh menu) để không che nút thao tác trong khung chi tiết */
-@media (min-width: 1001px) {
-    .orders-toasts {
-        right: auto;
-        left: 240px;
-    }
-}
-
 /* =====================================================================
    ĐƠN HÀNG — 4 MÀU TRẠNG THÁI + NÚT THEO VIỆC (theo góp ý chủ dự án)
      vàng     = chờ phục vụ / chưa thu tiền
@@ -3580,10 +3527,16 @@ fieldset.field {
     background: var(--surface-muted);
 }
 
-/* Thông báo đơn mới: đầu trang, nền CAM — màu báo "đơn mới" quen thuộc trên các app bán hàng / giao đồ ăn.
-   Không trùng nghĩa trạng thái nào (vàng = chờ, xanh dương = chuẩn bị, xanh lá = xong, đỏ = hủy). */
-.alert.orders-alert.new-order-alert {
-    margin-bottom: 14px;
+/* Thông báo đơn mới: nền CAM — màu báo "đơn mới" quen thuộc trên các app bán hàng / giao đồ ăn.
+   Không trùng nghĩa trạng thái nào (vàng = chờ, xanh dương = chuẩn bị, xanh lá = xong, đỏ = hủy).
+   Nằm trong trang, ngay dưới tiêu đề "Đơn hàng", trên mục lọc (chủ quán chọn 25/11/2026: dễ thấy nhất, chấp nhận
+   đẩy phần dưới xuống khi hiện). */
+.alert.new-order-alert {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0 0 14px;
     border: 1px solid var(--orange);
     border-left: 5px solid var(--orange);
     background: var(--orange-bg);
@@ -3591,13 +3544,63 @@ fieldset.field {
     font-size: var(--fs-md);
 }
 
-    .alert.orders-alert.new-order-alert .new-order-text {
+    .alert.new-order-alert .new-order-text {
         color: var(--orange);
     }
 
-        .alert.orders-alert.new-order-alert .new-order-text strong {
+        .alert.new-order-alert .new-order-text strong {
             color: var(--ink);
         }
+
+    .alert.new-order-alert .icon-button {
+        min-width: 36px;
+        min-height: 36px;
+    }
+
+/* Màn cảm ứng: nút Xem / × đủ 44px */
+@media (pointer: coarse) {
+    .alert.new-order-alert .btn,
+    .alert.new-order-alert .icon-button {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+/* Điện thoại: chữ gọn "Đơn mới #12, 25.000 đ", khoảng cách nhỏ hơn để chữ + Xem / × vừa một hàng */
+@media (max-width: 480px) {
+    .new-order-extra {
+        display: none;
+    }
+
+    .alert.new-order-alert {
+        gap: 6px;
+        padding: 10px 10px 10px 12px;
+    }
+}
+
+/* Kết quả thao tác: dưới nhóm nút (cách 12px, không thêm khoảng trống cuối khung) */
+.action-result .alert {
+    margin: 12px 0 0;
+}
+
+/* Bản sao ở đầu khung chi tiết — chỉ dùng ở màn ≤1000px khi khung chi tiết nằm dưới danh sách */
+.action-result-detail {
+    display: none;
+}
+
+    .action-result-detail .alert {
+        margin: 0 0 12px;
+    }
+
+@media (max-width: 1000px) {
+    .orders-page.has-detail .action-result-detail {
+        display: block;
+    }
+
+    .orders-page.has-detail .action-result-list {
+        display: none;
+    }
+}
 
 /* Đơn mới chưa xem: cùng màu cam với thông báo */
 .orders-table tr.is-new td:first-child {
@@ -3692,17 +3695,6 @@ fieldset.field {
     background: var(--surface);
     box-shadow: inset 0 0 0 1px var(--coffee-300);
 }
-
-/* [2] Thông báo nổi: chữ dài không đẩy nút × xuống dòng */
-.orders-toasts .alert.orders-alert {
-    flex-wrap: nowrap;
-    align-items: flex-start;
-}
-
-    .orders-toasts .alert.orders-alert > div {
-        flex: 1;
-        min-width: 0;
-    }
 
 /* [3] Viền focus dòng bảng rõ ràng (tô trên các ô, không phụ thuộc outline của <tr>) */
 .orders-table tr.selectable:focus-visible {
@@ -4087,27 +4079,6 @@ fieldset.field {
     }
 }
 
-/* Cảnh báo kho đã thu gọn: 1 dòng bấm được để mở lại danh sách */
-.alert .stock-expand {
-    display: inline-flex;
-    margin-left: 4px;
-    min-height: 32px;
-    font-weight: 700;
-}
-
-/* Tiêu đề danh sách cảnh báo kho khi thông báo phía trên là thông báo khác */
-.alert .stock-heading {
-    display: block;
-    margin-top: 4px;
-    font-size: var(--fs-sm);
-}
-
-@media (max-width: 1000px) {
-    .alert .stock-expand {
-        min-height: 44px;
-    }
-}
-
 /* =========================================================================
    [10] Chọn khoảng ngày (Từ ngày / Đến ngày + Áp dụng): dòng riêng dưới bộ lọc, nhãn rõ ràng
    ========================================================================= */
@@ -4453,4 +4424,58 @@ fieldset.field {
             height: auto;
             white-space: normal;
         }
+}
+
+/* Khuyến mãi: ghi chú "Ngoài giờ vàng lúc này" xuống dòng dưới khung giờ (thay cho trạng thái "Ngoài khung giờ" đã bỏ) */
+.promo-off-hours {
+    display: block;
+    line-height: 1.4;
+}
+
+/* Cảnh báo phiên đăng nhập sắp hết hạn (đầu mọi trang) */
+.alert.session-expiry {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+    .alert.session-expiry .icon {
+        flex: none;
+        margin-top: 3px;
+    }
+
+/* Đơn hàng: nhắc đơn treo (chưa thu tiền từ trước hôm nay) */
+.alert.stale-orders-alert {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px 12px;
+    margin-bottom: 12px;
+}
+
+    .alert.stale-orders-alert > span {
+        flex: 1 1 260px;
+        min-width: 0;
+    }
+
+@media (max-width: 1000px) {
+    .alert.stale-orders-alert .btn {
+        min-height: 44px;
+    }
+}
+
+/* Sửa đơn: ghi chú tổng chính thức do hệ thống tính lại */
+.draft-price-note {
+    margin-top: 6px;
+}
+
+/* Kho: tồn âm (bán vượt tồn) — luôn hiện, kể cả màn hình hẹp */
+.stock-negative {
+    display: block;
+    color: var(--danger);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
 }
