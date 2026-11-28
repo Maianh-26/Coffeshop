@@ -63,7 +63,7 @@
                 return;
             }
 
-            expiresLocal = exp.ToLocalTime();
+            expiresLocal = GioViet.TuUtc(exp);   // giờ Việt Nam, không theo múi giờ của máy
             minutesLeft = left <= WarnBefore ? (int)Math.Ceiling(left.TotalMinutes) : null;
         }
 

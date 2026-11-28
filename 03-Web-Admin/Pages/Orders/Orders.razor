@@ -138,7 +138,7 @@
                             <span>Từ ngày</span>
                             <input type="date"
                                    @bind="customFrom"
-                                   max="@IsoDate(customTo ?? DateTime.Today)"
+                                   max="@IsoDate(customTo ?? GioViet.Today)"
                                    aria-invalid="@(dateError is not null ? "true" : null)"
                                    aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
                         </label>
@@ -148,7 +148,7 @@
                             <input type="date"
                                    @bind="customTo"
                                    min="@(customFrom is { } cf ? IsoDate(cf) : null)"
-                                   max="@IsoDate(DateTime.Today)"
+                                   max="@IsoDate(GioViet.Today)"
                                    aria-invalid="@(dateError is not null ? "true" : null)"
                                    aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
                         </label>
@@ -1422,7 +1422,7 @@
         // để "24 giờ qua" luôn đúng là 24 giờ tính tới lúc này
         if (appliedPreset != DatePresets.Custom)
         {
-            fromDate = DatePresets.From(appliedPreset, DateTime.Now);
+            fromDate = DatePresets.From(appliedPreset, GioViet.Now);
             toDate = null;
         }
 
@@ -1435,9 +1435,9 @@
             // (trang 1 theo thứ tự mặc định "mới nhất trước" mới chứa sẵn các đơn mới nhất)
             string? requestedSort = SortParam;
             // Mốc nhanh (Hôm nay / 24h / 7 / 30 ngày) không có mốc cuối → trang 1 "mới nhất trước" vẫn chứa các đơn mới nhất.
-            // Trừ "Hôm nay" trong 30 phút đầu ngày: mốc 00:00 tính theo đồng hồ máy khách, lệch giờ với máy chủ
-            // có thể làm đơn vừa tạo (còn mang ngày hôm qua theo giờ máy chủ) nằm ngoài danh sách → dò riêng cho chắc.
-            DateTime clock = DateTime.Now;
+            // Trừ "Hôm nay" trong 30 phút đầu ngày: mốc 00:00 (giờ Việt Nam) tính trên đồng hồ máy khách, có thể lệch vài phút với máy chủ,
+            // làm đơn vừa tạo (còn mang ngày hôm qua theo giờ máy chủ) nằm ngoài danh sách → dò riêng cho chắc.
+            DateTime clock = GioViet.Now;
             bool openEndedPreset = appliedPreset != DatePresets.Custom
                                    && !(appliedPreset == DatePresets.Today && clock.TimeOfDay < TimeSpan.FromMinutes(30));
             bool unfilteredFirstPage = page == 1 && statusFilter == "" && paymentFilter == ""
@@ -1589,8 +1589,8 @@
         if (datePreset == DatePresets.Custom)
         {
             // Mở 2 ô Từ / Đến, điền sẵn khoảng đang lọc (hoặc hôm nay). Chưa lọc cho tới khi bấm Áp dụng.
-            customFrom = (fromDate ?? DateTime.Today).Date;
-            customTo = (toDate ?? DateTime.Today).Date;
+            customFrom = (fromDate ?? GioViet.Today).Date;
+            customTo = (toDate ?? GioViet.Today).Date;
             return;
         }
 
@@ -1834,7 +1834,7 @@
     /// <summary>Đang xem đúng danh sách đơn treo (đã bấm "Xem các đơn này") → không hiện lại thông báo.</summary>
     private bool ViewingStalePending =>
         paymentFilter == TrangThaiDon.Pending && appliedPreset == DatePresets.Custom
-        && toDate is { } to && to.Date < DateTime.Today;
+        && toDate is { } to && to.Date < GioViet.Today;
 
     /// <summary>
     /// Đếm đơn PENDING tạo trước 00:00 hôm nay (1 request, lấy kèm đơn cũ nhất). Hỏi tối đa mỗi <see cref="StaleCheckEvery"/>;
@@ -1848,7 +1848,7 @@
         {
             var result = await OrderApi.GetPageAsync(1, 1,
                 trangThai: TrangThaiDon.Pending,
-                denNgay: DateTime.Today.AddDays(-1),
+                denNgay: GioViet.Today.AddDays(-1),
                 sapXep: SortKeys.Id,   // cũ nhất trước
                 ct: ct);
 
@@ -1867,7 +1867,7 @@
     {
         if (stalePendingOldest is not { } oldest) return;
 
-        DateTime yesterday = DateTime.Today.AddDays(-1);
+        DateTime yesterday = GioViet.Today.AddDays(-1);
         DateTime from = oldest.Date <= yesterday ? oldest.Date : yesterday;
 
         search = "";

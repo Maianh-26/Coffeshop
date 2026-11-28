@@ -62,7 +62,7 @@ sqlcmd -S . -E -C -d QuanCaPheDB_KiemThu -W -Q "SELECT TrangThaiThanhToan, Trang
 Doanh thu hôm nay theo SQL (so với thẻ "Doanh thu thuần" trên Tổng quan):
 
 ```powershell
-sqlcmd -S . -E -C -d QuanCaPheDB_KiemThu -W -Q "SELECT COUNT(*) AS SoDon, SUM(TongTien) AS DoanhThu FROM DonHang WHERE TrangThaiThanhToan = 'PAID' AND ThoiGianThanhToan >= CAST(GETDATE() AS date)"
+sqlcmd -S . -E -C -d QuanCaPheDB_KiemThu -W -Q "SELECT COUNT(*) AS SoDon, SUM(TongTien) AS DoanhThu FROM DonHang WHERE TrangThaiThanhToan = 'PAID' AND ThoiGianThanhToan >= CAST(DATEADD(HOUR, 7, SYSUTCDATETIME()) AS date)"
 ```
 
 > Việc 3.4 (đối soát tồn kho với lịch sử kho) và 6.4 (đối soát báo cáo) của kế hoạch sẽ thêm câu SQL đối soát đầy đủ vào mục này.

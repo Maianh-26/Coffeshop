@@ -61,7 +61,7 @@ public static class DatePresets
         if (end < start) return "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.";
 
         // Ô ngày có max nhưng vẫn gõ tay được ngày vượt mốc (form dùng novalidate) → kiểm tra lại cả 2 đầu
-        if (start > DateTime.Today || end > DateTime.Today) return "Không chọn ngày trong tương lai.";
+        if (start > GioViet.Today || end > GioViet.Today) return "Không chọn ngày trong tương lai.";
 
         return null;
     }

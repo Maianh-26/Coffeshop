@@ -40,7 +40,7 @@
                 <span>Từ ngày</span>
                 <input type="date"
                        @bind="customFrom"
-                       max="@DatePresets.IsoDate(customTo ?? DateTime.Today)"
+                       max="@DatePresets.IsoDate(customTo ?? GioViet.Today)"
                        aria-invalid="@(dateError is not null ? "true" : null)"
                        aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
             </label>
@@ -50,7 +50,7 @@
                 <input type="date"
                        @bind="customTo"
                        min="@(customFrom is { } cf ? DatePresets.IsoDate(cf) : null)"
-                       max="@DatePresets.IsoDate(DateTime.Today)"
+                       max="@DatePresets.IsoDate(GioViet.Today)"
                        aria-invalid="@(dateError is not null ? "true" : null)"
                        aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
             </label>

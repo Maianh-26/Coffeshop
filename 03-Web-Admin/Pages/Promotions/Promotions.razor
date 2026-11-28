@@ -357,7 +357,7 @@
     private const string SortEnd = "end";
 
     /// <summary>Mốc thời gian để tính trạng thái (đặt lại mỗi lần tải danh sách).</summary>
-    private DateTime now = DateTime.Now;
+    private DateTime now = GioViet.Now;
     private int? selected;
     private int page = 1;
     private const int PageSize = 10;
@@ -426,7 +426,7 @@
         try
         {
             promotions = await PromotionApi.GetAllAsync(pageCts.Token);
-            now = DateTime.Now;
+            now = GioViet.Now;
             page = Math.Clamp(page, 1, Pages);
         }
         catch (ApiException ex)
@@ -522,7 +522,7 @@
         editing = false;
         error = null;
         message = null;
-        model = new KhuyenMaiForm { NgayBatDau = DateTime.Today, NgayKetThuc = DateTime.Today.AddDays(7) };
+        model = new KhuyenMaiForm { NgayBatDau = GioViet.Today, NgayKetThuc = GioViet.Today.AddDays(7) };
         dialog = "form";
         await LoadProducts();
     }

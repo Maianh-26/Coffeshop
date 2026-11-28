@@ -85,7 +85,7 @@
                                 <span>Từ ngày</span>
                                 <input type="date"
                                        @bind="customFrom"
-                                       max="@DatePresets.IsoDate(customTo ?? DateTime.Today)"
+                                       max="@DatePresets.IsoDate(customTo ?? GioViet.Today)"
                                        aria-invalid="@(dateError is not null ? "true" : null)"
                                        aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
                             </label>
@@ -95,7 +95,7 @@
                                 <input type="date"
                                        @bind="customTo"
                                        min="@(customFrom is { } cf ? DatePresets.IsoDate(cf) : null)"
-                                       max="@DatePresets.IsoDate(DateTime.Today)"
+                                       max="@DatePresets.IsoDate(GioViet.Today)"
                                        aria-invalid="@(dateError is not null ? "true" : null)"
                                        aria-describedby="@(dateError is not null ? "date-range-help" : null)" />
                             </label>
@@ -778,7 +778,7 @@
         // Mốc nhanh tính lại theo thời điểm hiện tại mỗi lần tải (khoảng trượt), giống trang Đơn hàng
         if (appliedPreset != DatePresets.Custom)
         {
-            fromDate = DatePresets.From(appliedPreset, DateTime.Now);
+            fromDate = DatePresets.From(appliedPreset, GioViet.Now);
             toDate = null;
         }
 
@@ -904,8 +904,8 @@
         if (datePreset == DatePresets.Custom)
         {
             // Mở 2 ô Từ / Đến, điền sẵn khoảng đang lọc (hoặc hôm nay). Chưa lọc cho tới khi bấm Áp dụng.
-            customFrom = (fromDate ?? DateTime.Today).Date;
-            customTo = (toDate ?? DateTime.Today).Date;
+            customFrom = (fromDate ?? GioViet.Today).Date;
+            customTo = (toDate ?? GioViet.Today).Date;
             return;
         }
 

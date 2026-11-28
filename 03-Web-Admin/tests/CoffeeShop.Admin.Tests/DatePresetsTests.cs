@@ -35,7 +35,7 @@ public class DatePresetsTests
     [Fact]
     public void ValidateCustom_ChiChonMotNgay_LocDungNgayDo()
     {
-        var day = DateTime.Today.AddDays(-8).AddHours(9);   // luôn là ngày quá khứ
+        var day = GioViet.Today.AddDays(-8).AddHours(9);   // luôn là ngày quá khứ
 
         string? error = DatePresets.ValidateCustom(day, null, out var start, out var end);
 
@@ -47,7 +47,7 @@ public class DatePresetsTests
     [Fact]
     public void ValidateCustom_BaoLoi_KhiNgayKetThucTruocNgayBatDau()
     {
-        string? error = DatePresets.ValidateCustom(DateTime.Today.AddDays(-2), DateTime.Today.AddDays(-3), out _, out _);
+        string? error = DatePresets.ValidateCustom(GioViet.Today.AddDays(-2), GioViet.Today.AddDays(-3), out _, out _);
 
         Assert.Equal("Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.", error);
     }
@@ -61,8 +61,8 @@ public class DatePresetsTests
     [Fact]
     public void ValidateCustom_BaoLoi_KhiChonNgayTuongLai()
     {
-        var nextYear = DateTime.Today.AddYears(1);
+        var nextYear = GioViet.Today.AddYears(1);
 
-        Assert.Equal("Không chọn ngày trong tương lai.", DatePresets.ValidateCustom(DateTime.Today, nextYear, out _, out _));
+        Assert.Equal("Không chọn ngày trong tương lai.", DatePresets.ValidateCustom(GioViet.Today, nextYear, out _, out _));
     }
 }

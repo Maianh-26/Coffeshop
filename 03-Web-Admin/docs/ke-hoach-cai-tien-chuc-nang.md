@@ -118,7 +118,7 @@ Tiêu chí: **code đơn giản, dễ hiểu, logic rõ, không có code rác.**
 
 | Thứ tự | Module | Phụ thuộc | Cỡ | Trạng thái | Commit cuối / PR |
 |---|---|---|---|---|---|
-| 0 | Nền tảng: dọn việc dở, test, chốt câu hỏi, múi giờ | — | M | CHƯA LÀM | |
+| 0 | Nền tảng: dọn việc dở, test, chốt câu hỏi, múi giờ | — | M | XONG (28/11) | commit cuối: xem `git log` "Mã việc: 0.5" |
 | 1 | Đăng nhập & Tài khoản | 0 | S | CHƯA LÀM | |
 | 2 | Thực đơn: Món · Danh mục · Topping · Công thức | 0 | M | CHƯA LÀM | |
 | 3 | Kho nguyên liệu | 2 | S | CHƯA LÀM | |
@@ -163,7 +163,7 @@ Thực đơn ──► Kho ──┐
 | 0.2 | Tạo project `CoffeeShop.Admin.Tests` cho logic thuần đang có: `DatePresets`, `SearchText`, `ColumnSort`, `DocSoTien`, `TokenClaims`, các lớp trạng thái, `XlsxWriter` | Web | Xong 28/11: `tests/CoffeeShop.Admin.Tests`, 84 test, `f17a565` |
 | 0.3 | Viết **kịch bản khói** (mục 11) + script SQL **dữ liệu mẫu** cố định (món, topping, công thức, nguyên liệu, khuyến mãi, ~30 đơn đủ trạng thái), chạy trên DB bản sao | Web | Xong 28/11: `tests/du-lieu-mau/*.ps1` + `docs/kiem-thu/kich-ban-khoi.md` (đã chạy: 30 đơn đúng 8 nhóm) |
 | 0.4 | Hỏi chủ quán **một lần** các câu ở 4.1, ghi câu trả lời vào bảng | Chủ quán | Xong 28/11 (mục 4.1); còn P1–P3 ở mục 4.2 — cần trước Module 2, 4, 5 |
-| 0.5 | **Múi giờ (B6):** backend cố định giờ Việt Nam cho mọi mốc thời gian (`DateTime.Now`, `GETDATE()`), ghi rõ vào `openapi.yaml`; web gửi / đọc giờ theo cùng quy ước | API + Web | Sửa lỗi nền: "Hôm nay", hạn khuyến mãi, báo cáo đều phụ thuộc |
+| 0.5 | **Múi giờ (B6):** backend cố định giờ Việt Nam cho mọi mốc thời gian (`DateTime.Now`, `GETDATE()`), ghi rõ vào `openapi.yaml`; web gửi / đọc giờ theo cùng quy ước | API + Web | Xong 28/11: `deb753a` (api) + commit web kế tiếp — `GioViet` hai phía, script `GioVietNam_20261128.sql` |
 | 0.6 | Sửa 3 chỗ lỗi thời trong `CLAUDE.md` web (mục 5 của `tien-do-quan-ly-don-hang.md`) | Web | Xong 28/11 |
 
 ### 4.1. Câu hỏi cần chủ quán chốt (chỉ hỏi về luật của chức năng đang có)
