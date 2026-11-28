@@ -160,8 +160,8 @@ Thực đơn ──► Kho ──┐
 | Mã | Việc | Phía | Ghi chú |
 |---|---|---|---|
 | 0.1 | Rà ~30 file đang thay đổi chưa commit, build, chạy thử, **commit theo từng nhóm ý nghĩa** (phiên đăng nhập, Excel, tài liệu…) theo mẫu 1.6 | Web | Xong 28/11: 9 commit `aeb7bbe`…`e8c4a44` + gộp phần `main` đã qua PR (`788bc8d`). 5 commit "cap nhat" của `main` chưa gộp — xem Sổ việc phát sinh |
-| 0.2 | Tạo project `CoffeeShop.Admin.Tests` cho logic thuần đang có: `DatePresets`, `SearchText`, `ColumnSort`, `DocSoTien`, `TokenClaims`, các lớp trạng thái, `XlsxWriter` | Web | Skill `dotnet-test:*`. Đây là công cụ kiểm thử, không phải chức năng cho người dùng |
-| 0.3 | Viết **kịch bản khói** (mục 11) + script SQL **dữ liệu mẫu** cố định (món, topping, công thức, nguyên liệu, khuyến mãi, ~30 đơn đủ trạng thái), chạy trên DB bản sao | Web | Không đụng `QuanCaPheDB` thật |
+| 0.2 | Tạo project `CoffeeShop.Admin.Tests` cho logic thuần đang có: `DatePresets`, `SearchText`, `ColumnSort`, `DocSoTien`, `TokenClaims`, các lớp trạng thái, `XlsxWriter` | Web | Xong 28/11: `tests/CoffeeShop.Admin.Tests`, 84 test, `f17a565` |
+| 0.3 | Viết **kịch bản khói** (mục 11) + script SQL **dữ liệu mẫu** cố định (món, topping, công thức, nguyên liệu, khuyến mãi, ~30 đơn đủ trạng thái), chạy trên DB bản sao | Web | Xong 28/11: `tests/du-lieu-mau/*.ps1` + `docs/kiem-thu/kich-ban-khoi.md` (đã chạy: 30 đơn đúng 8 nhóm) |
 | 0.4 | Hỏi chủ quán **một lần** các câu ở 4.1, ghi câu trả lời vào bảng | Chủ quán | Xong 28/11 (mục 4.1); còn P1–P3 ở mục 4.2 — cần trước Module 2, 4, 5 |
 | 0.5 | **Múi giờ (B6):** backend cố định giờ Việt Nam cho mọi mốc thời gian (`DateTime.Now`, `GETDATE()`), ghi rõ vào `openapi.yaml`; web gửi / đọc giờ theo cùng quy ước | API + Web | Sửa lỗi nền: "Hôm nay", hạn khuyến mãi, báo cáo đều phụ thuộc |
 | 0.6 | Sửa 3 chỗ lỗi thời trong `CLAUDE.md` web (mục 5 của `tien-do-quan-ly-don-hang.md`) | Web | Xong 28/11 |
@@ -354,9 +354,11 @@ Làm **đúng thứ tự 5A → 5D**.
 
 ### Kịch bản khói (chạy sau mỗi module, ~10 phút)
 
+Bản chạy được (kèm cách tạo CSDL kiểm thử và 30 đơn mẫu): **`docs/kiem-thu/kich-ban-khoi.md`**. Tóm tắt:
+
 1. Đăng nhập Quản lý → đủ 6 mục menu; Nhân viên → chỉ Đơn hàng.
 2. Thêm 1 món có công thức → hiện trong hộp tạo đơn tại quầy, đúng giá (kể cả khuyến mãi).
-3. Tạo đơn → gán số nhận món → Đang chuẩn bị → Đã phục vụ → Thu tiền mặt → xem trước hóa đơn.
+3. Tạo đơn → gán số nhận món → Đang chuẩn bị → Thu tiền mặt → Đã phục vụ → xem trước hóa đơn (thu tiền trước khi phục vụ — luật Q5).
 4. Tạo đơn thứ 2 → hủy kèm lý do.
 5. Kho: nguyên liệu của món bước 2 giảm đúng định mức; đối soát SQL kho khớp.
 6. Tổng quan "Hôm nay": doanh thu = tổng đơn bước 3; xuất Excel mở được.

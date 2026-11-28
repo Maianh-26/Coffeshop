@@ -33,7 +33,7 @@ dotnet watch                     # hot reload
 dotnet publish -c Release        # static output for deployment
 ```
 
-There is no test project in this repo and no linter configured.
+Tests: `tests/CoffeeShop.Admin.Tests` (xUnit, net8.0) covers the pure logic (`Utilities/`, status classes in `Models/`, `TokenClaims`); run `dotnet test CoffeeShop.Admin.sln`. The folder is excluded from the web app via `DefaultItemExcludes` in `CoffeeShop.Admin.csproj`. Sample data for manual testing: `tests/du-lieu-mau/` (separate DB `QuanCaPheDB_KiemThu`, see `docs/kiem-thu/kich-ban-khoi.md`). No linter is configured. The folder has both `.sln` and `.csproj`, so name the file in build/publish commands (`dotnet build CoffeeShop.Admin.sln`, `dotnet publish CoffeeShop.Admin.csproj -c Release`).
 
 To verify UI changes visually: start `dotnet run` in the background, then use the Playwright MCP tools (plugin `playwright`, uses the installed Chrome) to open `http://localhost:5101`, log in (`quanly` / `QuanLy@123`, against the running backend), take screenshots (also at phone/tablet widths) and read the browser console — Blazor WASM runtime errors only show there, not in `dotnet build`.
 
