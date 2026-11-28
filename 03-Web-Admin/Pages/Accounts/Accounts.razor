@@ -211,8 +211,11 @@
 
                     <div class="field">
                         <label for="a-role">Vai trò</label>
+                        @* Không cho tự đổi vai trò của chính mình (backend cũng chặn: 409) — tránh tự mất quyền quản lý *@
                         <InputSelect id="a-role"
-                                     @bind-Value="model.VaiTro">
+                                     @bind-Value="model.VaiTro"
+                                     disabled="@editingSelf"
+                                     title="@(editingSelf ? "Không thể đổi vai trò của tài khoản đang đăng nhập" : null)">
                             <option value="@Roles.Staff">@Roles.Label(Roles.Staff)</option>
                             <option value="@Roles.Admin">@Roles.Label(Roles.Admin)</option>
                         </InputSelect>
@@ -235,6 +238,7 @@
                                    type="password"
                                    @bind-Value="model.MatKhau"
                                    placeholder="@(editing ? "Để trống nếu giữ mật khẩu cũ" : "Tối thiểu 6 ký tự")"
+                                   title="@(editingSelf ? "Đổi mật khẩu của chính mình: lưu xong phải đăng nhập lại" : null)"
                                    autocomplete="new-password" />
                         <ValidationMessage For="@(() => model.MatKhau)" />
                     </div>
@@ -309,6 +313,7 @@
     private string dialog = "";
     private bool editing;
     private bool editingLocked;   // đang sửa tài khoản bị khóa → hiện ô Trạng thái để mở khóa
+    private bool editingSelf;     // đang sửa tài khoản đang đăng nhập → khóa ô Vai trò
     private bool loading;
     private bool saving;
     private string? error;
@@ -464,6 +469,7 @@
     {
         editing = false;
         editingLocked = false;
+        editingSelf = false;
         error = null;
         message = null;
         model = new NguoiDungForm { VaiTro = Roles.Staff, IsNew = true };
@@ -486,6 +492,7 @@
             TrangThai = source.TrangThai
         };
         editingLocked = !source.TrangThai;
+        editingSelf = IsMe(source);
         dialog = "form";
     }
 
@@ -528,11 +535,19 @@
                 saved = await AccountApi.UpdateAsync(model.MaNguoiDung, new NguoiDungCapNhatRequest
                 {
                     HoTen = model.HoTen.Trim(),
-                    VaiTro = model.VaiTro,
+                    VaiTro = editingSelf ? null : model.VaiTro,   // không tự đổi vai trò (null = giữ nguyên)
                     MatKhauMoi = string.IsNullOrEmpty(model.MatKhau) ? null : model.MatKhau,
                     // Chỉ gửi khi mở khóa tài khoản đang bị khóa (web không khóa tài khoản: dùng Xóa)
                     TrangThai = editingLocked && model.TrangThai ? true : null
                 }, pageCts.Token);
+
+                // Đổi mật khẩu của chính mình → token đang dùng hết hiệu lực ngay (backend): đăng xuất gọn
+                // thay vì để lần tải danh sách kế tiếp bị 401 rồi bị đẩy ra giữa chừng
+                if (editingSelf && !string.IsNullOrEmpty(model.MatKhau))
+                {
+                    await AuthService.LogoutAsync();
+                    return;
+                }
 
                 message = $"Đã cập nhật tài khoản {saved.HoTen}.";
             }
