@@ -12,7 +12,7 @@
             aria-label="Khoảng thời gian báo cáo"
             @bind="datePreset"
             @bind:after="OnDatePresetChanged">
-        @foreach (var p in DatePresets.ReportOptions)
+        @foreach (var p in DatePresets.Options)
         {
             <option value="@p">@DatePresets.Label(p)</option>
         }

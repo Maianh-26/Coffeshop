@@ -12,7 +12,7 @@ namespace CoffeeShop.Admin.Pages.Dashboard;
 /// Tổng quan cho chủ quán: doanh thu thuần (api/v1/bao-cao/doanh-thu), món bán chạy (mon-ban-chay),
 /// doanh thu theo giờ (gio-cao-diem — khi xem hôm nay, 24 giờ qua hoặc một ngày).
 /// Topping bán chạy (topping-ban-chay) không hiện trên trang, chỉ có trong file Excel.
-/// Bộ lọc thời gian: Utilities/DatePresets.ReportOptions, mặc định "Hôm nay".
+/// Bộ lọc thời gian: Utilities/DatePresets.Options, mặc định "Hôm nay" (dùng chung với Đơn hàng, Lịch sử kho).
 /// </summary>
 public partial class Dashboard : IDisposable
 {
@@ -29,7 +29,7 @@ public partial class Dashboard : IDisposable
     private CancellationTokenSource? loadCts;   // lượt tải đang chạy; đổi bộ lọc giữa chừng thì hủy lượt cũ
 
     /// <summary>Mở trang / bấm Làm mới khi đang lọc → về hôm nay.</summary>
-    private const string DefaultPreset = DatePresets.Today;
+    private const string DefaultPreset = DatePresets.Default;
 
     /// <summary>Số món / topping lấy cho file Excel (tối đa backend cho phép); trang chỉ hiện top 5 món.</summary>
     private const int ExportTop = 50;

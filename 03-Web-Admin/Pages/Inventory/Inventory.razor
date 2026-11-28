@@ -66,7 +66,7 @@
 
                 @if (transactionTab)
                 {
-                    @* Thời gian: mốc nhanh (áp dụng ngay) hoặc "Chọn khoảng ngày…" (chỉ lọc khi bấm Áp dụng) — giống trang Đơn hàng *@
+                    @* Thời gian (mặc định Hôm nay): mốc nhanh (áp dụng ngay) hoặc "Chọn khoảng ngày…" (chỉ lọc khi bấm Áp dụng) — giống trang Tổng quan / Đơn hàng *@
                     <select class="date-preset"
                             aria-label="Lọc theo thời gian giao dịch"
                             @bind="datePreset"
@@ -171,9 +171,17 @@
                         ? $"Đang xem giao dịch ngày {rangeFrom:dd/MM/yyyy}"
                         : $"Đang xem giao dịch từ {rangeFrom:dd/MM/yyyy} đến hết {rangeTo:dd/MM/yyyy}")
                 }
+                else if (appliedPreset == DatePresets.Last24h)
+                {
+                    @($"Đang xem giao dịch từ {rangeFrom:HH:mm dd/MM/yyyy} đến nay (trong 24 giờ qua)")
+                }
+                else if (appliedPreset == DatePresets.Today)
+                {
+                    @($"Đang xem giao dịch hôm nay ({rangeFrom:dd/MM/yyyy})")
+                }
                 else
                 {
-                    @($"Đang xem giao dịch từ {rangeFrom:HH:mm dd/MM/yyyy} đến nay ({DatePresets.Label(appliedPreset).ToLowerInvariant()})")
+                    @($"Đang xem giao dịch từ {rangeFrom:dd/MM/yyyy} đến nay ({DatePresets.Label(appliedPreset).ToLowerInvariant()})")
                 }
             </p>
         }
@@ -626,8 +634,8 @@
     // Bộ lọc tab Lịch sử kho (lọc ở máy chủ, có phân trang)
     private int historyIngredient;
     private string historyType = "";
-    private string datePreset = DatePresets.All;      // lựa chọn đang hiện trong ô chọn
-    private string appliedPreset = DatePresets.All;   // lựa chọn ĐANG ÁP DỤNG (Custom chỉ có hiệu lực sau khi bấm Áp dụng)
+    private string datePreset = DatePresets.Default;      // lựa chọn đang hiện trong ô chọn (mặc định Hôm nay)
+    private string appliedPreset = DatePresets.Default;   // lựa chọn ĐANG ÁP DỤNG (Custom chỉ có hiệu lực sau khi bấm Áp dụng)
     private DateTime? fromDate;     // mốc đang lọc (tính lại mỗi lần tải với mốc nhanh)
     private DateTime? toDate;       // chỉ có với khoảng ngày tự chọn
     private DateTime? customFrom;
@@ -680,14 +688,14 @@
     // ---------------------------------------------------------------- Bộ lọc
 
     private int ActiveFilterCount => transactionTab
-        ? (appliedPreset != DatePresets.All ? 1 : 0) + (historyIngredient > 0 ? 1 : 0) + (historyType != "" ? 1 : 0)
+        ? (appliedPreset != DatePresets.Default ? 1 : 0) + (historyIngredient > 0 ? 1 : 0) + (historyType != "" ? 1 : 0)
         : (usageFilter != LocSuDung.TatCa ? 1 : 0) + (stockFilter != "" ? 1 : 0);
 
     // Đang lọc / tìm khác mặc định → nút Làm mới có chấm báo (bấm sẽ đưa về mặc định)
     private bool FiltersActive => ActiveFilterCount > 0 || (!transactionTab && (search.Trim() != "" || sort.Active));
 
     private string RefreshTitle => transactionTab
-        ? (FiltersActive ? "Làm mới và bỏ lọc, xem toàn bộ lịch sử kho" : "Làm mới lịch sử kho")
+        ? (FiltersActive ? "Làm mới và bỏ lọc, xem lịch sử kho hôm nay" : "Làm mới lịch sử kho")
         : (FiltersActive ? "Làm mới và bỏ lọc, xem toàn bộ nguyên liệu" : "Làm mới danh sách nguyên liệu");
 
     private IEnumerable<NguyenLieu> FilteredIngredients
@@ -732,7 +740,7 @@
     private string EmptyText =>
         loading ? "Đang tải dữ liệu…"
         : FiltersActive ? (transactionTab ? "Không có giao dịch khớp bộ lọc." : "Không có nguyên liệu khớp bộ lọc.")
-        : transactionTab ? "Chưa có giao dịch kho." : "Chưa có nguyên liệu.";
+        : transactionTab ? "Hôm nay chưa có giao dịch kho." : "Chưa có nguyên liệu.";
 
     // ---------------------------------------------------------------- Tải dữ liệu
 
@@ -938,8 +946,8 @@
         {
             historyIngredient = 0;
             historyType = "";
-            datePreset = DatePresets.All;
-            appliedPreset = DatePresets.All;
+            datePreset = DatePresets.Default;
+            appliedPreset = DatePresets.Default;
             fromDate = null;
             toDate = null;
             customFrom = null;
