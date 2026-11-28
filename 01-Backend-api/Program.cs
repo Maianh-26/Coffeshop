@@ -57,15 +57,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             // Một truy vấn khóa chính mỗi request có token; endpoint ẩn danh (tablet đặt món) không bị chặn.
             OnTokenValidated = async ctx =>
             {
+                // Token chỉ còn hiệu lực khi tài khoản chưa xóa, chưa khóa, giữ nguyên vai trò và chưa đổi mật khẩu
                 var maNguoiDung = ctx.Principal?.MaNguoiDung();
                 var vaiTro = ctx.Principal?.FindFirst("role")?.Value;
+                var dauVan = ctx.Principal?.FindFirst(Passwords.ClaimDauVan)?.Value;
                 var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
-                var conHieuLuc = maNguoiDung is { } id && vaiTro is not null && await db.NguoiDungs.AsNoTracking()
-                    .AnyAsync(u => u.MaNguoiDung == id && u.TrangThai && !u.DaXoa && u.VaiTro == vaiTro);
+                var matKhau = maNguoiDung is { } id && vaiTro is not null && dauVan is not null
+                    ? await db.NguoiDungs.AsNoTracking()
+                        .Where(u => u.MaNguoiDung == id && u.TrangThai && !u.DaXoa && u.VaiTro == vaiTro)
+                        .Select(u => u.MatKhau).FirstOrDefaultAsync()
+                    : null;
+                var conHieuLuc = matKhau is not null && Passwords.DauVan(matKhau) == dauVan;
                 if (!conHieuLuc)
                 {
                     ctx.HttpContext.Items[PhienHetHieuLuc] = true;
-                    ctx.Fail("Tài khoản đã bị xóa, bị khóa hoặc đổi vai trò");
+                    ctx.Fail("Tài khoản đã bị xóa, bị khóa, đổi vai trò hoặc đổi mật khẩu");
                 }
             },
             OnChallenge = ctx =>
@@ -73,7 +79,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 ctx.HandleResponse();
                 return ErrorHandlingMiddleware.Write(ctx.HttpContext, 401, "UNAUTHORIZED",
                     ctx.HttpContext.Items.ContainsKey(PhienHetHieuLuc)
-                        ? "Phiên đăng nhập không còn hiệu lực (tài khoản đã bị xóa, bị khóa hoặc đổi vai trò). Vui lòng đăng nhập lại."
+                        ? "Phiên đăng nhập không còn hiệu lực (tài khoản đã bị xóa, bị khóa, đổi vai trò hoặc đổi mật khẩu). Vui lòng đăng nhập lại."
                         : "Chưa đăng nhập hoặc token không hợp lệ");
             },
             OnForbidden = ctx =>

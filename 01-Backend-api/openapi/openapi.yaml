@@ -72,6 +72,7 @@ paths:
     post:
       tags: [Xác thực]
       summary: Đổi mật khẩu của chính mình
+      description: Đổi xong thì token đang dùng hết hiệu lực ngay (claim dấu vân mật khẩu không còn khớp) — phải đăng nhập lại.
       requestBody:
         required: true
         content:
@@ -146,7 +147,7 @@ paths:
       tags: [Người dùng]
       summary: Sửa thông tin / đổi vai trò / khóa tài khoản / đặt lại mật khẩu (tài khoản đã xóa → 404)
       description: |
-        Đổi vai trò hoặc khóa tài khoản: token đang dùng của tài khoản đó bị 401 ngay ở request kế tiếp
+        Đổi vai trò, khóa tài khoản hoặc đặt lại mật khẩu (matKhauMoi): token đang dùng của tài khoản đó bị 401 ngay ở request kế tiếp
         (phải đăng nhập lại để nhận quyền mới).
       requestBody:
         required: true
@@ -971,7 +972,7 @@ components:
 
   responses:
     BadRequest: { description: Dữ liệu không hợp lệ (VALIDATION_ERROR / BAD_REQUEST), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-    Unauthorized: { description: 'Chưa đăng nhập / token sai / hết hạn, hoặc tài khoản của token đã bị xóa, bị khóa hay đổi vai trò (phải đăng nhập lại)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthorized: { description: 'Chưa đăng nhập / token sai / hết hạn, hoặc tài khoản của token đã bị xóa, bị khóa, đổi vai trò hay đổi / đặt lại mật khẩu (phải đăng nhập lại)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Forbidden: { description: Không đủ quyền, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     NotFound: { description: Không tìm thấy, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Conflict: { description: Xung đột trạng thái / trùng dữ liệu, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }

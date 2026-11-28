@@ -56,7 +56,7 @@ public class NguoiDungController(AppDbContext db) : ControllerBase
 
     /// <summary>
     /// Sửa thông tin, đổi vai trò, khóa/mở khóa (trangThai), đặt lại mật khẩu.
-    /// Đổi vai trò / khóa → token đang dùng của tài khoản đó bị 401 ngay (kiểm tra trong Program.cs OnTokenValidated).
+    /// Đổi vai trò / khóa / đặt lại mật khẩu → token đang dùng của tài khoản đó bị 401 ngay (Program.cs OnTokenValidated).
     /// </summary>
     [HttpPatch("{id:int}")]
     public async Task<NguoiDungDto> CapNhat(int id, NguoiDungCapNhatRequest req)
