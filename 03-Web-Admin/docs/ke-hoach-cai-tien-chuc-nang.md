@@ -118,8 +118,8 @@ Tiêu chí: **code đơn giản, dễ hiểu, logic rõ, không có code rác.**
 
 | Thứ tự | Module | Phụ thuộc | Cỡ | Trạng thái | Commit cuối / PR |
 |---|---|---|---|---|---|
-| 0 | Nền tảng: dọn việc dở, test, chốt câu hỏi, múi giờ | — | M | XONG việc 0.1–0.6 (28/11); **chưa đóng**: chưa chạy kịch bản khói trên giao diện, chưa mở PR (vướng 5 commit "cap nhat" của `main` — Sổ việc phát sinh) | commit cuối `e638e83` |
-| 1 | Đăng nhập & Tài khoản | 0 | S | CHƯA LÀM | |
+| 0 | Nền tảng: dọn việc dở, test, chốt câu hỏi, múi giờ | — | M | XONG việc 0.1–0.6 (28/11); kịch bản khói trên giao diện đã chạy (chưa thử bước Thêm món, Xuất Excel); **chờ PR** (vướng 5 commit "cap nhat" của `main` — Sổ việc phát sinh) | commit cuối `e638e83` |
+| 1 | Đăng nhập & Tài khoản | 0 | S | XONG việc 1.1–1.4 (28/11), kịch bản tay đã chạy; **chờ PR** cùng Giai đoạn 0 | commit cuối `995b31e` |
 | 2 | Thực đơn: Món · Danh mục · Topping · Công thức | 0 | M | CHƯA LÀM | |
 | 3 | Kho nguyên liệu | 2 | S | CHƯA LÀM | |
 | 4 | Khuyến mãi | 2 | S | CHƯA LÀM | |
@@ -204,10 +204,10 @@ Thực đơn ──► Kho ──┐
 
 | Mã | Việc | Phía | Ghi chú |
 |---|---|---|---|
-| 1.1 | **Lỗi:** chủ quán đang đăng nhập đổi được vai trò của **chính mình** sang Nhân viên → tự khóa mình khỏi trang quản lý. Chặn tự hạ quyền; hệ thống luôn còn ≥ 1 Quản lý đang hoạt động (khi sửa vai trò hoặc xóa người khác) | API + Web | Backend trả 409 kèm câu rõ ràng; web khóa ô Vai trò khi sửa chính mình |
-| 1.2 | **B8:** đặt lại mật khẩu / đổi vai trò / xóa tài khoản → token cũ **mất hiệu lực ngay** (thêm "phiên bản bảo mật" vào token, kiểm tra khi xác thực) | API + script SQL | Web đã tự đăng xuất khi gặp 401 |
-| 1.3 | Test tự động: `TokenClaims` (token hỏng / hết hạn / thiếu `role`), `Login.TargetAfterLogin` | Web | |
-| 1.4 | **Rà soát code của module:** `AuthenticationService` vừa dùng `ApiClient` vừa gọi `HttpClient` trực tiếp (`GetMyAccountAsync`, `ReadErrorAsync`, `MessageFor`) → đưa về một cách gọi; kiểm tra `Components/RedirectTo*`, `AppState` còn trường nào thừa | Web | |
+| 1.1 | Chặn tự hạ quyền; luôn còn ≥ 1 Quản lý | Web | **Đối chiếu 28/11:** backend đã chặn từ trước (409 tự khóa / tự hạ quyền; xóa Quản lý cuối). Còn thiếu ở web: ô Vai trò vẫn chọn được khi sửa chính mình → đã khóa ô (`editingSelf`) |
+| 1.2 | **B8:** token cũ mất hiệu lực khi đặt lại / đổi mật khẩu | API | **Đối chiếu 28/11:** xóa / khóa / đổi vai trò đã làm token 401 từ trước (`OnTokenValidated`). Còn thiếu đổi mật khẩu → claim `pv` (dấu vân mật khẩu) trong JWT, so với mật khẩu hiện tại; không đổi CSDL |
+| 1.3 | Test tự động: `TokenClaims` (đã có ở 0.2), `Roles.AfterLogin` (tách khỏi `Login.razor.cs` để test được) | Web | |
+| 1.4 | **Rà soát code của module:** bỏ `AuthenticationService.GetMyAccountAsync` / `MessageFor` / `IsLoggedIn` / phụ thuộc `AppState` và lớp `AuthResult<T>` (gọi API trùng `ApiClient`); tài khoản đang đăng nhập lấy qua `AccountService.GetMeAsync`; sửa chú thích `Roles.Staff` lỗi thời | Web | |
 
 **Kịch bản kiểm thử tay:** đăng nhập đúng / sai / tài khoản bị khóa; nhân viên mở thẳng `/products` → "Không có quyền"; F5 giữ phiên, đóng tab mất phiên; token hết hạn → về `/login` giữ `returnUrl`; tạo nhân viên → đăng nhập được; đặt lại mật khẩu cho nhân viên đang đăng nhập ở máy khác → máy đó bị đăng xuất ở lần gọi kế tiếp; thử tự hạ quyền / hạ quyền Quản lý cuối cùng → bị chặn.
 
@@ -395,4 +395,6 @@ Ghi mọi lỗi / ý tưởng **ngoài phạm vi module đang làm**. Chỉ xử
 | Ngày | Phát hiện khi làm | Thuộc module | Mô tả | Loại (sửa lỗi / chức năng mới / luồng mới) | Mức (chặn / thường) | Câu hỏi đã đặt → trả lời | Xử lý |
 |---|---|---|---|---|---|---|---|
 | 28/11/2026 | 0.1 | Đơn hàng | 5 commit "cap nhat" (82e2e34, 3969bf5, 2afbdc4, 63393eb, e1a87d7) push thẳng lên `main`, không qua PR: sửa hóa đơn in trong `Orders.razor` bằng `style="..."` viết trong thẻ (trái quy tắc dùng `app.css`), đánh số dòng món, `@inject AppState` không dùng; bỏ `UQ_CongThuc_Topping` trong `QuanCaPheDB.sql`; thêm `03-Web-Admin/package-lock.json` rỗng | Sửa lỗi / giao diện | Thường (xung đột với phần hóa đơn của web-admin) | Tạm không gộp — chờ người dùng quyết | Chưa gộp |
+| 28/11/2026 | Kịch bản khói | Kho / dữ liệu mẫu backend | `Data/SeedData.cs` ghi đơn vị nguyên liệu không dấu ("mieng") — hiện trong cảnh báo kho "Bánh tiramisu chỉ còn 3 mieng" | Sửa lỗi (dữ liệu mẫu) | Thường | — | Làm ở Module 3 |
+| 28/11/2026 | 1.2 | Tài khoản | Sau 1.2, chủ quán tự đặt lại mật khẩu của chính mình ở trang Tài khoản thì phiên hiện tại hết hiệu lực ngay, lần gọi API kế tiếp bị đăng xuất (đúng luật bảo mật). Xem review Module 1 về cách trang xử lý | Sửa lỗi / trải nghiệm | Thường | — | Đã xử lý ở 1.1 (`995b31e`): lưu mật khẩu mới của chính mình thì đăng xuất gọn, ô mật khẩu có title báo trước |
 | | | | | | | | |
