@@ -55,7 +55,7 @@
 | Chức năng | Hai máy cùng thao tác một đơn: không ghi đè im lặng | máy đến sau nhận thông báo rõ ràng (409) |
 | Tạm chưa làm | Âm báo; số đếm / "(n)" khi đang ở trang khác | — |
 | Độ trễ | Tablet bấm Đặt → quầy được báo | **p95 < 1 giây** (xem "p95" ở mục 2.9) trong wifi quán |
-| Độ trễ khi lỗi | Mất kết nối web ↔ máy chủ rồi có lại | đủ đơn **≤ 2 giây sau khi có mạng lại** |
+| Độ trễ khi lỗi | Mất kết nối web ↔ máy chủ rồi có lại | đủ đơn **≤ 3 giây sau khi có mạng lại** (vòng nền 3 giây; kênh trực tiếp có thể nối lại chậm hơn, không ảnh hưởng dữ liệu) |
 | Độ trễ xấu nhất | Chuông rơi mà kết nối không báo lỗi | **≤ 30 giây** |
 | Độ trễ ở giai đoạn 0 | Chưa có kênh đẩy, chỉ hỏi 3 giây | ≤ 3 giây khi tab đang mở phía trước; ≤ ~60 giây khi tab bị ẩn lâu (mục 2.13). Giai đoạn 3 hết giới hạn này |
 | Đúng đắn | Không mất đơn, không báo trùng, trạng thái cũ không đè trạng thái mới | 0 lỗi trong bộ test mục 9 |
@@ -242,7 +242,7 @@ Mỗi mục dưới đây có 3 phần: **là gì** (định nghĩa ngắn), **v
 | H1 | Mạng | `01-Backend-api/appsettings.json:2` `"Urls": "http://localhost:3000"` và `Properties/launchSettings.json:9` `"applicationUrl": "http://localhost:3000"` (bản này đè bản kia khi `dotnet run`) | Tablet và điện thoại trong LAN **không vào được**. Lúc phát triển (mỗi người chạy trên máy mình) thì không sao; phải sửa trước khi chạy chung / demo / triển khai ở quán (mục 6.2.1, **để sau**). |
 | H2 | Tablet → máy chủ | `POST api/v1/don-hang` (`DonHangController.cs:21`, `AllowAnonymous`), không có khóa chống trùng | Mạng chập mà khách bấm lại thì ra **2 đơn**. Không bấm lại thì khách tưởng đã đặt, trong khi có thể **mất đơn**. |
 | H3 | Tablet sửa giỏ | `cart.dart` (`checkout`, `_orderSig`): sửa giỏ sau khi đã có đơn thì tạo **đơn mới** | Đơn cũ **treo PENDING mãi** trên web. |
-| H4 | Máy chủ → web | Không có kênh đẩy. Web hỏi `GET don-hang` mỗi 10 giây (`Orders.razor`: `RefreshSeconds = 10` dòng 1125; `Timer` dòng 1380; `AutoRefresh` dòng 1556) | Trễ đến ~10 giây. Lượt hỏi bị **bỏ qua** khi đang mở hộp thoại / đang thao tác (dòng 1559). Tab ẩn thì hẹn giờ chậm lại. **Chỉ trang Đơn hàng** mới dò đơn mới. |
+| H4 | Máy chủ → web | Không có kênh đẩy. Web hỏi `GET don-hang` mỗi 10 giây (`Orders.razor`: `RefreshSeconds = 10` dòng 1125; `Timer` dòng 1380; `AutoRefresh` dòng 1556) | Trễ đến ~10 giây. Lượt hỏi bị **bỏ qua** khi đang mở hộp thoại / đang thao tác (dòng 1559). Tab ẩn thì hẹn giờ chậm lại. **Chỉ trang Đơn hàng** mới dò đơn mới (bản 3.0 chấp nhận giữ như vậy, xem mục 6.0). |
 | H5 | Dò đơn mới | `CheckNewOrders` dòng 1778–1827: mới khi `MaDonHang > lastSeenOrderId` | Có thể bỏ sót đơn commit muộn khi DB bật snapshot (mục 2.6). Với cấu hình hiện tại hiếm xảy ra, nhưng sửa luôn vì cách sửa rẻ. |
 | H6 | Nút "Tự cập nhật" | `Orders.razor` dòng 285–297, `ToggleAutoRefresh` dòng 1727 | Tắt là **mất báo đơn mới**, không có cảnh báo. F5 thì bật lại. Lý do tồn tại (bảng nhảy khi đang thao tác) đã được `AutoRefresh` tự xử lý. |
 | H7 | Máy chủ → tablet | Tablet hỏi `GET don-hang/{id}/trang-thai` mỗi 3 giây khi chờ thanh toán | Đủ dùng, **giữ nguyên**. |
@@ -293,7 +293,7 @@ Mỗi mục dưới đây có 3 phần: **là gì** (định nghĩa ngắn), **v
                                                │   ├─ chuông / kết nối lại / dự     │
                                                │   │  phòng 30 s (3 s khi mất mạng) │
                                                │   │     → ĐỒNG BỘ theo con trỏ     │
-                                               │   └─ bỏ bản cũ theo phienBan       │
+                                               │   └─ gộp trùng trong một lượt      │
                                                │  Orders.razor                      │
                                                │   ├─ "đơn mới" → banner            │
                                                │   ├─ khung chi tiết / cảnh báo     │
@@ -334,13 +334,17 @@ Mỗi giai đoạn ghi: mục tiêu, **file cần sửa**, code mẫu, và đi�
 
 ### 6.0. Phía web: đặt code ở đâu, có cần file mới không
 
-**Phạm vi phía web (bản 3.0).** Chỉ làm phần lõi: **nhận đơn và mọi thay đổi của đơn gần như tức thời trên trang Đơn hàng**, áp đúng vào bảng / khung chi tiết, và xử lý tranh chấp khi hai máy cùng thao tác.
+**Phạm vi phía web (bản 3.0).** Chỉ làm phần lõi:
 
-**Tạm chưa làm** (có thể thêm sau, không ảnh hưởng thiết kế lõi):
+- **nhận đơn và mọi thay đổi của đơn gần như tức thời trên trang Đơn hàng**;
+- áp đúng các thay đổi đó vào bảng, banner "đơn mới" và khung chi tiết;
+- không ghi đè im lặng khi hai máy cùng thao tác một đơn.
+
+**Tạm chưa làm** (có thể thêm sau mà không đổi thiết kế lõi):
 
 - âm báo;
 - số đếm đơn mới ở menu và "(n)" trên tiêu đề tab khi đang ở trang khác;
-- đồng bộ khi tab hiện lại (`visibilitychange`).
+- đồng bộ ngay khi tab hiện lại (`visibilitychange`).
 
 Nhân viên (`NhanVien`) vốn chỉ có trang Đơn hàng, nên phần lõi đã phủ đủ người trực quầy.
 
@@ -350,24 +354,22 @@ Ba chỗ có thể đặt code kết nối thời gian thực:
 
 | Phương án | Cách làm | Được | Mất |
 |---|---|---|---|
-| A. Viết thẳng trong `Orders.razor` | Hub, con trỏ, vòng dự phòng nằm trong `@code` của trang | Không thêm file | Trang đã **2.564 dòng**, thêm ~150 dòng logic kết nối lẫn với logic giao diện, rất khó đọc và khó kiểm tra |
-| B. Gộp vào `OrderService` | `OrderService` vừa gọi REST vừa giữ kết nối SignalR | Không thêm file | Xem 4 lý do bên dưới |
-| **C. `OrderService` + 1 file `OrderRealtime`** | `OrderService` thêm **một hàm REST** `GetChangesAsync`; kết nối nằm ở `Services/OrderRealtime.cs` | Mỗi lớp một việc, trang chỉ "nghe" | Thêm **1 file** (~170 dòng) |
+| A. Viết thẳng trong `Orders.razor` | Hub, con trỏ, vòng dự phòng nằm trong `@code` của trang | Không thêm file | Trang đã **2.564 dòng**; thêm ~150 dòng logic kết nối lẫn với logic giao diện, rất khó đọc và khó kiểm tra |
+| B. Gộp vào `OrderService` | `OrderService` vừa gọi REST vừa giữ kết nối SignalR | Không thêm file | Xem 3 lý do bên dưới |
+| **C. `OrderService` + 1 file `OrderRealtime`** | `OrderService` thêm **một hàm REST** `GetChangesAsync`; phần kết nối nằm ở `Services/OrderRealtime.cs` | Mỗi lớp một việc; trang chỉ nhận kết quả | Thêm **1 file** (~150 dòng) |
 
 Lý do không chọn B:
 
 1. **Hai loại việc khác nhau về bản chất.**
-   - `OrderService` là "danh bạ" các lệnh REST: mỗi hàm gửi đúng một request, **không giữ trạng thái gì**. Đây cũng là quy ước của dự án: `CLAUDE.md` ghi "Services are thin wrappers over ApiClient".
-   - Kết nối thời gian thực thì **có trạng thái**: kết nối đang mở, con trỏ, vòng dự phòng, bản phiên bản đã nhận của từng đơn.
-2. **Vòng đời khác nhau.** Trong Blazor WASM, `OrderService` đăng ký `Scoped`, nên thực chất là **một bản sống suốt cả phiên**. Đặt kết nối vào đó thì:
-   - kết nối sẽ mở mãi, kể cả khi đang ở trang Món hay Kho, nơi không ai cần nó;
-   - phải tự nghe sự kiện đăng xuất để đóng kết nối, vì token đổi.
-   
-   `OrderRealtime` đăng ký `Transient`: **mỗi lần mở trang Đơn hàng tạo một bản, rời trang thì hủy**. Kết nối tự đóng khi rời trang và khi đăng xuất (đăng xuất cũng là rời trang), không cần nghe thêm gì.
-3. **Lỗi khác nhau.** Lỗi REST là của từng lần bấm nút (trang tự báo). Lỗi kết nối là một **trạng thái kéo dài** ("đang mất kết nối"). Tách ra thì trang hiển thị hai loại này rõ ràng.
-4. **Dễ kiểm tra.** Kiểm tra `OrderRealtime` (rớt mạng, chuông rơi, con trỏ) không phải dựng cả trang 2.564 dòng.
+   - `OrderService` là "danh bạ" các lệnh REST: mỗi hàm gửi đúng một request, **không giữ trạng thái gì**. Đây cũng là quy ước của dự án (`CLAUDE.md`: "Services are thin wrappers over ApiClient").
+   - Kết nối thời gian thực thì **có trạng thái**: kết nối đang mở, con trỏ, vòng dự phòng, thời điểm đồng bộ cuối.
+2. **Vòng đời khác nhau.**
+   - Trong Blazor WASM, `OrderService` đăng ký `Scoped`, nên thực chất là **một bản sống suốt cả phiên trình duyệt**. Đặt kết nối vào đó thì nó mở mãi, kể cả khi đang ở trang Món hay Kho. Ngoài ra phải tự nghe sự kiện đăng xuất để đóng, vì token đổi.
+   - `OrderRealtime` được **trang Đơn hàng tự tạo khi mở và tự hủy khi rời trang**. Đăng xuất cũng là rời trang, nên không cần nghe thêm gì.
+   - **Không đăng ký vào DI**, kể cả `Transient`. Trong WASM, container giữ mọi bản `Transient` có `Dispose` tới hết ứng dụng, nên mỗi lần mở trang sẽ để sót một kết nối. Trang tạo bằng `ActivatorUtilities.CreateInstance<OrderRealtime>(Services)`: vẫn được DI đưa vào `HttpClient`, `AppState`, `OrderService`, `ILogger`, nhưng do trang làm chủ.
+3. **Lỗi khác nhau.** Lỗi REST là của từng lần bấm nút, trang báo ngay tại chỗ. Lỗi kết nối là một **trạng thái kéo dài** ("đang mất kết nối"). Tách ra thì trang hiển thị hai loại này rõ ràng, và kiểm tra `OrderRealtime` (rớt mạng, chuông rơi) không phải dựng cả trang 2.564 dòng.
 
-Phần nào **thực sự là REST** thì vẫn **gộp vào `OrderService`**: hàm `GetChangesAsync` gọi `GET don-hang/thay-doi`. `OrderRealtime` gọi hàm này chứ không tự gọi `ApiClient`.
+Phần nào **thực sự là REST** thì vẫn **gộp vào `OrderService`**: hàm `GetChangesAsync` gọi `GET don-hang/thay-doi`. `OrderRealtime` gọi hàm này, không tự gọi `ApiClient`.
 
 #### 6.0.2. Danh sách quyết định file
 
@@ -375,29 +377,32 @@ Phần nào **thực sự là REST** thì vẫn **gộp vào `OrderService`**: h
 |---|---|---|---|
 | Gọi `GET don-hang/thay-doi` | `Services/OrderService.cs` (thêm `GetChangesAsync`) | Không | Đúng vai trò của `OrderService` |
 | `PhienBan`, `ThayDoiResponse`, `ChuongDonHang` | `Models/DonHang.cs` | Không | Cùng nhóm model đơn hàng |
-| Mã lỗi `DON_DA_THAY_DOI` | Hằng số trong `OrderService` | Không | Một chỗ duy nhất, như quy ước chuỗi trạng thái |
-| Kết nối SignalR, con trỏ, dự phòng 3 / 30 giây | `Services/OrderRealtime.cs` | **Có — file mới duy nhất** | Mục 6.0.1 |
-| Chính sách thử kết nối lại | Lớp lồng `private` trong `OrderRealtime.cs` | Không | ~10 dòng, chỉ `OrderRealtime` dùng |
-| Áp thay đổi vào bảng, banner đơn mới, chỉ báo kết nối, xử lý 409 | `Pages/Orders/Orders.razor` | Không | Bảng, banner, khung chi tiết đã nằm sẵn ở đây |
-| Đăng ký DI | `Program.cs` (1 dòng) | Không | |
+| Kết nối SignalR, con trỏ, dự phòng 3 / 30 giây, trạng thái kết nối | `Services/OrderRealtime.cs` | **Có — file mới duy nhất** | Mục 6.0.1 |
+| Chính sách thử kết nối lại | Lớp lồng `private` trong `OrderRealtime.cs` | Không | ~5 dòng, chỉ `OrderRealtime` dùng |
+| Áp thay đổi vào bảng, banner, khung chi tiết; chỉ báo kết nối; 409 | `Pages/Orders/Orders.razor` | Không | Bảng, banner, khung chi tiết đã nằm ở đây |
 | Gói `Microsoft.AspNetCore.SignalR.Client` | `CoffeeShop.Admin.csproj` | Không | |
+| Kiểu chỉ báo kết nối | `wwwroot/css/app.css` (sửa `.live-toggle`), `wwwroot/index.html` (tăng `?v=`) | Không | |
+| Đăng ký DI | — | **Không cần** | Trang tự tạo `OrderRealtime` (mục 6.0.1 ý 2); `Program.cs` giữ nguyên |
+| Hằng mã lỗi 409 | — | **Không cần** | Trang đã xử lý theo `ex.Status == 409` rồi tải lại (`Orders.razor` dòng 1972–1980); chỉ áp cùng mẫu cho các thao tác khác |
 | Thông số 3 / 30 giây | Hằng số trong `OrderRealtime` | Không | Không cần mục `Realtime` trong `appsettings.json`; đổi thì sửa một dòng |
-| `OrderWatcher`, `TieuDeTrang`, JS âm báo / `visibilitychange`, lưu sessionStorage (bản 2.0) | — | **Bỏ** | Thuộc phần "tạm chưa làm"; con trỏ đã giải quyết F5 mà không cần lưu trạng thái |
+| `OrderWatcher`, `TieuDeTrang`, JS âm báo / `visibilitychange`, lưu sessionStorage (bản 2.0) | — | **Bỏ** | Thuộc phần "tạm chưa làm"; con trỏ đã lo trường hợp F5 mà không cần lưu trạng thái |
 
-Tổng cộng phía web: **1 file mới**, sửa **6 file** có sẵn.
+Tổng cộng phía web: **1 file mới**, sửa **6 file** có sẵn (`csproj`, `Models/DonHang.cs`, `Services/OrderService.cs`, `Pages/Orders/Orders.razor`, `app.css`, `index.html`), cộng tài liệu.
 
 ### 6.1. Giai đoạn 0: sửa nhỏ, làm ngay (không chờ backend)
 
+**Trạng thái: đã làm ngày 25/11/2026.**
+
 **Mục tiêu:** trễ còn 0–3 giây và không ai tắt nhầm được việc nhận đơn. Chỉ sửa **một file** `Pages/Orders/Orders.razor`, không thêm file. Giai đoạn 3 sẽ thay hẳn cơ chế hỏi định kỳ, nên ở đây **không** đầu tư thêm.
 
-| # | Việc | Chỗ sửa trong `Orders.razor` |
+| # | Việc | Chỗ sửa trong `Orders.razor` (số dòng trước khi sửa) |
 |---|---|---|
 | 0.1 | Xóa nút "Tự cập nhật" | Khối `live-toggle` (dòng 285–297), biến `autoRefreshEnabled` (dòng 1229), hàm `ToggleAutoRefresh` (dòng 1727), điều kiện `!autoRefreshEnabled` trong `AutoRefresh` (dòng 1559) |
 | 0.2 | Hỏi 3 giây thay cho 10 giây | `RefreshSeconds = 3` (dòng 1125) |
 | 0.3 | Cập nhật tài liệu | `docs/huong-dan/03-don-hang.md` (mục 3.6), `docs/tien-do-quan-ly-don-hang.md`, dòng "auto-refresh every 10 s" trong `CLAUDE.md` |
 
 - Giữ nguyên `CheckNewOrders`. Với DB hiện tại, lỗi "mã lớn nhất" chỉ là lý thuyết (mục 2.6), và giai đoạn 3 thay hẳn hàm này.
-- Kiểu `.live-toggle` trong `app.css` giữ lại, vì giai đoạn 3 dùng lại cho chỉ báo kết nối.
+- Kiểu `.realtime-controls`, `.live-toggle`, `.live-indicator` trong `app.css` giữ lại (có ghi chú trong file), vì giai đoạn 3 dùng lại cho chỉ báo kết nối.
 
 **Xong khi:**
 
@@ -665,48 +670,54 @@ Mẫu chung: `var kq = await Tim(id); await notifier.Bao(kq.MaDonHang, kq.PhienB
 
 ### 6.4. Giai đoạn 3: web nhận đơn và thay đổi tức thời (cần giai đoạn 1 + 2)
 
-**Điều kiện:** backend đã có `phienBan`, `GET don-hang/thay-doi`, hub `/hubs/don-hang` và mã lỗi 409 `DON_DA_THAY_DOI`. Không có API giả, nên chạy thử bằng backend ở nhánh đã làm xong giai đoạn 1–2. Phần web này **chỉ được gộp vào sau khi** backend giai đoạn 1 đã lên; giai đoạn 2 lên sau cũng được (xem mục 6.4.6).
+**Điều kiện:** backend đã có `phienBan`, `GET don-hang/thay-doi`, hub `/hubs/don-hang` và lỗi 409 khi tranh chấp.
+
+- Không có API giả, nên chạy thử bằng backend ở nhánh đã làm xong giai đoạn 1–2.
+- Phần web này **chỉ được gộp vào sau khi** backend giai đoạn 1 đã lên. Giai đoạn 2 lên sau cũng được (mục 6.4.6).
 
 #### 6.4.1. Luồng hoạt động trên trang Đơn hàng
 
 ```
-Mở trang Đơn hàng
-  1. mocMaDon = mã đơn lớn nhất hiện có         (GetPageAsync(1, 1))  → mốc để nhận diện "đơn mới"
-  2. Realtime.StartAsync()  → lấy con trỏ ban đầu, mở kết nối hub ở nền (không chờ)
-  3. LoadOrders()           → tải bảng như hiện nay
+Mở trang Đơn hàng (thứ tự bắt buộc)
+  1. mocMaDon = mã đơn lớn nhất hiện có (GetPageAsync(1, 1)); lỗi → null    → mốc nhận diện "đơn mới"
+  2. realtime = tạo OrderRealtime; await realtime.StartAsync(OnDonThayDoi, OnTrangThai)
+                → lấy con trỏ ban đầu, mở kết nối hub ở nền (không chờ kết nối xong)
+  3. LoadOrders()  → tải bảng như hiện nay
 
-Máy chủ rung chuông / kết nối lại / lượt dự phòng
-  → Realtime.DongBoAsync()  → GET thay-doi?sau=conTro (lặp khi conNua)
-  → bỏ bản cũ (phienBan ≤ bản đã nhận)
-  → phát DonThayDoi(danh sách đơn vừa đổi)
+Máy chủ rung chuông / kết nối lại / vòng nền
+  → realtime.DongBoAsync() → GET thay-doi?sau=conTro (lặp khi conNua)
+  → gộp các bản trùng trong một lượt
+  → gọi OnDonThayDoi(danh sách đơn vừa đổi)
 
-Trang nhận DonThayDoi(ds)
-  a. ghi nhận đơn mới cho banner (quy tắc 6.4.4)
-  b. đơn đang mở ở khung chi tiết / hộp sửa / hộp hủy có trong ds → cập nhật hoặc cảnh báo
-  c. không đang thao tác → LoadOrders(quiet: true) ngay
+Trang nhận OnDonThayDoi(ds)
+  a. ghi nhận đơn mới cho banner (quy tắc ở 6.4.4)
+  b. đang mở hộp sửa / hủy của một đơn trong ds → cảnh báo trong hộp
+  c. không đang thao tác → LoadOrders(quiet: true) ngay (khung chi tiết cập nhật theo)
      đang thao tác        → đánh dấu canTaiLai, tải lại ngay khi rảnh
 
-Rời trang / đăng xuất → Realtime.DisposeAsync() → đóng kết nối, dừng vòng dự phòng
+Rời trang / đăng xuất → trang gọi realtime.DisposeAsync() → đóng kết nối, dừng vòng nền
 ```
 
 **Vì sao trang tải lại bảng (bước c) thay vì tự chèn / sửa từng dòng:**
 
-- Bảng có bộ lọc trạng thái, thời gian, tìm kiếm, sắp xếp, phân trang và tổng số đơn. Tự chèn đơn vào bảng thì phải viết lại toàn bộ logic lọc đó ở phía web, và rất dễ lệch với máy chủ.
-- Tải lại trang đang xem chỉ là **1 request** (~50 ms trong LAN), dùng lại `LoadOrders(quiet: true)` có sẵn, nên luôn đúng bộ lọc và đúng tổng số.
-- Dữ liệu từ `thay-doi` vẫn được dùng cho những việc cần ngay mà không phụ thuộc bộ lọc: banner đơn mới, khung chi tiết, cảnh báo trong hộp thoại.
+- Bảng có bộ lọc trạng thái, thời gian, tìm kiếm, sắp xếp, phân trang và tổng số đơn. Tự chèn đơn vào bảng thì phải viết lại toàn bộ logic lọc đó ở phía web, rất dễ lệch với máy chủ.
+- Tải lại trang đang xem chỉ là **1 request** (~50 ms trong LAN), dùng lại `LoadOrders(quiet: true)` có sẵn. Request này không bật vòng xoay, luôn đúng bộ lọc và tổng số, và `RefreshSelected` bên trong nó đã cập nhật khung chi tiết cùng ô số nhận món.
+- Dữ liệu từ `thay-doi` vẫn được dùng cho những việc không phụ thuộc bộ lọc: banner đơn mới và cảnh báo trong hộp thoại.
+- Máy tự thao tác cũng nhận chuông của chính mình nên tải bảng thêm một lần. Như vậy thừa 1 request nhưng không sai, nên chấp nhận để code đơn giản.
 
 #### 6.4.2. File và việc cụ thể
 
 | # | File | Việc |
 |---|---|---|
-| 3.1 | `CoffeeShop.Admin.csproj` | Thêm gói `Microsoft.AspNetCore.SignalR.Client` 8.0.x (cùng đời .NET 8) |
+| 3.1 | `CoffeeShop.Admin.csproj` | Thêm gói `Microsoft.AspNetCore.SignalR.Client`, cùng đời .NET 8 với các gói đang có (đang là 8.0.33; kiểm tra bản 8.0.x mới nhất có trên NuGet) |
 | 3.2 | `Models/DonHang.cs` | `DonHang.PhienBan` (`string?`); thêm `ThayDoiResponse`, `ChuongDonHang` |
-| 3.3 | `Services/OrderService.cs` | Thêm `GetChangesAsync(string? sau, ct)` và hằng `MaLoiDonDaThayDoi` |
-| 3.4 | `Services/OrderRealtime.cs` (**mới**) | Kết nối + con trỏ + dự phòng (mục 6.4.3) |
-| 3.5 | `Program.cs` | `builder.Services.AddTransient<OrderRealtime>();` |
-| 3.6 | `Pages/Orders/Orders.razor` | Mục 6.4.4 |
-| 3.7 | `wwwroot/css/app.css`, `wwwroot/index.html` | Chỉnh kiểu `.live-toggle` thành chỉ báo kết nối (không bấm được); tăng `?v=` |
-| 3.8 | Tài liệu | `docs/huong-dan/03-don-hang.md`, `docs/tien-do-quan-ly-don-hang.md`, `CLAUDE.md` (luồng "auto-refresh") |
+| 3.3 | `Services/OrderService.cs` | Thêm `GetChangesAsync(string? sau, ct)` |
+| 3.4 | `Services/OrderRealtime.cs` (**mới**) | Mục 6.4.3 |
+| 3.5 | `Pages/Orders/Orders.razor` | Mục 6.4.4 |
+| 3.6 | `wwwroot/css/app.css`, `wwwroot/index.html` | Chỉnh `.live-toggle` thành chỉ báo kết nối (không bấm được, 3 trạng thái); tăng `?v=` |
+| 3.7 | Tài liệu | `docs/huong-dan/03-don-hang.md`, `docs/tien-do-quan-ly-don-hang.md`, `CLAUDE.md` (luồng "auto-refresh") |
+
+`Program.cs` **không sửa** (mục 6.0.1 ý 2).
 
 Model (3.2) và service (3.3):
 
@@ -726,8 +737,6 @@ public class ThayDoiResponse
 public record ChuongDonHang(int MaDonHang, string PhienBan, DateTimeOffset GioCommit);
 
 // Services/OrderService.cs
-public const string MaLoiDonDaThayDoi = "DON_DA_THAY_DOI";
-
 /// <summary>Các đơn đã đổi sau con trỏ <paramref name="sau"/>; null = chỉ lấy con trỏ ban đầu.</summary>
 public Task<ThayDoiResponse> GetChangesAsync(string? sau, CancellationToken ct = default) =>
     _api.GetAsync<ThayDoiResponse>(Query.Build("api/v1/don-hang/thay-doi", ("sau", sau), ("limit", 100)), ct);
@@ -736,52 +745,72 @@ public Task<ThayDoiResponse> GetChangesAsync(string? sau, CancellationToken ct =
 #### 6.4.3. `Services/OrderRealtime.cs`
 
 ```csharp
+using System.Net;
+using CoffeeShop.Admin.Models;
+using Microsoft.AspNetCore.SignalR.Client;
+
+namespace CoffeeShop.Admin.Services;
+
+public enum TrangThaiKetNoi { TrucTiep, DoDinhKy, MatKetNoi }
+
 /// <summary>
 /// Nhận thay đổi đơn hàng gần như tức thời: SignalR rung chuông → đọc lại từ DB theo con trỏ phienBan.
-/// Mỗi trang Đơn hàng tạo một bản (Transient), rời trang thì DisposeAsync.
+/// Trang Đơn hàng tự tạo (ActivatorUtilities) và tự DisposeAsync khi rời trang — KHÔNG đăng ký DI.
 /// </summary>
-public sealed class OrderRealtime(
-    HttpClient http, AppState app, OrderService orders,
-    TokenAuthenticationStateProvider auth, ILogger<OrderRealtime> log) : IAsyncDisposable
+public sealed class OrderRealtime(HttpClient http, AppState app, OrderService orders, ILogger<OrderRealtime> log)
+    : IAsyncDisposable
 {
-    private static readonly TimeSpan NhipKiemTra = TimeSpan.FromSeconds(3);   // nhịp vòng nền
-    private static readonly TimeSpan DuPhongKhiCoKetNoi = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan NhipNen = TimeSpan.FromSeconds(3);      // vòng nền
+    private static readonly TimeSpan DuPhong = TimeSpan.FromSeconds(30);     // có kết nối: bắt chuông bị rơi
+    private static readonly TimeSpan ConTuoi = TimeSpan.FromSeconds(10);     // REST còn chạy nếu thành công trong 10 giây qua
 
-    private readonly CancellationTokenSource cts = new();
-    private readonly Dictionary<int, ulong> banDaNhan = [];   // mã đơn → phienBan mới nhất đã phát cho trang
+    private readonly CancellationTokenSource cts = new();   // chỉ Cancel, không Dispose → không bao giờ ObjectDisposedException
     private HubConnection? hub;
+    private Func<IReadOnlyList<DonHang>, Task>? onThayDoi;
+    private Action? onTrangThai;
     private ulong? conTro;                                    // null = chưa lấy được con trỏ ban đầu
-    private DateTime lanDongBoCuoi = DateTime.MinValue;
+    private ulong chuongLonNhat;                              // phienBan lớn nhất mà chuông đã báo
+    private int lanChoChuong;
+    private DateTime lanThanhCong = DateTime.MinValue;        // lần đọc thay-doi thành công cuối
+    private TrangThaiKetNoi daBao = TrangThaiKetNoi.MatKetNoi;
     private bool dangDongBo, canChayThem, dangDung;
 
-    /// <summary>Danh sách đơn vừa đổi (đã bỏ bản cũ). Danh sách RỖNG = "hãy tải lại bảng" (vừa lấy lại được con trỏ).</summary>
-    public event Func<IReadOnlyList<DonHang>, Task>? DonThayDoi;
-    public event Action? TrangThaiDoi;
-    public bool DaKetNoi => hub?.State == HubConnectionState.Connected;
+    public TrangThaiKetNoi TrangThai =>
+        hub?.State == HubConnectionState.Connected ? TrangThaiKetNoi.TrucTiep
+        : DateTime.UtcNow - lanThanhCong < ConTuoi ? TrangThaiKetNoi.DoDinhKy
+        : TrangThaiKetNoi.MatKetNoi;
 
-    public async Task StartAsync()
+    /// <param name="onThayDoi">Danh sách đơn vừa đổi. Danh sách RỖNG = "hãy tải lại bảng" (vừa lấy lại được con trỏ).</param>
+    /// <param name="onTrangThai">Trạng thái kết nối vừa đổi (vẽ lại chỉ báo).</param>
+    public async Task StartAsync(Func<IReadOnlyList<DonHang>, Task> onThayDoi, Action onTrangThai)
     {
-        await LayConTroAsync();                               // lỗi mạng → để vòng nền lấy lại sau
+        if (dangDung) return;
+        (this.onThayDoi, this.onTrangThai) = (onThayDoi, onTrangThai);
+
+        await LayConTroAsync();                               // lỗi mạng → vòng nền lấy lại sau
+        if (dangDung) return;                                 // rời trang trong lúc chờ
 
         hub = new HubConnectionBuilder()
             .WithUrl(new Uri(http.BaseAddress!, "hubs/don-hang"),
-                     o => o.AccessTokenProvider = () => Task.FromResult(app.Token))  // token HIỆN TẠI
+                     o => o.AccessTokenProvider = () => Task.FromResult(app.Token))   // token HIỆN TẠI
             .WithAutomaticReconnect(new ThuMaiMai())
             .Build();
 
+        // Handler trả về ngay: SignalR chờ handler xong mới đọc tin kế tiếp, nên không chờ đồng bộ ở đây
         hub.On<ChuongDonHang>("DonHangThayDoi", c =>
         {
-            log.LogDebug("Chuông #{Id}, trễ {Ms} ms", c.MaDonHang, (DateTimeOffset.UtcNow - c.GioCommit).TotalMilliseconds);
-            return DongBoAsync(ulong.Parse(c.PhienBan));
+            log.LogInformation("Chuông đơn #{Id}, trễ {Ms:F0} ms", c.MaDonHang, (DateTimeOffset.UtcNow - c.GioCommit).TotalMilliseconds);
+            chuongLonNhat = Math.Max(chuongLonNhat, ulong.Parse(c.PhienBan));
+            _ = DongBoAsync();
+            return Task.CompletedTask;
         });
-        hub.Reconnecting += _ => { TrangThaiDoi?.Invoke(); return Task.CompletedTask; };
-        hub.Reconnected  += _ => { TrangThaiDoi?.Invoke(); return DongBoAsync(); };
-        hub.Closed       += ex =>
+        hub.Reconnecting += _ => { BaoTrangThai(); return Task.CompletedTask; };
+        hub.Reconnected  += _ => { BaoTrangThai(); _ = DongBoAsync(); return Task.CompletedTask; };
+        hub.Closed       += _ =>
         {
-            TrangThaiDoi?.Invoke();
             if (dangDung) return Task.CompletedTask;          // chính mình đóng (rời trang) → không mở lại
-            if (La401(ex)) return auth.SignOutAsync(byUser: false);
-            _ = KetNoiAsync();                                // lỗi khác → vòng kết nối lại từ đầu
+            BaoTrangThai();
+            _ = KetNoiAsync();
             return Task.CompletedTask;
         };
 
@@ -790,8 +819,9 @@ public sealed class OrderRealtime(
     }
 
     /// <summary>Đọc mọi thay đổi sau con trỏ. Chỉ 1 lượt chạy một lúc; gọi trong lúc đang chạy → chạy thêm đúng 1 lượt.</summary>
-    public async Task DongBoAsync(ulong? phienBanChuong = null)
+    public async Task DongBoAsync()
     {
+        if (dangDung) return;
         if (dangDongBo) { canChayThem = true; return; }
         dangDongBo = true;
         try
@@ -801,52 +831,53 @@ public sealed class OrderRealtime(
                 canChayThem = false;
                 if (conTro is null) { if (await LayConTroAsync()) await Phat([]); continue; }
 
-                var doi = new List<DonHang>();
+                var doi = new Dictionary<int, DonHang>();     // cùng đơn xuất hiện 2 lần (lượt có conNua) → giữ bản sau, mới hơn
                 ThayDoiResponse r;
                 do
                 {
                     r = await orders.GetChangesAsync(conTro.ToString(), cts.Token);
-                    foreach (var d in r.Data)
-                    {
-                        ulong pb = ulong.Parse(d.PhienBan!);
-                        if (banDaNhan.TryGetValue(d.MaDonHang, out var cu) && pb <= cu) continue;  // bản cũ / trùng
-                        banDaNhan[d.MaDonHang] = pb;
-                        doi.Add(d);
-                    }
-                    conTro = Math.Max(conTro.Value, ulong.Parse(r.ConTro));                      // chỉ tăng
+                    foreach (var d in r.Data) doi[d.MaDonHang] = d;
+                    conTro = Math.Max(conTro.Value, ulong.Parse(r.ConTro));   // chỉ tăng, không lùi
                 } while (r.ConNua);
 
-                lanDongBoCuoi = DateTime.UtcNow;
-                if (doi.Count > 0) await Phat(doi);
+                lanThanhCong = DateTime.UtcNow;
+                if (doi.Count > 0) await Phat([.. doi.Values]);
 
-                // Chuông báo bản mới hơn con trỏ: một transaction khác còn giữ mốc (mục 2.8) → đọc lại sau 300 ms
-                if (phienBanChuong > conTro && !cts.IsCancellationRequested)
+                // Chuông báo bản mới hơn con trỏ: một transaction khác còn giữ mốc (mục 2.8) → đọc lại sau 300 ms, tối đa 3 lần
+                if (chuongLonNhat > conTro && lanChoChuong < 3)
                 {
+                    lanChoChuong++;
                     await Task.Delay(300, cts.Token);
                     canChayThem = true;
-                    phienBanChuong = null;                    // chỉ chờ một lần; còn thiếu thì vòng nền bắt
                 }
-            } while (canChayThem && !cts.IsCancellationRequested);
+                else lanChoChuong = 0;                        // đã đủ, hoặc để vòng nền bắt
+            } while (canChayThem && !dangDung);
         }
-        catch (ApiException ex) { log.LogWarning("Không đồng bộ được đơn hàng: {Code}", ex.Code); }
         catch (OperationCanceledException) { }
-        finally { dangDongBo = false; }
+        catch (ApiException ex) { log.LogWarning("Không đồng bộ được đơn hàng: {Code} {Status}", ex.Code, ex.Status); }
+        catch (Exception ex) { log.LogError(ex, "Lỗi khi đồng bộ đơn hàng"); }  // không để vòng nền chết im lặng
+        finally { dangDongBo = false; BaoTrangThai(); }
     }
 
-    // Vòng nền: mất kết nối → đồng bộ mỗi 3 giây; có kết nối → 30 giây một lần (bắt chuông bị rơi)
+    // Vòng nền 3 giây: chưa có kết nối trực tiếp → đồng bộ mỗi nhịp; có kết nối → 30 giây một lần
     private async Task VongNenAsync()
     {
-        using var timer = new PeriodicTimer(NhipKiemTra);
+        using var timer = new PeriodicTimer(NhipNen);
         try
         {
             while (await timer.WaitForNextTickAsync(cts.Token))
-                if (!DaKetNoi || DateTime.UtcNow - lanDongBoCuoi >= DuPhongKhiCoKetNoi)
-                    await DongBoAsync();
+            {
+                if (TrangThai != TrangThaiKetNoi.TrucTiep || DateTime.UtcNow - lanThanhCong >= DuPhong)
+                    await DongBoAsync();                      // DongBoAsync tự bắt mọi lỗi
+                BaoTrangThai();
+            }
         }
         catch (OperationCanceledException) { }
     }
 
-    // Lần StartAsync đầu KHÔNG được WithAutomaticReconnect thử lại → tự thử, lùi dần, không bỏ cuộc
+    // Lần StartAsync đầu KHÔNG được WithAutomaticReconnect thử lại → tự thử, lùi dần, không bỏ cuộc.
+    // 404 (backend chưa có hub) hay 401 đều chỉ thử lại chậm: dữ liệu vẫn về qua vòng nền,
+    // còn 401 thì lời gọi REST thay-doi nhận 401 → AuthHeaderHandler đăng xuất → trang bị hủy → DisposeAsync.
     private async Task KetNoiAsync()
     {
         for (int lan = 0; !dangDung; lan++)
@@ -854,16 +885,14 @@ public sealed class OrderRealtime(
             try
             {
                 await hub!.StartAsync(cts.Token);
-                TrangThaiDoi?.Invoke();
-                await DongBoAsync();                          // bù khoảng hở trước khi kết nối xong
+                BaoTrangThai();
+                _ = DongBoAsync();                            // bù khoảng hở trước khi kết nối xong
                 return;
             }
-            catch (Exception ex) when (La401(ex)) { await auth.SignOutAsync(byUser: false); return; }
             catch (OperationCanceledException) { return; }
             catch (Exception ex)
             {
-                // 404 = backend chưa có hub: vẫn chạy được nhờ vòng nền 3 giây, cứ thử lại chậm
-                log.LogInformation("Chưa kết nối được hub đơn hàng: {Message}", ex.Message);
+                log.LogInformation("Chưa kết nối được kênh đơn hàng: {Message}", ex.Message);
                 try { await Task.Delay(ThuMaiMai.Cho(lan), cts.Token); } catch (OperationCanceledException) { return; }
             }
         }
@@ -872,29 +901,34 @@ public sealed class OrderRealtime(
     private async Task<bool> LayConTroAsync()
     {
         try { conTro = ulong.Parse((await orders.GetChangesAsync(null, cts.Token)).ConTro); return true; }
+        catch (OperationCanceledException) { return false; }
         catch (ApiException ex) { log.LogWarning("Chưa lấy được con trỏ: {Code}", ex.Code); return false; }
     }
 
-    private Task Phat(IReadOnlyList<DonHang> ds) => DonThayDoi?.Invoke(ds) ?? Task.CompletedTask;
+    private Task Phat(IReadOnlyList<DonHang> ds) => onThayDoi?.Invoke(ds) ?? Task.CompletedTask;
 
-    private static bool La401(Exception? ex) =>
-        ex is HttpRequestException { StatusCode: HttpStatusCode.Unauthorized };
+    private void BaoTrangThai()
+    {
+        if (dangDung || TrangThai == daBao) return;
+        daBao = TrangThai;
+        onTrangThai?.Invoke();
+    }
 
     public async ValueTask DisposeAsync()
     {
+        if (dangDung) return;                                 // gọi nhiều lần vẫn an toàn
         dangDung = true;                                      // đặt TRƯỚC khi đóng → Closed không mở lại
+        (onThayDoi, onTrangThai) = (null, null);              // không gọi vào trang đã hủy
         cts.Cancel();
         if (hub is not null) await hub.DisposeAsync();
-        cts.Dispose();
     }
 
-    /// <summary>0, 2, 5, 10, 30, 30… giây, không bỏ cuộc — trừ khi 401 (token hết hạn / tài khoản bị xóa).</summary>
+    /// <summary>0, 2, 5, 10, 30, 30… giây, không bỏ cuộc.</summary>
     private sealed class ThuMaiMai : IRetryPolicy
     {
         private static readonly int[] Giay = [0, 2, 5, 10, 30];
         public static TimeSpan Cho(int lan) => TimeSpan.FromSeconds(Giay[Math.Min(lan, Giay.Length - 1)]);
-        public TimeSpan? NextRetryDelay(RetryContext ctx) =>
-            La401(ctx.RetryReason) ? null : Cho((int)ctx.PreviousRetryCount);   // null → SignalR gọi Closed(ex)
+        public TimeSpan? NextRetryDelay(RetryContext ctx) => Cho((int)ctx.PreviousRetryCount);
     }
 }
 ```
@@ -902,8 +936,10 @@ public sealed class OrderRealtime(
 Ghi chú:
 
 - Blazor WASM chạy một luồng, nên các cờ `dangDongBo` / `canChayThem` không cần khóa.
-- `banDaNhan` chỉ sống trong một lần mở trang, nên không phình mãi.
-- **F5 không cần lưu gì.** Mở lại trang thì lấy con trỏ mới và tải lại bảng; đơn đã có trong bảng. Banner chỉ báo đơn tới sau lúc mở trang (giống hành vi hiện nay).
+- **Không có nhánh xử lý 401 riêng.** Token hết hạn hay tài khoản bị xóa thì lời gọi REST `thay-doi` nhận 401, và `AuthHeaderHandler` đang có sẵn sẽ đăng xuất (có kiểm tra đúng phiên). Thời gian phát hiện: ≤ 3 giây khi không có kết nối trực tiếp; khi có thì ≤ 30 giây, và backend đóng hub lúc token hết hạn (`CloseOnAuthenticationExpiration`) nên thực tế cũng về mức 3 giây.
+- **Không cần "bỏ bản cũ theo phienBan".** Máy chủ chỉ trả các dòng mới hơn con trỏ, và con trỏ chỉ tăng. Chỉ cần gộp trường hợp cùng một đơn xuất hiện 2 lần trong một lượt dài.
+- **F5 không cần lưu gì.** Mở lại trang thì lấy mốc + con trỏ mới và tải lại bảng; đơn đã có trong bảng. Banner chỉ báo đơn tới sau lúc mở trang, giống hành vi hiện nay.
+- Mức log mặc định của WASM là Information, nên dòng "trễ … ms" hiện trong Console để đo (mục 9.1).
 
 #### 6.4.4. `Pages/Orders/Orders.razor`: thay đổi cụ thể
 
@@ -911,31 +947,48 @@ Ghi chú:
    - Xóa `CheckNewOrders`, `NewOrderScan`, `scanTask`, `unfilteredFirstPage`, đoạn `pageCoversNew` (dòng 1488–1494) và `newOrdersInitialized`.
    - Giữ `Timer` 3 giây, nhưng `AutoRefresh` **không gọi máy chủ** nữa. Nó chỉ làm một việc: `if (canTaiLai && !DangThaoTac) { canTaiLai = false; await LoadOrders(quiet: true); }`.
    - `DangThaoTac` gom đúng các điều kiện đang có ở dòng 1559 (đang tải, đang thu tiền, đang tạo, đang hủy, đang mở hộp thoại…).
-2. **Khởi động** trong `OnInitializedAsync`, theo đúng thứ tự ở mục 6.4.1:
-   - lấy `mocMaDon` (đổi tên từ `lastSeenOrderId`) bằng `GetPageAsync(1, 1)`;
-   - `Realtime.DonThayDoi += OnDonThayDoi`, `Realtime.TrangThaiDoi += OnTrangThaiDoi`;
-   - `await Realtime.StartAsync()`;
-   - rồi `LoadOrders()`.
+2. **Khởi động** trong `OnInitializedAsync`, đúng thứ tự mục 6.4.1. Thêm `@inject IServiceProvider Services`; dòng 3 đã có `@using Microsoft.Extensions.DependencyInjection`.
+
+   ```csharp
+   mocMaDon = await LayMocMaDonAsync();                     // int?; lỗi → null
+   if (pageCts.IsCancellationRequested) return;             // rời trang trong lúc chờ (giống dòng 1378)
+   realtime = ActivatorUtilities.CreateInstance<OrderRealtime>(Services);
+   await realtime.StartAsync(OnDonThayDoi, () => _ = InvokeAsync(StateHasChanged));
+   if (pageCts.IsCancellationRequested) return;
+   await LoadOrders();                                      // như hiện nay
+   ```
 3. **`OnDonThayDoi(ds)`** chạy trong `InvokeAsync`:
-   - `foreach (var d in ds) GhiNhanDonMoi(d);`
-   - Nếu `selectedOrder` có trong `ds`:
-     - đang mở hộp sửa / hủy của chính đơn đó → bật cờ `donVuaDoiOMayKhac` và hiện trong hộp "Đơn vừa được cập nhật ở máy khác". Không thay dữ liệu đang sửa dưới tay người dùng;
-     - không mở hộp nào → `selectedOrder = d`.
-   - `if (DangThaoTac) canTaiLai = true; else await LoadOrders(quiet: true);`
-   - `StateHasChanged()`.
-4. **Quy tắc "đơn mới"** (`GhiNhanDonMoi(d)`), áp cho cả dữ liệu từ `thay-doi` **và** mỗi lần `LoadOrders`:
-   - Điều kiện: `d.MaNguoiDung is null` (đơn từ tablet), `d.MaDonHang > mocMaDon` (tạo sau lúc mở trang), `d.DangPhucVu` và `daBao.Add(d.MaDonHang)` (chưa từng báo).
-   - Đủ điều kiện thì đưa vào `newOrderIds`, `newOrderCache`, và `newBannerHidden = false`.
-   - Đơn đang trong banner mà không còn `DangPhucVu` (đã phục vụ / hủy ở máy khác) → bỏ khỏi banner.
+
+   ```csharp
+   if (mocMaDon is null) mocMaDon = await LayMocMaDonAsync();   // máy chủ vừa có lại (thường đi kèm ds rỗng)
+   foreach (var d in ds) GhiNhanDonMoi(d);
+   if (DangMoHopCuaDon(ds)) donVuaDoiOMayKhac = true;           // hộp sửa / hủy: cảnh báo, KHÔNG thay dữ liệu đang sửa
+   if (DangThaoTac) canTaiLai = true; else await LoadOrders(quiet: true);   // RefreshSelected cập nhật khung chi tiết + ô số nhận món
+   StateHasChanged();
+   ```
+   Cảnh báo trong hộp: "Đơn vừa được cập nhật ở máy khác. Đóng hộp để xem bản mới."
+4. **Quy tắc "đơn mới"** `GhiNhanDonMoi(d)`, áp cho dữ liệu từ `thay-doi` **và** cho danh sách mỗi lần `LoadOrders`, theo đúng thứ tự:
+   1. Đơn **đang có trong banner** (`newOrderIds.Contains(id)`): cập nhật `newOrderCache[id] = d`. Nếu `!d.DangPhucVu` (đã phục vụ / hủy ở máy khác) thì bỏ khỏi banner.
+   2. Ngược lại, đơn mới khi đủ cả 4 điều kiện:
+      - `mocMaDon is not null`: chưa có mốc thì không báo gì, tránh báo nhầm hàng loạt khi máy chủ vừa có lại;
+      - `d.MaNguoiDung is null`: đơn từ tablet;
+      - `d.MaDonHang > mocMaDon`: tạo sau lúc mở trang;
+      - `d.DangPhucVu && daBao.Add(id)`: còn cần xử lý và chưa từng báo.
+      
+      Đủ điều kiện thì thêm vào `newOrderIds`, `newOrderCache`, và đặt `newBannerHidden = false`.
    - Mở xem đơn (`SelectOrder`) vẫn bỏ đơn khỏi banner như hiện nay. `daBao` giữ mã đó nên đơn không quay lại banner.
-   - Vì sao dùng `mocMaDon` mà không cần "tập mã đã thấy" của bản 2.0: con trỏ đã bảo đảm **không bỏ sót thay đổi nào**; còn `mocMaDon` chỉ để phân biệt "đơn tạo sau khi mở trang" với "đơn cũ vừa được sửa".
+   - Vì sao `mocMaDon` là đủ, không cần "tập mã đã thấy" của bản 2.0: con trỏ đã bảo đảm **không bỏ sót thay đổi nào**. `mocMaDon` chỉ để phân biệt "đơn tạo sau khi mở trang" với "đơn cũ vừa được sửa". Đơn tại quầy có `MaNguoiDung` nên không bao giờ bị báo.
    - Khe hở còn lại: một đơn được tạo **đúng trong vài mili giây** giữa bước lấy `mocMaDon` và bước lấy con trỏ. Đơn đó vẫn hiện trong bảng (bước `LoadOrders`) và vẫn được báo nếu đang xem trang 1, nên chấp nhận được.
-5. **Chỉ báo kết nối** đặt ở chỗ nút "Tự cập nhật" cũ, dùng lại kiểu `.live-toggle` nhưng là `<span role="status">`, không phải nút:
-   - `Realtime.DaKetNoi` → "● Đang nhận đơn trực tiếp";
-   - ngược lại → "Mất kết nối máy chủ, đang thử lại…" kèm nút "Thử lại" gọi `Realtime.DongBoAsync()`.
-   - `OnTrangThaiDoi` → `InvokeAsync(StateHasChanged)`.
-6. **Lỗi 409:** trong các `catch (ApiException ex)` của thao tác (thu tiền, hủy, sửa món, đổi phục vụ, số nhận món), nếu `ex.Code == OrderService.MaLoiDonDaThayDoi` thì hiện `ex.Message` (thông báo tiếng Việt của máy chủ) và `LoadOrders(quiet: true)`.
-7. **Giải phóng:** trang đổi từ `IDisposable` sang `IAsyncDisposable`. Trong `DisposeAsync`: hủy đăng ký 2 sự kiện, `await Realtime.DisposeAsync()`, rồi dispose `Timer` / `CancellationTokenSource` như hiện nay.
+5. **Chỉ báo kết nối** đặt ở chỗ nút "Tự cập nhật" cũ. Dùng lại kiểu `.live-toggle` nhưng là `<span role="status">`, không phải nút, và **không có nút "Thử lại"** vì vòng nền đã tự thử 3 giây một lần:
+
+   | `realtime.TrangThai` | Chữ hiển thị |
+   |---|---|
+   | `TrucTiep` | "● Đang nhận đơn trực tiếp" |
+   | `DoDinhKy` | "Đang cập nhật mỗi 3 giây" (REST chạy, chưa có kênh trực tiếp) |
+   | `MatKetNoi` | "Mất kết nối máy chủ, đang thử lại…" |
+6. **Lỗi 409:** áp cùng mẫu đang có ở thu tiền (dòng 1972–1980: hiện `ex.Message`, nếu `ex.Status == 409` thì `LoadOrders(quiet: true)`) cho hủy, sửa món, đổi phục vụ và số nhận món. `ApiClient` đã dùng câu tiếng Việt của máy chủ cho 409.
+7. **Giải phóng:** đổi `@implements IDisposable` thành `@implements IAsyncDisposable`. Trong `DisposeAsync`: `if (realtime is not null) await realtime.DisposeAsync();`, rồi dispose `Timer` / `CancellationTokenSource` như hiện nay. Callback được truyền vào `StartAsync`, nên không có sự kiện nào phải hủy đăng ký.
+8. (Tùy chọn) Nếu thấy bảng nháy khi tải lại, thêm `@key="order.MaDonHang"` cho dòng bảng.
 
 #### 6.4.5. Một thao tác ở máy A hiện ở máy B (ví dụ thu tiền)
 
@@ -944,28 +997,28 @@ Ghi chú:
 | 0 ms | Máy A bấm "Thu tiền" → `POST thanh-toan` |
 | ~40 ms | Backend: SP thu tiền + trừ kho, commit → chuông `DonHangThayDoi` |
 | ~60 ms | Máy B nhận chuông → `GET thay-doi` → có đơn với `phienBan` mới |
-| ~100 ms | Máy B: khung chi tiết đổi sang "Đã thu"; bảng tải lại (1 request) |
-| ~150 ms | Máy B hiển thị xong |
+| ~110 ms | Máy B tải lại trang bảng đang xem (1 request) → bảng và khung chi tiết hiện "Đã thu" |
 
-Nếu máy B đang mở hộp sửa đơn đó: hộp hiện cảnh báo. Bấm Lưu thì nhận 409 (hoặc lỗi "Đơn đã thanh toán" từ backend), không ghi đè.
+Nếu máy B đang mở hộp sửa đơn đó thì hộp hiện cảnh báo. Bấm Lưu thì nhận lỗi từ máy chủ (409, hoặc "đơn đã thanh toán"), không ghi đè.
 
 #### 6.4.6. Khi backend thiếu một phần
 
 | Backend | Web chạy thế nào |
 |---|---|
-| Có cả `thay-doi` và hub | Trễ < 1 giây; dự phòng 30 giây |
-| Có `thay-doi`, chưa có hub (404) | Vẫn chạy: vòng nền đồng bộ **3 giây** một lần; chỉ báo hiện "Mất kết nối…"; `KetNoiAsync` thử lại chậm. Không cần code riêng cho trường hợp này |
+| Có cả `thay-doi` và hub | Trễ < 1 giây; dự phòng 30 giây; chỉ báo "● Đang nhận đơn trực tiếp" |
+| Có `thay-doi`, chưa có hub (404) | Vẫn chạy: vòng nền đồng bộ **3 giây** một lần, chỉ báo "Đang cập nhật mỗi 3 giây". Không cần code riêng. Chrome vẫn in đỏ request `negotiate` 404 (khoảng 30 giây một lần) trong tab Network / Console; điều này bình thường, không phải lỗi .NET |
 | Chưa có `thay-doi` | **Không hỗ trợ.** Chỉ gộp giai đoạn 3 sau khi backend giai đoạn 1 đã lên |
 
 #### 6.4.7. Xong khi
 
-- [ ] Tablet đặt đơn → banner + bảng ở máy quầy cập nhật < 1 giây (log `trễ … ms`).
+- [ ] Tablet đặt đơn → banner + bảng ở máy quầy cập nhật < 1 giây (Console có dòng "Chuông đơn #…, trễ … ms").
 - [ ] Máy A thu tiền / hủy / đổi phục vụ / đổi số nhận món / sửa món → máy B thấy < 1 giây.
 - [ ] Đang mở hộp sửa đơn #X ở máy B, máy A thu tiền #X → hộp ở B hiện cảnh báo; bảng không nhảy dưới tay.
 - [ ] Hai máy cùng hủy một đơn → một máy thành công, máy kia hiện thông báo 409 rõ ràng.
-- [ ] Tắt backend 2 phút rồi bật → tự kết nối lại không cần F5, không mất đơn.
+- [ ] Tắt backend 2 phút rồi bật → chỉ báo chuyển "Mất kết nối…" rồi tự trở lại "Đang nhận đơn trực tiếp", không cần F5, không mất đơn, không báo nhầm đơn cũ là đơn mới.
+- [ ] Mở trang khi backend đang tắt, rồi bật backend → bảng tự tải, banner không báo nhầm.
 - [ ] Rời trang Đơn hàng / đăng xuất → tab Network không còn request `thay-doi` hay kết nối hub nào.
-- [ ] Backend chỉ có `thay-doi` (tắt hub) → web vẫn cập nhật trong ≤ 3 giây.
+- [ ] Backend chỉ có `thay-doi` (tắt hub) → web vẫn cập nhật trong ≤ 3 giây, không có thanh lỗi Blazor.
 - [ ] Rà soát bằng code-reviewer + ui-ux-reviewer.
 
 ### 6.5. Giai đoạn 4: tablet (đề xuất cho nhóm Flutter, kèm R6, R7 cho backend)
@@ -1015,11 +1068,11 @@ Thứ tự: **0 làm ngay**. Đường chính là 1 → 2 → 3. Giai đoạn 4 
 | Hai transaction chồng nhau, cái lấy số nhỏ commit sau | Mốc `MIN_ACTIVE_ROWVERSION` đọc trước → con trỏ dừng trước nó | Lượt sau lấy được cả hai (mục 2.8) |
 | Chuông đến khi mốc còn bị giữ | `phienBanChuong > conTro` | Đọc lại sau 300 ms, rồi để vòng nền bắt |
 | Thay đổi xảy ra giữa lúc lấy con trỏ đầu và lúc hub kết nối xong | Không có chuông cho nó | `DongBoAsync()` chạy ngay sau `StartAsync` |
-| Mở trang khi máy chủ đang tắt | Chưa lấy được con trỏ | Vòng nền thử lại 3 giây một lần; lấy được con trỏ thì báo trang tải lại bảng |
+| Mở trang khi máy chủ đang tắt | Chưa lấy được mốc mã đơn và con trỏ | Vòng nền thử lại 3 giây một lần; lấy được con trỏ thì trang lấy lại mốc rồi tải lại bảng. Chưa có mốc thì banner không báo gì, nên không báo nhầm đơn cũ |
 | Máy A thao tác khi máy B đang mở hộp sửa cùng đơn | B nhận thay đổi | Hộp ở B hiện cảnh báo, không thay dữ liệu dưới tay; B bấm Lưu thì nhận 409 / lỗi trạng thái |
 | Wifi máy quầy mất 1 phút | Chỉ báo chuyển sang "Mất kết nối", dò 3 giây, hub thử lại mãi | Có mạng lại → `Reconnected` → đồng bộ theo con trỏ |
 | Máy chủ khởi động lại | Kết nối rớt; lâu quá thì `Closed` → tự khởi động lại | Con trỏ là số trong DB, không mất |
-| Tin lộn thứ tự / trùng | Ví dụ "Đã thu" đến trước "Tạo" | Chỉ nhận bản có `phienBan` lớn hơn; dữ liệu luôn đọc từ DB |
+| Tin lộn thứ tự / trùng | Ví dụ "Đã thu" đến trước "Tạo" | Chuông chỉ kích hoạt việc đọc; máy chủ chỉ trả bản mới hơn con trỏ và con trỏ chỉ tăng; dữ liệu luôn đọc từ DB |
 | Hai máy cùng thu tiền một đơn | SP có `WHERE … PENDING` → một máy thành công | Máy kia nhận lỗi và thấy "Đã thu" < 1 giây |
 | Hai máy cùng hủy / đổi phương thức | `DbUpdateConcurrencyException` | 409 `DON_DA_THAY_DOI`, web tải lại |
 | Tab admin bị ẩn lâu | Hẹn giờ bị làm chậm | WebSocket vẫn nhận chuông, và lời gọi đồng bộ chạy ngay khi chuông tới |
@@ -1069,7 +1122,7 @@ Thứ tự: **0 làm ngay**. Đường chính là 1 → 2 → 3. Giai đoạn 4 
 | T8 | Máy A và B cùng hủy đơn #X | Một bên thành công, bên kia 409 với thông báo rõ | 1 |
 | T9 | Xóa tài khoản nhân viên đang đăng nhập | Lượt đọc kế tiếp nhận 401 → đăng xuất | 3 |
 | T10 | Tab admin ẩn 10 phút, tablet đặt đơn, rồi mở lại tab | Đơn đã có sẵn trên banner + bảng: GĐ 0 trong ≤ ~60 giây (Chrome làm chậm hẹn giờ, mục 2.13), GĐ 3 < 1 giây | 0, 3 |
-| T11 | Backend có `thay-doi` nhưng tắt hub | Web vẫn cập nhật trong ≤ 3 giây, chỉ báo hiện "Mất kết nối…", console không lỗi đỏ | 3 |
+| T11 | Backend có `thay-doi` nhưng tắt hub | Web vẫn cập nhật trong ≤ 3 giây, chỉ báo "Đang cập nhật mỗi 3 giây", không có thanh lỗi Blazor (request `negotiate` 404 màu đỏ trong Network là bình thường) | 3 |
 | T12 | 20 đơn trong 1 phút | Không đơ, không mất, thứ tự đúng | 0, 3 |
 | T13 | Khách sửa giỏ sau khi đã đặt | Vẫn 1 đơn, món đã cập nhật | 4 |
 | T14 | Điện thoại chủ quán vào web qua wifi quán | Kết nối được (địa chỉ LAN, CORS đúng origin) | 1, 2 |
