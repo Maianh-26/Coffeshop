@@ -65,7 +65,7 @@ Người dùng đã được hỏi có ghi phần này vào tài liệu đề xu
 ## 5. Việc còn mở / cần hỏi người dùng
 
 - [ ] Push nhánh `web-admin` và mở PR cho trưởng nhóm (chỉ làm khi người dùng yêu cầu).
-- [ ] `CLAUDE.md` có 3 chỗ đã lỗi thời: dòng 21 ("backend has only payment statuses"), dòng 49 ("orders cannot be edited"), dòng 70 (`TrangThaiDon` "`Label`/`Color`", nay dùng `Tone`; `TrangThaiDon.Color` không còn ai gọi). Hỏi người dùng trước khi sửa.
+- [x] ~~`CLAUDE.md` có 3 chỗ lỗi thời~~ — đã sửa 28/11/2026 (dòng về trạng thái thanh toán và sửa đơn đã đúng từ trước; dòng `TrangThaiDon` `Label`/`Color` đổi thành `Label` + `Tone` của `PhuongThucThanhToans` / `TrangThaiPhucVus`). `TrangThaiDon.Color` không còn ai gọi — xóa ở việc 5B.1 của `ke-hoach-cai-tien-chuc-nang.md`.
 - [ ] Thu tiền mặt một cú bấm, không hỏi lại, không hoàn tác: agent đề nghị thêm xác nhận hoặc hoàn tác vài giây. Chờ chủ quán quyết định.
 - [ ] Có cho hủy đơn "Đã phục vụ" không? Có bắt buộc thu tiền trước khi phục vụ không? Chờ chủ quán.
 - [x] ~~Trên điện thoại, thông báo nổi che nút In hóa đơn khoảng 6 giây~~ — hết, đã bỏ thông báo nổi (25/11).

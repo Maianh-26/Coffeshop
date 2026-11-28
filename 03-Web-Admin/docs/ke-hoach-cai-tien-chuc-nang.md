@@ -77,7 +77,7 @@ Tiêu chí: **code đơn giản, dễ hiểu, logic rõ, không có code rác.**
   Co-Authored-By: ...
   ```
 
-- Tên module dùng trong tiêu đề: `nen-tang`, `tai-khoan`, `thuc-don`, `kho`, `khuyen-mai`, `don-hang`, `bao-cao`.
+- Tên module dùng trong tiêu đề: `nen-tang`, `tai-khoan`, `thuc-don`, `kho`, `khuyen-mai`, `don-hang`, `bao-cao`; việc chung nhiều module: `giao-dien` (chỉ `app.css` / `index.html`), `tai-lieu` (chỉ tài liệu).
 - Ví dụ tốt: `don-hang(api): chặn thu tiền 2 lần trong sp_ThanhToanVaTruKho bằng UPDATE có điều kiện`.
 - **Cấm** tiêu đề mơ hồ: "cập nhật", "sửa lỗi", "fix", "update code", "chỉnh sửa", "hoàn thiện", "tối ưu" đứng một mình không nói sửa gì, ở đâu.
 - **Push sau mỗi đầu việc** lên `web-admin` (`git push origin web-admin`), không hỏi lại. **Không bao giờ** push lên `main` / `API-HIHI`, không `--force`, không bỏ qua hook.
@@ -159,12 +159,12 @@ Thực đơn ──► Kho ──┐
 
 | Mã | Việc | Phía | Ghi chú |
 |---|---|---|---|
-| 0.1 | Rà ~30 file đang thay đổi chưa commit, build, chạy thử, **commit theo từng nhóm ý nghĩa** (phiên đăng nhập, Excel, tài liệu…) theo mẫu 1.6 | Web | Sau bước này cây làm việc sạch |
+| 0.1 | Rà ~30 file đang thay đổi chưa commit, build, chạy thử, **commit theo từng nhóm ý nghĩa** (phiên đăng nhập, Excel, tài liệu…) theo mẫu 1.6 | Web | Xong 28/11: 9 commit `aeb7bbe`…`e8c4a44` + gộp phần `main` đã qua PR (`788bc8d`). 5 commit "cap nhat" của `main` chưa gộp — xem Sổ việc phát sinh |
 | 0.2 | Tạo project `CoffeeShop.Admin.Tests` cho logic thuần đang có: `DatePresets`, `SearchText`, `ColumnSort`, `DocSoTien`, `TokenClaims`, các lớp trạng thái, `XlsxWriter` | Web | Skill `dotnet-test:*`. Đây là công cụ kiểm thử, không phải chức năng cho người dùng |
 | 0.3 | Viết **kịch bản khói** (mục 11) + script SQL **dữ liệu mẫu** cố định (món, topping, công thức, nguyên liệu, khuyến mãi, ~30 đơn đủ trạng thái), chạy trên DB bản sao | Web | Không đụng `QuanCaPheDB` thật |
 | 0.4 | Hỏi chủ quán **một lần** các câu ở 4.1, ghi câu trả lời vào bảng | Chủ quán | Chưa có câu trả lời của module nào thì chưa mở module đó |
 | 0.5 | **Múi giờ (B6):** backend cố định giờ Việt Nam cho mọi mốc thời gian (`DateTime.Now`, `GETDATE()`), ghi rõ vào `openapi.yaml`; web gửi / đọc giờ theo cùng quy ước | API + Web | Sửa lỗi nền: "Hôm nay", hạn khuyến mãi, báo cáo đều phụ thuộc |
-| 0.6 | Sửa 3 chỗ lỗi thời trong `CLAUDE.md` web (mục 5 của `tien-do-quan-ly-don-hang.md`) | Web | |
+| 0.6 | Sửa 3 chỗ lỗi thời trong `CLAUDE.md` web (mục 5 của `tien-do-quan-ly-don-hang.md`) | Web | Xong 28/11 |
 
 ### 4.1. Câu hỏi cần chủ quán chốt (chỉ hỏi về luật của chức năng đang có)
 
@@ -372,4 +372,5 @@ Ghi mọi lỗi / ý tưởng **ngoài phạm vi module đang làm**. Chỉ xử
 
 | Ngày | Phát hiện khi làm | Thuộc module | Mô tả | Loại (sửa lỗi / chức năng mới / luồng mới) | Mức (chặn / thường) | Câu hỏi đã đặt → trả lời | Xử lý |
 |---|---|---|---|---|---|---|---|
+| 28/11/2026 | 0.1 | Đơn hàng | 5 commit "cap nhat" (82e2e34, 3969bf5, 2afbdc4, 63393eb, e1a87d7) push thẳng lên `main`, không qua PR: sửa hóa đơn in trong `Orders.razor` bằng `style="..."` viết trong thẻ (trái quy tắc dùng `app.css`), đánh số dòng món, `@inject AppState` không dùng; bỏ `UQ_CongThuc_Topping` trong `QuanCaPheDB.sql`; thêm `03-Web-Admin/package-lock.json` rỗng | Sửa lỗi / giao diện | Thường (xung đột với phần hóa đơn của web-admin) | Tạm không gộp — chờ người dùng quyết | Chưa gộp |
 | | | | | | | | |
