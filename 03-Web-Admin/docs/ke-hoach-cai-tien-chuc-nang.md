@@ -118,7 +118,7 @@ Tiêu chí: **code đơn giản, dễ hiểu, logic rõ, không có code rác.**
 
 | Thứ tự | Module | Phụ thuộc | Cỡ | Trạng thái | Commit cuối / PR |
 |---|---|---|---|---|---|
-| 0 | Nền tảng: dọn việc dở, test, chốt câu hỏi, múi giờ | — | M | XONG (28/11) | commit cuối: xem `git log` "Mã việc: 0.5" |
+| 0 | Nền tảng: dọn việc dở, test, chốt câu hỏi, múi giờ | — | M | XONG việc 0.1–0.6 (28/11); **chưa đóng**: chưa chạy kịch bản khói trên giao diện, chưa mở PR (vướng 5 commit "cap nhat" của `main` — Sổ việc phát sinh) | commit cuối `e638e83` |
 | 1 | Đăng nhập & Tài khoản | 0 | S | CHƯA LÀM | |
 | 2 | Thực đơn: Món · Danh mục · Topping · Công thức | 0 | M | CHƯA LÀM | |
 | 3 | Kho nguyên liệu | 2 | S | CHƯA LÀM | |
