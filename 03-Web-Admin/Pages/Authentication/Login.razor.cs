@@ -80,28 +80,8 @@ public partial class Login
         }
     }
 
-    // Trang nhân viên được phép mở (khớp menu nhân viên)
-    private static readonly string[] StaffPages = ["orders"];
-
-    /// <summary>
-    /// Trang mở sau khi đăng nhập: trang định mở trước đó (nếu hợp lệ và đúng quyền),
-    /// không thì trang chính theo vai trò — chủ quán: Tổng quan, nhân viên: Đơn hàng.
-    /// </summary>
-    private string TargetAfterLogin(bool isAdmin)
-    {
-        string target = SafeReturnUrl();
-
-        if (isAdmin)
-        {
-            return target;
-        }
-
-        string page = target.Split('?', '#')[0].Trim('/');
-
-        return StaffPages.Any(p => page.Equals(p, StringComparison.OrdinalIgnoreCase))
-            ? target
-            : "orders";
-    }
+    /// <summary>Trang mở sau khi đăng nhập (đã lọc returnUrl an toàn, rồi lọc theo quyền — xem <see cref="Roles.AfterLogin"/>).</summary>
+    private string TargetAfterLogin(bool isAdmin) => Roles.AfterLogin(SafeReturnUrl(), isAdmin);
 
     /// <summary>
     /// Chỉ cho quay về đường dẫn NỘI BỘ của ứng dụng — dùng danh sách CHO PHÉP, không dùng danh sách chặn,
