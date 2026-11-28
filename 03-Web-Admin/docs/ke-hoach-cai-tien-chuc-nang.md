@@ -162,7 +162,7 @@ Thực đơn ──► Kho ──┐
 | 0.1 | Rà ~30 file đang thay đổi chưa commit, build, chạy thử, **commit theo từng nhóm ý nghĩa** (phiên đăng nhập, Excel, tài liệu…) theo mẫu 1.6 | Web | Xong 28/11: 9 commit `aeb7bbe`…`e8c4a44` + gộp phần `main` đã qua PR (`788bc8d`). 5 commit "cap nhat" của `main` chưa gộp — xem Sổ việc phát sinh |
 | 0.2 | Tạo project `CoffeeShop.Admin.Tests` cho logic thuần đang có: `DatePresets`, `SearchText`, `ColumnSort`, `DocSoTien`, `TokenClaims`, các lớp trạng thái, `XlsxWriter` | Web | Skill `dotnet-test:*`. Đây là công cụ kiểm thử, không phải chức năng cho người dùng |
 | 0.3 | Viết **kịch bản khói** (mục 11) + script SQL **dữ liệu mẫu** cố định (món, topping, công thức, nguyên liệu, khuyến mãi, ~30 đơn đủ trạng thái), chạy trên DB bản sao | Web | Không đụng `QuanCaPheDB` thật |
-| 0.4 | Hỏi chủ quán **một lần** các câu ở 4.1, ghi câu trả lời vào bảng | Chủ quán | Chưa có câu trả lời của module nào thì chưa mở module đó |
+| 0.4 | Hỏi chủ quán **một lần** các câu ở 4.1, ghi câu trả lời vào bảng | Chủ quán | Xong 28/11 (mục 4.1); còn P1–P3 ở mục 4.2 — cần trước Module 2, 4, 5 |
 | 0.5 | **Múi giờ (B6):** backend cố định giờ Việt Nam cho mọi mốc thời gian (`DateTime.Now`, `GETDATE()`), ghi rõ vào `openapi.yaml`; web gửi / đọc giờ theo cùng quy ước | API + Web | Sửa lỗi nền: "Hôm nay", hạn khuyến mãi, báo cáo đều phụ thuộc |
 | 0.6 | Sửa 3 chỗ lỗi thời trong `CLAUDE.md` web (mục 5 của `tien-do-quan-ly-don-hang.md`) | Web | Xong 28/11 |
 
@@ -170,14 +170,29 @@ Thực đơn ──► Kho ──┐
 
 | # | Câu hỏi | Dùng cho | Trả lời |
 |---|---|---|---|
-| Q1 | Món / topping **chưa có công thức**: vẫn cho bán (không trừ kho) hay không cho bán? | 2.3 | |
-| Q2 | Một món chỉ thuộc **một** khuyến mãi (như hiện tại) — giữ nguyên? | 4.1 | |
-| Q3 | Kho trừ **lúc nào**: lúc bắt đầu pha (Đang chuẩn bị), lúc Đã phục vụ, hay lúc thu tiền (như hiện tại)? | 5C.4 | |
-| Q4 | Hủy đơn **đã thu nhưng chưa pha**: có trả lại nguyên liệu vào kho không? | 5C.5 | |
-| Q5 | Có cho **hủy đơn đã phục vụ** không? Có **bắt buộc thu tiền trước khi phục vụ** không? | 5C.8 | |
-| Q6 | Nút Thu tiền hiện bấm một lần là xong: có cần **hỏi lại xác nhận** trước khi ghi không? | 5C.9 | |
-| Q7 | Báo cáo: tiền hoàn trừ vào **ngày hoàn tiền** (số của ngày đã chốt không đổi về sau) — đồng ý? | 6.1 | |
-| Q8 | Giờ cao điểm tính theo giờ **khách đặt** hay giờ **thu tiền** (như hiện tại)? | 6.3 | |
+| Q1 | Món / topping **chưa có công thức**: vẫn cho bán (không trừ kho) hay không cho bán? | 2.3, 2.8, 2.9 | **28/11:** công thức phải nhập **ngay trong form Thêm món** (mỗi size một công thức) mới thêm được món; form **Sửa** cũng sửa được công thức từng size; nút **Công thức** chỉ còn **xem** (không thêm / sửa), hiện lần lượt công thức của mọi size của món đang chọn, **bỏ ô sổ xuống chọn món khác**. Còn hỏi: topping có áp dụng giống vậy không (P1, mục 4.2) |
+| Q2 | Một món chỉ thuộc **một** khuyến mãi (như hiện tại) — giữ nguyên? | 4.1, 4.2 | **28/11:** **bỏ giờ vàng**, khuyến mãi chỉ theo ngày (ví dụ 20/10, 11/11); **1 ngày tối đa 1 khuyến mãi**; thêm khuyến mãi thì chọn các món được giảm. Còn hỏi: một món có được nằm trong nhiều khuyến mãi khác ngày không (P2, mục 4.2) |
+| Q3 | Kho trừ **lúc nào**: lúc bắt đầu pha (Đang chuẩn bị), lúc Đã phục vụ, hay lúc thu tiền (như hiện tại)? | 5C.4 | **28/11: lúc bắt đầu pha** (bấm Đang chuẩn bị); thu tiền không trừ nữa |
+| Q4 | Hủy đơn **đã thu nhưng chưa pha**: có trả lại nguyên liệu vào kho không? | 5C.5 | **28/11: tự trả lại kho.** Theo Q3 thì đơn chưa pha chưa bị trừ kho, nên chỉ còn áp dụng cho đơn đã bị trừ theo luật cũ (thu tiền trước khi pha) lúc chuyển đổi |
+| Q5 | Có cho **hủy đơn đã phục vụ** không? Có **bắt buộc thu tiền trước khi phục vụ** không? | 5C.8 | **28/11: bắt buộc thu tiền trước khi bấm Đã phục vụ; đơn đã phục vụ không hủy được** |
+| Q6 | Nút Thu tiền hiện bấm một lần là xong: có cần **hỏi lại xác nhận** trước khi ghi không? | 5C.9 | **28/11: thêm hộp xác nhận thu tiền.** Hướng xác nhận chuyển khoản (tự động hay bấm tay) — xem P3, mục 4.2 |
+| Q7 | Báo cáo: tiền hoàn trừ vào **ngày hoàn tiền** (số của ngày đã chốt không đổi về sau) — đồng ý? | 6.1 | **28/11: trừ vào ngày hoàn** |
+| Q8 | Giờ cao điểm tính theo giờ **khách đặt** hay giờ **thu tiền** (như hiện tại)? | 6.3 | **28/11: giữ giờ thu tiền** (6.3 không làm) |
+
+### 4.2. Câu hỏi còn mở sau lượt trả lời 28/11
+
+| # | Câu hỏi | Dùng cho | Đề xuất | Trả lời |
+|---|---|---|---|---|
+| P1 | Topping cũng bắt buộc nhập công thức trong form Thêm / Sửa topping và nút Công thức chỉ xem — giống món? | 2.8, 2.9 | Có, để cùng một luật (topping cũng trừ kho) | |
+| P2 | CSDL hiện gắn khuyến mãi **ngay trên món** (`TenMon.MaKhuyenMai`, mỗi món 1 ô) → món chỉ nằm trong **một** khuyến mãi tại một thời điểm. Tạo trước KM 11/11 có Cà phê sữa thì Cà phê sữa bị rút khỏi KM 20/10 chưa diễn ra. Chọn: (a) giữ CSDL, chặn thêm món đang thuộc KM **chưa kết thúc** khác; (b) đổi sang bảng nối khuyến mãi – món (một món nằm được trong nhiều KM khác ngày) | 4.2 | (b) đúng với cách quán dùng KM theo ngày; (a) ít sửa hơn nhưng phải tạo KM lần lượt | |
+| P3 | Xác nhận chuyển khoản: tự động qua ngân hàng hay nhân viên bấm tay? (phân tích ở mục 4.3) | 5C.9 | Bấm tay có hộp xác nhận; tự động để đợt sau | |
+
+### 4.3. Phân tích: xác nhận tiền mặt / chuyển khoản (Q6)
+
+- **Hiện có:** tablet cho khách chọn QR hoặc tiền mặt (đổi được khi đơn còn chờ qua `PUT don-hang/{id}/phuong-thuc-thanh-toan`), tablet hỏi `GET don-hang/{id}/trang-thai` để biết đã thanh toán. Web có ô chọn Tiền mặt | Chuyển khoản + một nút xác nhận (nhãn đổi theo lựa chọn). **Chưa có** kết nối ngân hàng: hệ thống không tự biết tiền chuyển khoản đã vào tài khoản.
+- **Tự động xác nhận chuyển khoản** cần dịch vụ trung gian đọc giao dịch ngân hàng và gọi về backend (webhook — ví dụ các dịch vụ VietQR / cổng thanh toán), kèm mã đơn trong nội dung chuyển khoản, API nhận webhook có xác thực, xử lý chuyển thiếu / thừa / sai nội dung. Đây là **chức năng mới**, cần tài khoản dịch vụ và chi phí → không thuộc đợt sửa lỗi này (mục 12).
+- **Đề xuất cho đợt này:** giữ **một khối thanh toán** với ô chọn hình thức (mặc định = lựa chọn của khách), bấm xác nhận thì **mở hộp xác nhận**: tiền mặt → "Xác nhận đã thu X đ tiền mặt?"; chuyển khoản → "Đã kiểm tra tài khoản nhận được X đ?". Không tách 2 nút riêng vì ô chọn đã làm việc đó và tránh bấm nhầm nút. Tablet vẫn tự thấy "đã thanh toán" ngay sau khi nhân viên xác nhận.
+- **Đợt sau (nếu chủ quán muốn):** tích hợp webhook ngân hàng → đơn QR tự chuyển PAID, nút xác nhận chuyển khoản chỉ còn dùng khi webhook lỗi.
 
 **DoD Giai đoạn 0:** cây làm việc sạch; project test chạy được; kịch bản khói + dữ liệu mẫu có sẵn; Q1–Q8 đã trả lời; múi giờ đã sửa và kiểm tra; build sạch cả 2 phía.
 
@@ -206,11 +221,13 @@ Thực đơn ──► Kho ──┐
 |---|---|---|---|
 | 2.1 | **B9:** API món / topping trả `coCongThuc` cho từng size và từng topping | API | Hoàn thiện cảnh báo công thức trống đã có trên web |
 | 2.2 | Cột trạng thái món / topping hiện nhãn **"Chưa có công thức"** dựa trên 2.1 (hiện web chỉ biết khi mở hộp Công thức) | Web | Dùng nhãn trong cột đang có, không thêm cột / bộ lọc mới |
-| 2.3 | Theo Q1: nếu không cho bán → backend tính `coTheBan = false` và từ chối đặt món-size / topping chưa có công thức | API + Web | |
+| 2.3 | Theo Q1: món / topping mới luôn có công thức (2.8). Món cũ chưa có công thức: nhãn "Chưa có công thức" (2.2); backend chặn **thêm món / thêm size** không kèm công thức | API + Web | |
 | 2.4 | **B14:** lưu công thức có nguyên liệu đã ngừng dùng → backend trả 422; web hiện lỗi ngay cạnh dòng (hiện web chỉ cảnh báo) | API + Web | |
 | 2.5 | Rà các trường hợp **Xóa** bị chặn: danh mục còn món, món / topping đang trong đơn chưa xong, nguyên liệu đang trong công thức → backend chặn đúng, web `DeleteBlockedReason` nói đúng lý do | API + Web | |
 | 2.6 | Test tự động: `TrangThaiMon.Of`, validate form giá theo size | Web | |
 | 2.7 | **Rà soát code của module:** `Products.razor.cs` (778 dòng, 3 tab chung một lớp) — tách logic từng tab nếu đọc khó; xóa `Utilities/ModelCopy.cs` (không còn nơi nào dùng); backend: kiểm tra mọi `ToDto` có đủ `Include` (thiếu thì giá / tình trạng sai âm thầm) | Web + API | |
+| 2.8 | **Q1:** form **Thêm món** có phần công thức cho **từng size** đã chọn giá (bắt buộc ≥ 1 dòng nguyên liệu mỗi size, không đủ thì không lưu); form **Sửa món** sửa được công thức từng size. Backend nhận món + giá + công thức trong một lần lưu (một transaction) để không có món "nửa vời" | API + Web | Sửa luồng Thêm / Sửa đang có |
+| 2.9 | **Q1:** nút **Công thức** chỉ còn **xem**: hiện lần lượt công thức của mọi size của món đang chọn, không có nút thêm / sửa / lưu, **bỏ ô sổ xuống chọn món khác** | Web | Sửa hộp Công thức đang có |
 
 **Kịch bản kiểm thử tay:** thêm món 3 size + công thức → hộp tạo đơn tại quầy hiện đúng giá; sửa giá → đơn cũ giữ giá cũ; ngừng bán / tạm hết → không đặt được, vẫn hiện trên bảng; món chưa có công thức → có nhãn và xử lý đúng theo Q1; công thức có nguyên liệu ngừng dùng → bị chặn; xóa danh mục còn món → bị chặn, nói rõ lý do.
 
@@ -239,14 +256,14 @@ Thực đơn ──► Kho ──┐
 
 | Mã | Việc | Phía | Ghi chú |
 |---|---|---|---|
-| 4.1 | Theo Q2: tích một món **đang thuộc khuyến mãi khác** hiện chỉ có nhãn xám rồi chuyển âm thầm khi lưu → khi lưu phải hỏi lại "Chuyển món X từ KM A sang KM B?" | Web | Sửa luồng lưu đang có |
-| 4.2 | Giờ vàng: kiểm tra khung giờ qua nửa đêm (22:00–02:00), giờ bắt đầu = giờ kết thúc, chỉ nhập một trong hai giờ → backend và web **cùng một luật**, cùng câu báo lỗi | API + Web | Sau 0.5 (múi giờ) |
+| 4.1 | Theo Q2: **bỏ giờ vàng** — web bỏ 2 ô giờ trong form, cột Giờ vàng, `OutsideGoldenHours`, ghi chú "Ngoài giờ vàng lúc này"; backend bỏ kiểm tra / áp khung giờ trong `GiaSauGiam`, không nhận `gioBatDau` / `gioKetThuc` nữa (cập nhật `openapi.yaml`), script vá đặt các giờ đang có về NULL | API + Web + script SQL | Báo nhóm tablet nếu tablet đọc 2 trường giờ |
+| 4.2 | Theo Q2: **1 ngày tối đa 1 khuyến mãi** — backend chặn khoảng ngày chồng lên khuyến mãi khác (409, câu nói rõ trùng với mã nào); web hiện lỗi ngay ở ô ngày | API + Web | Cách gắn món: chờ P2 |
 | 4.3 | Backend kiểm tra hợp lệ giống web: mã trùng, % ngoài 0,01–100, ngày kết thúc trước ngày bắt đầu | API | Web đã chặn; backend phải chặn khi gọi thẳng API |
 | 4.4 | Xóa khuyến mãi đang áp dụng: câu hỏi xác nhận nói rõ các món về giá gốc ngay | Web | Sửa câu của hộp xác nhận đang có |
-| 4.5 | Test tự động: `TrangThaiKhuyenMai.Of`, `OutsideGoldenHours` (cả qua nửa đêm), `KhuyenMaiForm.Validate` | Web | |
+| 4.5 | Test tự động: `TrangThaiKhuyenMai.Of`, `KhuyenMaiForm.Validate` (ngày kết thúc trước ngày bắt đầu) | Web | |
 | 4.6 | **Rà soát code của module:** logic "đang áp dụng" có ở cả web (`TrangThaiKhuyenMai`) lẫn backend (`DangApDung`) → web dùng `dangApDung` của backend làm chuẩn nếu được, tránh 2 nơi tính lệch nhau | Web + API | |
 
-**Kịch bản kiểm thử tay:** KM 20% món A hôm nay → đặt đơn A đúng 80%; ngoài giờ vàng → giá gốc; KM hết hạn → giá gốc; chuyển món sang KM khác → có hỏi lại; đơn đặt trước khi sửa KM giữ giá cũ; gọi thẳng API với dữ liệu sai → 400.
+**Kịch bản kiểm thử tay:** KM 20% món A hôm nay → đặt đơn A đúng 80% (cả giờ nào trong ngày); KM hết hạn → giá gốc; tạo KM thứ hai trùng ngày → bị chặn; đơn đặt trước khi sửa KM giữ giá cũ; gọi thẳng API với dữ liệu sai → 400.
 
 ---
 
@@ -280,12 +297,12 @@ Làm **đúng thứ tự 5A → 5D**.
 | 5C.1 | **Thu tiền 2 lần:** `sp_ThanhToanVaTruKho` dùng `UPDATE … WHERE TrangThaiThanhToan='PENDING'` + kiểm tra `@@ROWCOUNT`; truyền hình thức thanh toán vào SP (không lưu trước khi gọi SP) | API + script SQL | Hiện có thể trừ kho 2 lần / ghi đè hình thức |
 | 5C.2 | **B4:** `Huy()` và các thao tác đổi đơn cập nhật **có điều kiện** theo trạng thái đã đọc (như `SuaMon` đang làm); 0 dòng → 409 | API | Không thêm cột mới nếu cập nhật có điều kiện là đủ |
 | 5C.3 | Web xử lý 409 **một chỗ duy nhất**: tải lại đơn, báo "Đơn vừa được thay đổi ở máy khác" (hiện mỗi thao tác tự xử lý riêng) | Web | |
-| 5C.4 | **B1 / Q3:** chuyển thời điểm trừ kho theo quyết định của chủ quán; không trừ 2 lần | API + script SQL | |
-| 5C.5 | **B2 / Q4:** hủy đơn đã thu + chưa pha → trả lại kho, ghi `LichSuKho` (dùng loại giao dịch đang có hoặc thêm một giá trị loại, không thêm bảng) | API + Web (`LoaiGiaoDichKho`) | |
+| 5C.4 | **B1 / Q3:** trừ kho khi đơn chuyển sang **Đang chuẩn bị** (gọi thủ tục trừ kho trong `DoiTrangThaiPhucVu`); `sp_ThanhToanVaTruKho` chỉ còn đổi trạng thái thanh toán, không trừ kho; không trừ 2 lần | API + script SQL | |
+| 5C.5 | **B2 / Q4:** hủy đơn đã bị trừ kho mà chưa pha (chỉ còn đơn trừ theo luật cũ) → trả lại kho, ghi `LichSuKho` (dùng loại giao dịch đang có hoặc thêm một giá trị loại, không thêm bảng) | API + Web (`LoaiGiaoDichKho`) | |
 | 5C.6 | Hộp **Hủy đơn**: viết lại câu ảnh hưởng kho theo luật mới (bỏ câu "gợi ý nhập lại / xuất hủy" nếu hệ thống đã tự làm) | Web | |
-| 5C.7 | **B3 (phần đơn):** thủ tục trừ kho kiểm tra lại tồn, thiếu → 422 `HET_NGUYEN_LIEU`, không tồn âm; web hiện danh sách thiếu (đã có khung hiển thị) | API + Web | |
-| 5C.8 | Theo Q5: chặn / cho phép hủy đơn đã phục vụ; bắt buộc / không bắt buộc thu trước khi phục vụ — áp ở **backend** và web cùng một luật | API + Web | |
-| 5C.9 | Theo Q6: thêm bước xác nhận cho nút Thu tiền đang có (nếu chủ quán chọn) | Web | |
+| 5C.7 | **B3 (phần đơn):** bấm Đang chuẩn bị mà thiếu nguyên liệu → 422 `HET_NGUYEN_LIEU`, không đổi trạng thái, không tồn âm; web hiện danh sách thiếu (đã có khung hiển thị) | API + Web | |
+| 5C.8 | **Q5:** chưa thu tiền thì **không** cho bấm Đã phục vụ (backend 409, web khóa nút + nói lý do, thay hộp hỏi lại hiện tại); đơn **Đã phục vụ không hủy được** (backend 409, web khóa nút Hủy đơn) | API + Web | |
+| 5C.9 | **Q6:** thêm hộp xác nhận trước khi ghi thu tiền ("Xác nhận đã thu X đ bằng …?"); cách xác nhận chuyển khoản theo P3 | Web | |
 | 5C.10 | Đơn không chọn hình thức thanh toán → backend lưu `null` thay vì tự điền `CASH` (hiện không phân biệt được "khách chọn tiền mặt" với "chưa chọn") | API + script SQL | Web đã xử lý hiển thị |
 | 5C.11 | **B12:** lỗi SQL thô không được lộ qua 409 — chỉ dùng câu của `RAISERROR`, lỗi khác trả câu cố định | API | |
 | 5C.12 | **Rà soát code của module:** `DonHangService` (đặt món, sửa, thu, hủy dùng chung đoạn kiểm tra trạng thái → gom một hàm); mỗi component mới ở 5B có tên / tham số rõ; không còn code chết | Web + API | |
@@ -304,9 +321,10 @@ Làm **đúng thứ tự 5A → 5D**.
 | Trạng thái đơn khi hủy | Kho | Tiền |
 |---|---|---|
 | Chưa thu · Chờ | không đổi | không thu |
-| Chưa thu · Đang chuẩn bị / Đã phục vụ | theo Q3 | không thu |
-| Đã thu · Chờ | theo Q4 | đánh dấu hoàn tiền |
-| Đã thu · Đang chuẩn bị / Đã phục vụ | đã tiêu hao | đánh dấu hoàn tiền (nếu Q5 cho hủy) |
+| Chưa thu · Đang chuẩn bị | đã trừ lúc bắt đầu pha (Q3) — không trả | không thu |
+| Đã thu · Chờ | chưa trừ (Q3); đơn trừ theo luật cũ thì trả lại (Q4) | đánh dấu hoàn tiền |
+| Đã thu · Đang chuẩn bị | đã tiêu hao — không trả | đánh dấu hoàn tiền |
+| Đã phục vụ (luôn đã thu theo Q5) | **không hủy được** (Q5) | — |
 
 ---
 
@@ -318,7 +336,7 @@ Làm **đúng thứ tự 5A → 5D**.
 |---|---|---|---|
 | 6.1 | **B5 / Q7:** `bao-cao/doanh-thu` giữ doanh thu gốc ở ngày thu, tiền hoàn tính ở **ngày hoàn**; `soDonHuy` và `soDonHoanTien` cùng một mốc thời gian | API | Sửa cách tính của báo cáo đang có |
 | 6.2 | Thẻ "Doanh thu thuần" và sheet "Tổng hợp" của file Excel tính theo 6.1 (hiện số của ngày cũ tự giảm khi có hoàn tiền về sau) | Web | |
-| 6.3 | **B7 / Q8:** `gio-cao-diem` gom theo đúng mốc chủ quán chọn (sửa trong truy vấn đang có, không thêm tham số) | API | |
+| 6.3 | ~~B7 / Q8: gom giờ cao điểm theo giờ đặt~~ — **không làm**: chủ quán giữ giờ thu tiền (Q8) | — | |
 | 6.4 | Đối soát: script SQL tính doanh thu / số đơn / top món của một ngày mẫu → so với web và file Excel, khớp từng đồng → đưa vào kịch bản khói | Web (script kiểm thử) | |
 | 6.5 | Test tự động: `ReportExporter.Build` (đủ 4 sheet, tổng khớp dữ liệu vào), `XlsxWriter` | Web | |
 | 6.6 | **Rà soát code của module:** bỏ nhánh "máy chủ chưa hỗ trợ báo cáo topping" (`Dashboard.razor.cs`, `ReportExporter`, `Models/BaoCao.cs` — backend đã có route); `Dashboard.razor.cs` (539 dòng) tách phần dựng biểu đồ nếu khó đọc | Web | |
