@@ -14,6 +14,9 @@ public class DonHangService(AppDbContext db)
         .Include(d => d.ChiTiets).ThenInclude(c => c.Toppings)
         .AsSplitQuery();
 
+    /// <summary>Bảng DonHang trơn, không Include — để lọc / đếm / sắp xếp trước khi nạp chi tiết.</summary>
+    public IQueryable<DonHang> DonHangs() => db.DonHangs.AsNoTracking();
+
     public async Task<DonHang> Tim(int id) =>
         await Query().FirstOrDefaultAsync(d => d.MaDonHang == id) ?? throw ApiException.NotFound("Đơn hàng");
 
@@ -196,6 +199,20 @@ public class DonHangService(AppDbContext db)
             .ToListAsync();
         var tienThua = req.TienKhachDua is { } t ? t - daThanhToan.TongTien : 0;
         return new ThanhToanResponse(daThanhToan.ToDto(), tienThua, canhBao);
+    }
+
+    /// <summary>Khách đổi QR ↔ tiền mặt trên tablet (không tạo đơn trùng). Chỉ áp dụng cho đơn còn PENDING.</summary>
+    public async Task<DonHang> DoiPhuongThuc(int id, string phuongThuc)
+    {
+        var don = await db.DonHangs.FindAsync(id) ?? throw ApiException.NotFound("Đơn hàng");
+        if (don.TrangThaiThanhToan != TrangThais.Pending)
+            throw ApiException.Conflict($"Đơn đang ở trạng thái {don.TrangThaiThanhToan}, không đổi được phương thức thanh toán");
+        if (don.PhuongThucThanhToan != phuongThuc)
+        {
+            don.PhuongThucThanhToan = phuongThuc;
+            await db.SaveChangesAsync();
+        }
+        return don;
     }
 
     // ------------------------------------------------------------------ PHỤC VỤ TẠI QUẦY

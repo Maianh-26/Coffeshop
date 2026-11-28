@@ -304,6 +304,27 @@ public class ThanhToanRequest
 public record CanhBaoKhoDto(int MaNguyenLieu, string TenNguyenLieu, decimal SoLuongTon, decimal MucCanhBaoToiThieu, string DonViTinh);
 public record ThanhToanResponse(DonHangDto DonHang, decimal TienThua, IReadOnlyList<CanhBaoKhoDto> CanhBaoKho);
 
+/// <summary>POST /don-hang/{id}/xac-nhan-tien-mat — body không bắt buộc</summary>
+public class XacNhanTienMatRequest
+{
+    /// <summary>Tiền khách đưa để tính tiền thừa (bỏ trống nếu khách đưa vừa đủ)</summary>
+    [Range(0, 1_000_000_000)] public decimal? TienKhachDua { get; set; }
+}
+
+/// <summary>PUT /don-hang/{id}/phuong-thuc-thanh-toan — khách đổi QR ↔ tiền mặt trên tablet khi đơn còn PENDING</summary>
+public class DoiPhuongThucRequest
+{
+    [Required, AllowedValues("CASH", "QR_TRANSFER")] public string PhuongThucThanhToan { get; set; } = "";
+}
+
+/// <summary>GET /don-hang/{id}/trang-thai — thông tin rút gọn, công khai cho tablet hỏi định kỳ</summary>
+public record TrangThaiDonDto(
+    int MaDonHang, string TrangThaiThanhToan, string PhuongThucThanhToan, decimal TongTien, int? SoNhanMon, string TrangThaiPhucVu)
+{
+    public static TrangThaiDonDto Of(Data.DonHang d) =>
+        new(d.MaDonHang, d.TrangThaiThanhToan, d.PhuongThucThanhToan, d.TongTien, d.SoNhanMon, d.TrangThaiPhucVu);
+}
+
 public class HuyDonRequest
 {
     [Required, StringLength(255, MinimumLength = 1)] public string LyDoHuy { get; set; } = "";

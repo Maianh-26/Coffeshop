@@ -1,0 +1,16 @@
+thao_tac	ms_trung_vi	ms_min	ms_max	byte	http
+Danh sách trang 1 (mặc định, mới nhất)	255	170	294	16435	200
+Sắp xếp tổng tiền cao→thấp	249	148	283	22434	200
+Sắp xếp tổng tiền thấp→cao	2917	2796	3116	10575	200
+Sắp xếp mã đơn giảm dần	165	139	194	16435	200
+Trang 25.000 (rất xa)	3296	3033	5159	16459	200
+Lọc hôm nay	10	9	15	16430	200
+Lọc PAID trong 7 ngày	13	11	37	17012	200
+Tìm mã đơn 523456	12979	12554	13333	575	200
+Trang 100 đơn (limit tối đa)	353	298	402	81955	200
+Chi tiết 1 đơn (#523456)	17	5	19	510	200
+Báo cáo doanh thu hôm nay	294	286	318	338	200
+Báo cáo doanh thu cả năm	5280	5188	5443	20738	200
+Món bán chạy cả năm	1851	1692	1878	816	200
+Topping bán chạy cả năm	887	846	944	259	200
+Giờ cao điểm cả năm	567	531	627	1002	200

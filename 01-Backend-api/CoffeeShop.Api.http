@@ -300,6 +300,26 @@ Content-Type: application/json
   "tienKhachDua": 200000
 }
 
+### 8.6a Web admin: xác nhận khách đã trả TIỀN MẶT (body không bắt buộc) → tablet hiện "Đã thanh toán bằng tiền mặt"
+POST {{host}}/don-hang/1/xac-nhan-tien-mat
+Authorization: Bearer {{tokenNV}}
+Content-Type: application/json
+
+{
+  "tienKhachDua": 100000
+}
+
+### 8.6b Tablet hỏi trạng thái đơn (KHÔNG cần token) — PENDING | PAID | CANCELLED + phuongThucThanhToan
+GET {{host}}/don-hang/1/trang-thai
+
+### 8.6c Tablet: khách đổi QR ↔ tiền mặt cho đơn còn PENDING (KHÔNG cần token)
+PUT {{host}}/don-hang/1/phuong-thuc-thanh-toan
+Content-Type: application/json
+
+{
+  "phuongThucThanhToan": "CASH"
+}
+
 ### 8.7 Quản lý hủy đơn (đơn đã PAID → ghi nhận hoàn tiền)
 POST {{host}}/don-hang/2/huy
 Authorization: Bearer {{tokenQL}}
