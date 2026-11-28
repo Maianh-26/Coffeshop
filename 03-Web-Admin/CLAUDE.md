@@ -18,9 +18,9 @@ This repo is one part of a team-built coffee-shop management system. Each part i
 - **Tablet app** (other team): Flutter. Customers pick items and place orders on the tablet.
 - **Web admin** (this repo, our team): Blazor WebAssembly. Owner and staff manage the orders placed from tablets, plus menu, inventory, promotions, accounts and reports.
 
-Core flow: tablet creates order (`POST api/v1/don-hang`, no token) → backend stores it as `PENDING` → web admin sees it (auto-refresh every 10 s), takes payment (`POST api/v1/don-hang/{id}/thanh-toan`, backend deducts stock via `sp_ThanhToanVaTruKho`) or the owner cancels it (`POST api/v1/don-hang/{id}/huy` + reason). Two independent statuses: payment `PENDING`/`PAID`/`CANCELLED` and serving `WAITING` → `PREPARING` → `SERVED` (`PUT don-hang/{id}/trang-thai-phuc-vu`), plus a pickup number 1–50 (`PUT don-hang/{id}/so-nhan-mon`) and order editing (`PUT don-hang/{id}`). The backend sync contract is `docs/hop-dong-api-bo-sung.md` (done by the backend on `main`, folder `01-Backend-api`, 18/11/2026).
+Core flow: tablet creates order (`POST api/v1/don-hang`, no token) → backend stores it as `PENDING` → web admin sees it (the Orders page always auto-refreshes every 3 s — there is deliberately no on/off toggle; SignalR push is planned in `docs/ke-hoach-dong-bo-thoi-gian-thuc.md`), takes payment (`POST api/v1/don-hang/{id}/thanh-toan`, backend deducts stock via `sp_ThanhToanVaTruKho`) or the owner cancels it (`POST api/v1/don-hang/{id}/huy` + reason). Two independent statuses: payment `PENDING`/`PAID`/`CANCELLED` and serving `WAITING` → `PREPARING` → `SERVED` (`PUT don-hang/{id}/trang-thai-phuc-vu`), plus a pickup number 1–50 (`PUT don-hang/{id}/so-nhan-mon`) and order editing (`PUT don-hang/{id}`). Stock is deducted only at payment and cancelling never returns stock, so the cancel dialog explains the stock impact per case; the receipt of an unpaid order prints as "PHIẾU TẠM TÍNH"; a yellow banner lists "đơn treo" (PENDING orders created before today, counted at most every 60 s) with a button that filters them. Backend-side business gaps (stock timing, overselling, refund in reports, time zone…) are proposed in `docs/de-xuat-api-nghiep-vu-kho-bao-cao.md`. The backend sync contract is `docs/hop-dong-api-bo-sung.md` (done by the backend on `main`, folder `01-Backend-api`, 18/11/2026).
 
-We don't write backend code here. The API contract (routes, DTO shapes, auth) is agreed with the backend team: keep `Models/` and `api/...` routes in sync with what they expose, and flag mismatches instead of silently changing them.
+The API contract (routes, DTO shapes, auth) is agreed with the backend team: keep `Models/` and `api/...` routes in sync with what they expose. **Since 28/11/2026 (owner's decision) we may change backend code in `01-Backend-api/`** when a fix needs it, following `docs/ke-hoach-cai-tien-chuc-nang.md` mục 1.4 (backend's own `CLAUDE.md` order: `openapi.yaml` → DTOs → service/controller → `.http`; DB changes = `QuanCaPheDB.sql` + a patch script; backend commits separate from web commits; list backend changes in the PR).
 
 Relevant installed skills: `dotnet-blazor:*` (components, forms, data fetching, auth), `dotnet:csharp-expert`, `dotnet-test:*`, `ui-ux-pro-max` and `frontend-design` (UI/UX).
 
@@ -78,6 +78,16 @@ Follow these when writing code (existing code still violates some — fix them w
 - Put styles in `wwwroot/css/app.css` using the design tokens — not new inline `style="..."`, and not a `.razor.css` (the scoped-CSS bundle isn't linked in `index.html`, so it would have no effect). Bump `app.css?v=N` in `index.html` after editing.
 - Any change to an `api/...` route or DTO shape: flag that the API contract doc / backend team needs updating.
 
+## Kế hoạch cải tiến theo module (từ 28/11/2026)
+
+Mọi việc cải tiến đi theo `docs/ke-hoach-cai-tien-chuc-nang.md` (các quy tắc ở mục 1 và 3 của file đó đã được duyệt — làm theo, không hỏi lại):
+- **Một module một lúc**, theo thứ tự bảng theo dõi (mục 2), xong hết tiêu chí hoàn thành mới mở module sau. Lỗi / ý tưởng ngoài module → "Sổ việc phát sinh"; lỗi sai dữ liệu hoặc chặn việc → dừng hỏi trước khi sửa.
+- **Chỉ sửa / hoàn thiện chức năng đang có, không thêm chức năng mới** (danh sách đã loại ở mục 12). Phân vân → coi là mới, ghi sổ, hỏi chủ quán sau.
+- Cần backend thì **sửa luôn trong `01-Backend-api`** để đồng bộ trong cùng module.
+- Mỗi đầu việc: hiểu đúng yêu cầu (ghi rõ logic đang thiếu / sai và kết quả đúng) → code đơn giản, rõ logic, không code chết / trùng → **build sạch 0 lỗi 0 cảnh báo** cả phía đã chạm → review → **đối chiếu lại yêu cầu bằng kịch bản kiểm thử** → **commit riêng và push** theo mẫu (tiêu đề `<module>(<web|api>): <động từ> <việc cụ thể>`, thân: Mục đích / Thay đổi / Kiểm tra / Mã việc).
+- **Phát sinh vấn đề hoặc buộc phải thêm luồng nghiệp vụ / nút / API / luật mới → dừng và hỏi người dùng, không tự sửa** (mục 1.8 của kế hoạch: nêu vấn đề, ảnh hưởng, 2–3 phương án + đề xuất; ghi vào Sổ việc phát sinh). Trong lúc chờ chỉ làm đầu việc khác cùng module không phụ thuộc.
+- Cập nhật bảng theo dõi khi đổi trạng thái module.
+
 ## Quy trình bắt buộc khi sửa / nâng cấp chức năng (yêu cầu của chủ dự án)
 
 Áp dụng cho **mọi phiên** phát triển dự án này, với mọi thay đổi code hoặc giao diện (trừ sửa chữ / lỗi chính tả rất nhỏ):
@@ -103,7 +113,7 @@ Standing rule (superseded/strengthened by "Quy trình bắt buộc" above): afte
 ## Repo notes
 
 - **Location:** this app lives in the team monorepo https://github.com/Maianh-26/Coffeshop (public) under `03-Web-Admin/`, next to `01-Backend-Blazor/` and `02-Flutter-Tablet/`. Local clone: `C:\dev\Coffeshop` — open `C:\dev\Coffeshop\03-Web-Admin\CoffeeShop.Admin.sln` in Visual Studio and run Claude Code from `C:\dev\Coffeshop\03-Web-Admin`. The old copy in OneDrive (`...\projectTT\CoffeeShop.Admin`) is an archive only — never edit it.
-- **Git workflow:** never push straight to `main`; work on a branch (`web-admin` or `feature/...`), push, open a Pull Request for the team lead. Only touch files under `03-Web-Admin/` — other folders belong to the other teams. Run `git pull` before starting work. Commit/push only when the user asks.
+- **Git workflow:** never push straight to `main`; work directly on `web-admin` (no per-module branches — user's decision 28/11/2026), push, open a Pull Request `web-admin` → `main` for the team lead. Touch only `03-Web-Admin/` and, when a fix needs it, `01-Backend-api/` — never `02-Flutter-Tablet/`. Run `git pull` before starting work. During the improvement plan, **commit and push after each finished task** without asking (push to `web-admin` only — never `main`/`API-HIHI`, no `--force`), using the message format in `docs/ke-hoach-cai-tien-chuc-nang.md` mục 1.6 (no vague titles like "cập nhật", "sửa lỗi", "fix"); open the PR `web-admin` → `main` when the module is closed. Before a new module / backend edits, review new commits on `main`: merge reviewed, non-conflicting ones; hold back and ask about conflicting or problematic ones.
 - The repo is public: never commit secrets, real credentials or private screenshots.
 - `.playwright-mcp/` holds Playwright screenshots/logs — scratch output, don't commit it.
 
