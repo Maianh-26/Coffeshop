@@ -116,6 +116,12 @@
                                 <span class="badge @(item.VaiTro == Roles.Admin ? "yellow" : "green")">
                                     @Roles.Label(item.VaiTro)
                                 </span>
+                                @if (!item.TrangThai)
+                                {
+                                    @* Tài khoản bị khóa từ trước (web không còn nút khóa): vẫn hiện để mở khóa hoặc xóa,
+                                       nếu ẩn thì tên đăng nhập bị chiếm mà không ai tìm thấy để xử lý *@
+                                    <span class="badge gray" title="Không đăng nhập được. Sửa → Trạng thái để mở khóa, hoặc Xóa.">Bị khóa</span>
+                                }
                             </td>
 
                         </tr>
@@ -211,6 +217,17 @@
                         </InputSelect>
                     </div>
 
+                    @if (editingLocked)
+                    {
+                        <div class="field">
+                            <label for="a-status">Trạng thái</label>
+                            <InputSelect id="a-status" @bind-Value="model.TrangThai">
+                                <option value="false">Bị khóa</option>
+                                <option value="true">Hoạt động (mở khóa)</option>
+                            </InputSelect>
+                        </div>
+                    }
+
                     <div class="field">
                         <label for="a-password">@(editing ? "Đặt lại mật khẩu" : "Mật khẩu *")</label>
                         <InputText id="a-password"
@@ -290,6 +307,7 @@
 
     private string dialog = "";
     private bool editing;
+    private bool editingLocked;   // đang sửa tài khoản bị khóa → hiện ô Trạng thái để mở khóa
     private bool loading;
     private bool saving;
     private string? error;
@@ -326,7 +344,8 @@
         : "Chưa có tài khoản.";
 
     /// <summary>
-    /// Tài khoản đã xóa backend không trả về; tài khoản bị khóa (TrangThai = false, web không dùng) cũng ẩn. Tìm không phân biệt dấu theo họ tên, tên đăng nhập, mã.
+    /// Tài khoản đã xóa backend không trả về. Tài khoản bị khóa (TrangThai = false, khóa từ trước — web không còn nút khóa)
+    /// vẫn hiện kèm nhãn "Bị khóa" để chủ quán mở khóa (Sửa → Trạng thái) hoặc xóa. Tìm không phân biệt dấu theo họ tên, tên đăng nhập, mã.
     /// </summary>
     private IEnumerable<NguoiDung> FilteredAccounts
     {
@@ -336,8 +355,7 @@
 
             return sort.Apply(
                 accounts.Where(a =>
-                    a.TrangThai
-                    && (roleFilter == "" || a.VaiTro == roleFilter)
+                    (roleFilter == "" || a.VaiTro == roleFilter)
                     && (term == ""
                         || a.MaNguoiDung.ToString(System.Globalization.CultureInfo.InvariantCulture).Contains(term, StringComparison.Ordinal)
                         || SearchText.Contains(a.HoTen, term)
@@ -433,6 +451,7 @@
     private void Add()
     {
         editing = false;
+        editingLocked = false;
         error = null;
         message = null;
         model = new NguoiDungForm { VaiTro = Roles.Staff, IsNew = true };
@@ -454,6 +473,7 @@
             VaiTro = source.VaiTro,
             TrangThai = source.TrangThai
         };
+        editingLocked = !source.TrangThai;
         dialog = "form";
     }
 
@@ -497,7 +517,9 @@
                 {
                     HoTen = model.HoTen.Trim(),
                     VaiTro = model.VaiTro,
-                    MatKhauMoi = string.IsNullOrEmpty(model.MatKhau) ? null : model.MatKhau
+                    MatKhauMoi = string.IsNullOrEmpty(model.MatKhau) ? null : model.MatKhau,
+                    // Chỉ gửi khi mở khóa tài khoản đang bị khóa (web không khóa tài khoản: dùng Xóa)
+                    TrangThai = editingLocked && model.TrangThai ? true : null
                 }, pageCts.Token);
 
                 message = $"Đã cập nhật tài khoản {saved.HoTen}.";

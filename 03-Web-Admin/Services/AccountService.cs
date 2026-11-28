@@ -4,7 +4,7 @@ namespace CoffeeShop.Admin.Services;
 
 /// <summary>
 /// Quản lý tài khoản (chỉ Quản lý) — api/v1/nguoi-dung. Web không dùng "khóa / mở khóa": chỉ có Xóa
-/// (xem <see cref="DeleteAsync"/>). Tài khoản đã xóa backend không trả về; tài khoản bị khóa (TrangThai = false) web ẩn.
+/// (xem <see cref="DeleteAsync"/>). Tài khoản đã xóa backend không trả về; tài khoản bị khóa (TrangThai = false) hiện nhãn "Bị khóa", Sửa để mở khóa.
 /// </summary>
 public class AccountService
 {
