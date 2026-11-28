@@ -323,7 +323,8 @@
         @if (dialog == "product")
         {
             <EditForm Model="productModel"
-                      OnValidSubmit="SaveProduct">
+                      OnValidSubmit="SaveProduct"
+                      novalidate>
 
                 <DataAnnotationsValidator />
 
@@ -384,6 +385,7 @@
 
                                 <InputNumber @bind-Value="price.GiaBan"
                                              disabled="@(!price.Ban)"
+                                             min="0"
                                              step="1000"
                                              placeholder="Giá (đ)"
                                              aria-label="@($"Giá size {price.MaKichThuoc}")" />
@@ -462,7 +464,8 @@
         @if (dialog == "topping")
         {
             <EditForm Model="toppingModel"
-                      OnValidSubmit="SaveTopping">
+                      OnValidSubmit="SaveTopping"
+                      novalidate>
 
                 <DataAnnotationsValidator />
 
@@ -480,6 +483,7 @@
                         <label for="t-price">Giá thêm (đ) *</label>
                         <InputNumber id="t-price"
                                      @bind-Value="toppingModel.GiaThem"
+                                     min="0"
                                      step="1000" />
                         <ValidationMessage For="@(() => toppingModel.GiaThem)" />
                     </div>
@@ -577,7 +581,7 @@
                                             <option value="0">Chọn nguyên liệu</option>
                                             @foreach (var ingredient in ingredients.Where(i => i.DangSuDung || i.MaNguyenLieu == line.MaNguyenLieu))
                                             {
-                                                <option value="@ingredient.MaNguyenLieu">@ingredient.TenNguyenLieu</option>
+                                                <option value="@ingredient.MaNguyenLieu">@ingredient.TenNguyenLieu@(ingredient.DangSuDung ? "" : " (ngừng sử dụng)")</option>
                                             }
                                         </select>
                                     </td>
@@ -606,6 +610,24 @@
                         </tbody>
                     </table>
                 </div>
+
+                @* Công thức trống: món vẫn bán được (backend coi là đủ nguyên liệu) nhưng thu tiền KHÔNG trừ kho gì *@
+                @if (error is null && !recipe.Any(r => r.MaNguyenLieu > 0))
+                {
+                    <p class="alert yellow" role="status">
+                        @(ToppingTab ? "Topping" : "Món – size") này <strong>chưa có định mức</strong>: vẫn bán được nhưng khi thu tiền
+                        sẽ <strong>không trừ kho</strong>. Thêm nguyên liệu để tồn kho đúng thực tế.
+                    </p>
+                }
+
+                @* Nguyên liệu đã ngừng sử dụng vẫn bị trừ kho theo công thức → nhắc thay bằng nguyên liệu đang dùng *@
+                @if (StoppedInRecipe is { Count: > 0 } stopped)
+                {
+                    <p class="alert yellow" role="status">
+                        Công thức đang dùng nguyên liệu đã <strong>ngừng sử dụng</strong>: @string.Join(", ", stopped).
+                        Kho vẫn bị trừ theo các dòng này — hãy thay bằng nguyên liệu đang dùng hoặc bỏ dòng.
+                    </p>
+                }
 
                 <button type="button" class="btn outline" @onclick="() => recipe.Add(new())">
                     <Icon Name="plus" Size="16" />

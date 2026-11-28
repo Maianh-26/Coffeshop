@@ -635,6 +635,14 @@ public partial class Products : IDisposable
             : products.OrderBy(p => p.TenMon)
                 .SelectMany(p => p.KichThuoc.Select(s => (s.MaChiTietMon, $"{p.TenMon} – {s.TenKichThuoc}{(s.DangApDung ? "" : " (đã tắt)")}")));
 
+    /// <summary>Tên các nguyên liệu đã ngừng sử dụng đang nằm trong công thức đang mở.</summary>
+    private List<string> StoppedInRecipe =>
+        recipe.Select(r => ingredients.FirstOrDefault(i => i.MaNguyenLieu == r.MaNguyenLieu))
+            .Where(i => i is { DangSuDung: false })
+            .Select(i => i!.TenNguyenLieu)
+            .Distinct()
+            .ToList();
+
     private async Task OpenRecipe()
     {
         Prepare();
@@ -646,6 +654,8 @@ public partial class Products : IDisposable
                       ?? 0;
 
         dialog = "recipe";
+        // Bật cờ đang tải ngay: trong lúc chờ danh sách nguyên liệu không được hiện nhầm "chưa có định mức"
+        recipeLoading = true;
 
         try
         {
@@ -656,6 +666,7 @@ public partial class Products : IDisposable
         catch (ApiException ex)
         {
             error = ex.Message;
+            recipeLoading = false;
             return;
         }
 
